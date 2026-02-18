@@ -1,197 +1,245 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <title>Hive Resources — Models</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
 
-  <!-- model-viewer -->
   <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 
   <style>
-    :root {
-      --bg: #0e0e11;
-      --card: #1a1a20;
-      --muted: #9aa0a6;
-      --accent: #5fd35f;
-      --text: #ffffff;
+    :root{
+      --bg:#070a0f; --card:#0f1420; --muted:#9aa6b2; --text:#fff;
+      --accent:#5fd35f; --pill:#151c2a; --pillOn:#1e2a1e;
+      --line:rgba(255,255,255,.08);
     }
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--text)}
+    .wrap{max-width:1200px;margin:0 auto;padding:20px}
+    h1{margin:0 0 14px 0;font-size:34px}
+    .topbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0 18px}
+    .pill{padding:8px 12px;border-radius:999px;background:var(--pill);border:1px solid var(--line);cursor:pointer;color:var(--muted);user-select:none}
+    .pill.on{background:var(--pillOn);color:#c8ffd0;border-color:rgba(95,211,95,.35)}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0 18px}
+    input{background:#0b1020;border:1px solid var(--line);border-radius:12px;padding:10px 12px;color:var(--text);min-width:260px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden;cursor:pointer}
+    .mvbox{height:160px;background:#0b1020}
+    model-viewer{width:100%;height:100%;background:#0b1020}
+    .meta{padding:12px}
+    .name{font-weight:700;margin-bottom:8px}
+    .tag{display:inline-flex;gap:6px;align-items:center;padding:4px 10px;border-radius:999px;background:rgba(95,211,95,.12);border:1px solid rgba(95,211,95,.25);color:#bfffc6;font-size:12px}
 
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-    }
+    .status{color:var(--muted);padding:20px 0}
 
-    header {
-      padding: 20px;
-      border-bottom: 1px solid #222;
-    }
-
-    h1 {
-      margin: 0;
-      font-size: 22px;
-    }
-
-    .pills {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      padding: 16px;
-    }
-
-    .pill {
-      padding: 6px 12px;
-      border-radius: 999px;
-      background: #222;
-      cursor: pointer;
-      font-size: 13px;
-      color: var(--muted);
-    }
-
-    .pill.active {
-      background: var(--accent);
-      color: #000;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 16px;
-      padding: 16px;
-    }
-
-    .card {
-      background: var(--card);
-      border-radius: 10px;
-      overflow: hidden;
-      cursor: pointer;
-      transition: transform 0.15s ease;
-    }
-
-    .card:hover {
-      transform: translateY(-2px);
-    }
-
-    model-viewer {
-      width: 100%;
-      height: 200px;
-      background: #111;
-    }
-
-    .meta {
-      padding: 10px;
-    }
-
-    .name {
-      font-size: 14px;
-      font-weight: 600;
-    }
-
-    .badge {
-      display: inline-block;
-      margin-top: 6px;
-      font-size: 11px;
-      color: #000;
-      background: var(--accent);
-      padding: 2px 6px;
-      border-radius: 6px;
-    }
-
-    .loading {
-      padding: 40px;
-      text-align: center;
-      color: var(--muted);
-    }
+    /* modal */
+    .modalBack{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;padding:18px}
+    .modalBack.on{display:flex}
+    .modal{width:min(1100px,96vw);background:#0b1020;border:1px solid var(--line);border-radius:18px;overflow:hidden}
+    .modalTop{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line)}
+    .btn{background:#111a2a;border:1px solid var(--line);color:var(--text);padding:8px 10px;border-radius:12px;cursor:pointer}
+    .modalBody{height:min(70vh,720px)}
+    .modalBody model-viewer{height:100%;width:100%}
   </style>
 </head>
+
 <body>
+  <div class="wrap">
+    <h1>Hive Models</h1>
 
-<header>
-  <h1>Hive Models</h1>
-</header>
+    <div class="topbar" id="gamesBar"></div>
 
-<div class="pills" id="pills"></div>
-<div class="grid" id="grid">
-  <div class="loading">Loading models…</div>
-</div>
+    <div class="row">
+      <input id="q" placeholder="Search models…" />
+      <div class="topbar" id="groupsBar" style="margin:0"></div>
+    </div>
+
+    <div class="status" id="status">Loading…</div>
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <!-- modal -->
+  <div class="modalBack" id="modalBack">
+    <div class="modal">
+      <div class="modalTop">
+        <div id="modalTitle" style="font-weight:800"></div>
+        <div style="display:flex;gap:10px">
+          <a class="btn" id="modalDownload" target="_blank" rel="noopener">Download</a>
+          <button class="btn" id="modalClose">Close</button>
+        </div>
+      </div>
+      <div class="modalBody">
+        <model-viewer id="modalMV"
+          camera-controls
+          auto-rotate
+          shadow-intensity="1"
+          exposure="1.1"
+          loading="eager"
+          crossorigin="anonymous">
+        </model-viewer>
+      </div>
+    </div>
+  </div>
 
 <script>
-  const API_URL =
-    "https://script.google.com/macros/s/AKfycbxwo50cJWxjW95aoG1QeoxBRlUAIVrYPc3VHuaDUw2Vkst-2k05fltz8s__nIku7JL7lQ/exec";
+  const API_LIST = "/api/models?list=1";
+  const API_GAME = (game) => `/api/models?game=${encodeURIComponent(game || "")}`;
+  const FILE = (id) => `/api/file?id=${encodeURIComponent(id)}`;
 
-  let DATA = null;
-  let CURRENT_GROUP = null;
-  const PAGE_SIZE = 24;
-
-  const pills = document.getElementById("pills");
+  const gamesBar = document.getElementById("gamesBar");
+  const groupsBar = document.getElementById("groupsBar");
   const grid = document.getElementById("grid");
+  const statusEl = document.getElementById("status");
+  const q = document.getElementById("q");
 
-  fetch(API_URL)
-    .then(r => {
-      if (!r.ok) throw new Error("API error " + r.status);
-      return r.json();
-    })
-    .then(json => {
-      DATA = json;
-      CURRENT_GROUP = DATA.groups[0];
-      renderPills();
-      renderGrid();
-    })
-    .catch(err => {
-      console.error(err);
-      grid.innerHTML = `
-        <div class="loading">
-          Failed to load models.<br>
-          Check console for details.
-        </div>`;
-    });
+  const modalBack = document.getElementById("modalBack");
+  const modalClose = document.getElementById("modalClose");
+  const modalTitle = document.getElementById("modalTitle");
+  const modalMV = document.getElementById("modalMV");
+  const modalDownload = document.getElementById("modalDownload");
 
-  function renderPills() {
-    pills.innerHTML = "";
-    DATA.groups.forEach(g => {
-      const p = document.createElement("div");
-      p.className = "pill" + (g === CURRENT_GROUP ? " active" : "");
-      p.textContent = g.label;
-      p.onclick = () => {
-        CURRENT_GROUP = g;
-        renderPills();
-        renderGrid();
+  let data = null;
+  let activeGroup = "all";
+  let activeGame = new URL(location.href).searchParams.get("game") || "";
+
+  // ---- modal
+  function openModal(item){
+    modalTitle.textContent = item.name;
+    modalMV.src = FILE(item.modelId);
+    modalDownload.href = FILE(item.modelId);
+    modalBack.classList.add("on");
+  }
+  function closeModal(){
+    modalBack.classList.remove("on");
+    modalMV.src = "";
+  }
+  modalClose.onclick = closeModal;
+  modalBack.onclick = (e)=>{ if(e.target===modalBack) closeModal(); };
+
+  // ---- UI: games
+  async function loadGames(){
+    const res = await fetch(API_LIST);
+    const j = await res.json();
+
+    gamesBar.innerHTML = "";
+    j.games.forEach(g=>{
+      const b = document.createElement("div");
+      b.className = "pill" + (g.key === activeGame ? " on" : "");
+      b.textContent = g.name;
+      b.onclick = ()=>{
+        const u = new URL(location.href);
+        u.searchParams.set("game", g.key);
+        location.href = u.toString();
       };
-      pills.appendChild(p);
+      gamesBar.appendChild(b);
+    });
+
+    // default if none
+    if(!activeGame && j.games.length){
+      const u = new URL(location.href);
+      u.searchParams.set("game", j.games[0].key);
+      location.href = u.toString();
+    }
+  }
+
+  // ---- UI: groups
+  function renderGroups(){
+    groupsBar.innerHTML = "";
+    data.groups.forEach(g=>{
+      const b = document.createElement("div");
+      b.className = "pill" + (g.key === activeGroup ? " on" : "");
+      b.textContent = g.label;
+      b.onclick = ()=>{ activeGroup = g.key; render(); };
+      groupsBar.appendChild(b);
     });
   }
 
-  function renderGrid() {
-    grid.innerHTML = "";
-    CURRENT_GROUP.items
-      .slice(0, PAGE_SIZE)
-      .forEach(item => {
-        const card = document.createElement("div");
-        card.className = "card";
-        card.onclick = () => window.open(item.downloadUrl, "_blank");
+  // ---- cards (lazy-load model preview)
+  function cardEl(item){
+    const c = document.createElement("div");
+    c.className = "card";
 
-        card.innerHTML = `
-          <model-viewer
-            src="${item.modelUrl}"
-            camera-controls
-            auto-rotate
-            shadow-intensity="1">
-          </model-viewer>
+    const mvbox = document.createElement("div");
+    mvbox.className = "mvbox";
 
-          <div class="meta">
-            <div class="name">${item.name}</div>
-            ${item.folderLabel ? `<div class="badge">${item.folderLabel}</div>` : ""}
-          </div>
-        `;
+    // We'll set src later when visible (IntersectionObserver)
+    const mv = document.createElement("model-viewer");
+    mv.setAttribute("loading", "lazy");
+    mv.setAttribute("reveal", "interaction"); // doesn’t auto-spin until interacted
+    mv.setAttribute("camera-controls", "");
+    mv.setAttribute("disable-pan", "");
+    mv.setAttribute("interaction-prompt", "none");
+    mv.setAttribute("shadow-intensity", "0.8");
+    mv.setAttribute("exposure", "1.1");
+    mv.setAttribute("crossorigin", "anonymous");
 
-        grid.appendChild(card);
-      });
+    mvbox.appendChild(mv);
+
+    const meta = document.createElement("div");
+    meta.className = "meta";
+
+    const name = document.createElement("div");
+    name.className = "name";
+    name.textContent = item.name;
+
+    const tag = document.createElement("div");
+    tag.className = "tag";
+    tag.textContent = (item.folderLabel || "model");
+
+    meta.appendChild(name);
+    meta.appendChild(tag);
+
+    c.appendChild(mvbox);
+    c.appendChild(meta);
+
+    c.onclick = ()=>openModal(item);
+
+    // lazy-load only when card enters viewport
+    io.observe(mv);
+    mv._modelId = item.modelId;
+
+    return c;
   }
-</script>
 
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{
+      if(!e.isIntersecting) return;
+      const mv = e.target;
+      if(mv.src) return;
+      mv.src = FILE(mv._modelId);
+      io.unobserve(mv);
+    });
+  }, { rootMargin: "250px" });
+
+  function getActiveItems(){
+    const g = data.groups.find(x=>x.key===activeGroup) || data.groups[0];
+    const term = (q.value||"").trim().toLowerCase();
+    let items = g.items || [];
+    if(term) items = items.filter(i=> (i.name||"").toLowerCase().includes(term));
+    return items;
+  }
+
+  function render(){
+    grid.innerHTML = "";
+    const items = getActiveItems();
+    statusEl.textContent = items.length ? "" : "No matches.";
+    items.forEach(i=>grid.appendChild(cardEl(i)));
+  }
+
+  async function loadGame(){
+    statusEl.textContent = "Loading…";
+    const res = await fetch(API_GAME(activeGame));
+    data = await res.json();
+    activeGroup = "all";
+    renderGroups();
+    render();
+  }
+
+  q.addEventListener("input", ()=>render());
+
+  (async ()=>{
+    await loadGames();
+    await loadGame();
+  })();
+</script>
 </body>
 </html>
-
-
