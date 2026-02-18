@@ -1,186 +1,678 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<title>Hive Models</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Hive Resources — Models</title>
 
-<script type="module"
-  src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js">
-</script>
+  <!-- Model Viewer -->
+  <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 
-<style>
-:root {
-  --bg: #0b0e14;
-  --card: #121826;
-  --text: #e5e7eb;
-  --muted: #9aa4b2;
-  --accent: #22c55e;
-}
+  <!-- Minecraft font (Option A) -->
+  <link href="https://fonts.cdnfonts.com/css/minecraftia" rel="stylesheet">
 
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: system-ui, sans-serif;
-}
+  <style>
+    :root{
+      --bg:#070b12;
+      --panel:#0b1220;
+      --panel2:#0a1428;
+      --card:#0b1730;
+      --stroke:#14234a;
+      --stroke2:#1c3268;
+      --text:#eaf2ff;
+      --muted:#9bb0d6;
+      --accent:#00aaff; /* Sparkskye blue */
+      --accent2:#1b6cff;
+      --good:#22c55e;
+      --shadow: 0 16px 50px rgba(0,0,0,.55);
 
-header {
-  padding: 24px;
-  font-size: 28px;
-  font-weight: 700;
-}
+      --radius: 18px;
+      --radius2: 24px;
 
-.controls {
-  display: flex;
-  gap: 12px;
-  padding: 0 24px 16px;
-  flex-wrap: wrap;
-}
+      --px: 2px; /* "pixel-ish" border thickness */
+      --bevel: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,0));
+    }
 
-.controls a {
-  color: var(--muted);
-  text-decoration: none;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: #0f1629;
-}
+    html,body{
+      margin:0;
+      background: radial-gradient(1200px 700px at 25% 0%, rgba(0,170,255,.12), transparent 55%),
+                  radial-gradient(900px 600px at 75% 25%, rgba(27,108,255,.10), transparent 60%),
+                  var(--bg);
+      color:var(--text);
+      font-family: "Minecraftia", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      letter-spacing:.2px;
+    }
 
-.controls a.active {
-  color: #000;
-  background: var(--accent);
-}
+    .wrap{
+      max-width: 1320px;
+      margin: 42px auto 80px;
+      padding: 0 22px;
+    }
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 16px;
-  padding: 24px;
-}
+    .topbar{
+      display:flex;
+      align-items:flex-end;
+      justify-content:space-between;
+      gap:16px;
+      margin-bottom: 18px;
+    }
 
-.card {
-  background: var(--card);
-  border-radius: 14px;
-  padding: 12px;
-  cursor: pointer;
-}
+    .titleblock h1{
+      margin:0;
+      font-size: 44px;
+      line-height:1.05;
+      letter-spacing: 1px;
+      text-shadow: 0 10px 30px rgba(0,0,0,.55);
+    }
+    .titleblock .sub{
+      margin-top:10px;
+      color:var(--muted);
+      font-size: 13px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    }
 
-.card-name {
-  margin-top: 8px;
-  font-weight: 600;
-}
+    .panel{
+      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,0)),
+                  linear-gradient(180deg, rgba(0,170,255,.06), rgba(0,170,255,0)),
+                  var(--panel);
+      border: var(--px) solid var(--stroke);
+      border-radius: var(--radius2);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
 
-.card-tag {
-  font-size: 12px;
-  color: var(--muted);
-}
+    .panel-inner{
+      padding: 18px;
+    }
 
-model-viewer {
-  width: 100%;
-  height: 160px;
-  background: #0f172a;
-  border-radius: 10px;
-}
+    .row{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+    }
 
-/* MODAL */
-.modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,.75);
-  display: none;
-  align-items: center;
-  justify-content: center;
-}
+    .pill{
+      appearance:none;
+      border: var(--px) solid var(--stroke2);
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,0)),
+                  rgba(8, 18, 40, .72);
+      color:var(--text);
+      padding: 10px 12px;
+      border-radius: 999px;
+      cursor:pointer;
+      font-size: 12px;
+      transition: transform .08s ease, filter .15s ease, border-color .15s ease;
+      user-select:none;
+    }
+    .pill:hover{ filter: brightness(1.08); transform: translateY(-1px); }
+    .pill.active{
+      border-color: rgba(0,170,255,.95);
+      box-shadow: 0 0 0 2px rgba(0,170,255,.16);
+    }
 
-.modal.open { display: flex; }
+    .searchbox{
+      flex:1;
+      min-width: 240px;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: var(--px) solid var(--stroke2);
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,0)),
+                  rgba(6, 14, 32, .66);
+    }
+    .searchbox input{
+      width:100%;
+      border:0;
+      outline:none;
+      background:transparent;
+      color:var(--text);
+      font-size: 13px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    }
+    .searchbox .hint{
+      color:var(--muted);
+      font-size: 12px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      white-space:nowrap;
+    }
 
-.modal-content {
-  width: min(90vw, 900px);
-  height: min(90vh, 700px);
-  background: #020617;
-  border-radius: 16px;
-  padding: 16px;
-}
+    .grid{
+      margin-top: 16px;
+      display:grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+    @media (max-width: 1100px){ .grid{ grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 780px){ .grid{ grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 520px){ .grid{ grid-template-columns: 1fr; } }
 
-.modal model-viewer {
-  height: 100%;
-}
-</style>
+    .card{
+      position:relative;
+      background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,0)),
+                  radial-gradient(600px 240px at 10% 0%, rgba(0,170,255,.08), transparent 55%),
+                  var(--card);
+      border: var(--px) solid var(--stroke);
+      border-radius: var(--radius);
+      overflow:hidden;
+      cursor:pointer;
+      box-shadow: 0 10px 28px rgba(0,0,0,.35);
+      transition: transform .08s ease, filter .15s ease, border-color .15s ease;
+      min-height: 220px;
+      display:flex;
+      flex-direction:column;
+    }
+    .card:hover{
+      transform: translateY(-2px);
+      filter: brightness(1.05);
+      border-color: rgba(0,170,255,.35);
+    }
+
+    .thumb{
+      height: 150px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background: linear-gradient(180deg, rgba(0,0,0,.1), rgba(0,0,0,.35));
+    }
+    .thumb img{
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      image-rendering: pixelated;
+      filter: drop-shadow(0 12px 22px rgba(0,0,0,.4));
+    }
+    .thumb .fallback{
+      width: 76px;
+      height: 76px;
+      border-radius: 16px;
+      border: var(--px) solid rgba(0,170,255,.3);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color: rgba(234,242,255,.9);
+      background: rgba(0,170,255,.08);
+      box-shadow: 0 14px 30px rgba(0,0,0,.35);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      font-weight: 700;
+    }
+
+    .card-body{
+      padding: 12px 12px 14px;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      flex:1;
+    }
+
+    .name{
+      font-size: 14px;
+      line-height: 1.15;
+      margin:0;
+      color: var(--text);
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .name:hover{
+      text-decoration: underline;
+      text-decoration-color: rgba(0,170,255,.65);
+    }
+
+    .meta{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin-top:auto;
+    }
+
+    .tag{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: var(--px) solid rgba(20,35,74,.9);
+      background: rgba(8, 16, 36, .72);
+      color: var(--muted);
+      font-size: 11px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      white-space:nowrap;
+      max-width: 75%;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    .ext{
+      font-size: 11px;
+      color: rgba(0,170,255,.95);
+      border: var(--px) solid rgba(0,170,255,.3);
+      background: rgba(0,170,255,.08);
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      white-space:nowrap;
+    }
+
+    .status{
+      margin-top: 10px;
+      color: var(--muted);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      font-size: 13px;
+    }
+
+    /* ===== Modal ===== */
+    .modal{
+      position:fixed;
+      inset:0;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index: 9999;
+      background: rgba(0,0,0,.55);
+      backdrop-filter: blur(6px);
+      padding: 22px;
+    }
+    .modal.open{ display:flex; }
+
+    .modal-card{
+      width:min(1100px, 100%);
+      border-radius: 28px;
+      border: var(--px) solid rgba(0,170,255,.35);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,0)),
+        radial-gradient(900px 450px at 15% 0%, rgba(0,170,255,.10), transparent 60%),
+        var(--panel2);
+      box-shadow: 0 40px 120px rgba(0,0,0,.75);
+      overflow:hidden;
+      position:relative;
+    }
+
+    .modal-close{
+      position:absolute;
+      top: 14px;
+      right: 14px;
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      border: var(--px) solid rgba(0,170,255,.35);
+      background: rgba(0,170,255,.10);
+      color: var(--text);
+      cursor:pointer;
+      font-size: 22px;
+      line-height: 1;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .modal-close:hover{ filter: brightness(1.1); }
+
+    .viewer{
+      height: 560px;
+      background: transparent;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding: 12px;
+    }
+    model-viewer{
+      width: 100%;
+      height: 100%;
+      background-color: transparent !important;
+      --poster-color: transparent;
+      --progress-bar-color: var(--accent);
+      --progress-bar-height: 6px;
+    }
+
+    .modal-footer{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 14px;
+      padding: 14px 16px 16px;
+      border-top: var(--px) solid rgba(20,35,74,.9);
+      background: rgba(0,0,0,.18);
+    }
+    .modal-title{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      min-width: 0;
+    }
+    .modal-title .n{
+      font-size: 16px;
+      margin:0;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .modal-title .p{
+      font-size: 12px;
+      color: var(--muted);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    .btn{
+      border: var(--px) solid rgba(0,170,255,.35);
+      background: linear-gradient(180deg, rgba(0,170,255,.22), rgba(0,170,255,.06));
+      color: var(--text);
+      padding: 10px 14px;
+      border-radius: 14px;
+      cursor:pointer;
+      font-size: 12px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      white-space:nowrap;
+    }
+    .btn:hover{ filter: brightness(1.1); }
+  </style>
 </head>
 
 <body>
-<header>Hive Models</header>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="titleblock">
+        <h1>Hive Models</h1>
+        <div class="sub">Dynamic + fast: data from Google Drive, served through your Worker, rendered like a real asset browser.</div>
+      </div>
+    </div>
 
-<div class="controls" id="games"></div>
-<div class="grid" id="grid"></div>
+    <div class="panel">
+      <div class="panel-inner">
+        <div class="row" id="gameRow"></div>
+        <div style="height:12px"></div>
+        <div class="row">
+          <div class="searchbox" style="max-width:520px">
+            <input id="search" placeholder="search models..." autocomplete="off" />
+            <div class="hint" id="countHint">—</div>
+          </div>
+        </div>
+        <div style="height:12px"></div>
+        <div class="row" id="groupRow"></div>
+        <div class="status" id="status">Loading…</div>
+      </div>
+    </div>
 
-<div class="modal" id="modal" onclick="closeModal(event)">
-  <div class="modal-content">
-    <model-viewer id="viewer"
-      camera-controls
-      auto-rotate
-      shadow-intensity="1">
-    </model-viewer>
+    <div class="grid" id="grid"></div>
   </div>
-</div>
 
-<script>
-const API_BASE = "/api/models";
-const FILE_PROXY = "/api/file";
+  <!-- Modal -->
+  <div class="modal" id="modal">
+    <div class="modal-card">
+      <button class="modal-close" id="modalClose" aria-label="Close">×</button>
+      <div class="viewer">
+        <model-viewer
+          id="viewer"
+          camera-controls
+          touch-action="pan-y"
+          exposure="1"
+          shadow-intensity="0.8"
+          environment-image="neutral"
+          loading="lazy"
+          reveal="auto">
+        </model-viewer>
+      </div>
+      <div class="modal-footer">
+        <div class="modal-title">
+          <p class="n" id="modalName">—</p>
+          <p class="p" id="modalPath">—</p>
+        </div>
+        <button class="btn" id="modalDownload">Download</button>
+      </div>
+    </div>
+  </div>
 
-const params = new URLSearchParams(location.search);
-const game = params.get("game") || "bedwars";
+  <script>
+    // ===== CONFIG =====
+    const WORKER_BASE = "https://delicate-bush-cf6f.sparkskye-minecraft.workers.dev";
+    const API_MODELS = `${WORKER_BASE}/api/models`;
+    const API_FILE   = `${WORKER_BASE}/api/file`;
 
-const grid = document.getElementById("grid");
-const modal = document.getElementById("modal");
-const viewer = document.getElementById("viewer");
+    // ===== STATE =====
+    let games = [];
+    let currentGame = null;
+    let groups = [];
+    let itemsAll = [];      // all items for current game
+    let groupKey = "all";
+    let searchQ = "";
 
-/* ---------- LOAD MODELS ---------- */
-(async () => {
-  const res = await fetch(`${API_BASE}?game=${game}`);
-  const data = await res.json();
+    const el = (id) => document.getElementById(id);
+    const gameRow = el("gameRow");
+    const groupRow = el("groupRow");
+    const grid = el("grid");
+    const status = el("status");
+    const search = el("search");
+    const countHint = el("countHint");
 
-  renderGames(data.game.key);
-  renderItems(data.groups[0].items);
-})();
+    const modal = el("modal");
+    const modalClose = el("modalClose");
+    const viewer = el("viewer");
+    const modalName = el("modalName");
+    const modalPath = el("modalPath");
+    const modalDownload = el("modalDownload");
 
-/* ---------- UI ---------- */
-function renderGames(active) {
-  const games = ["bedwars", "skywars", "murder", "survival"]; // add freely
-  const el = document.getElementById("games");
-  el.innerHTML = games.map(g =>
-    `<a href="?game=${g}" class="${g===active?"active":""}">${g}</a>`
-  ).join("");
-}
+    // ===== URL PARAMS =====
+    function getParam(name){
+      const u = new URL(location.href);
+      return u.searchParams.get(name);
+    }
+    function setParam(name, val){
+      const u = new URL(location.href);
+      if (val == null) u.searchParams.delete(name);
+      else u.searchParams.set(name, val);
+      history.replaceState({}, "", u.toString());
+    }
 
-function renderItems(items) {
-  grid.innerHTML = "";
-  items.forEach(item => {
-    const src = `${FILE_PROXY}?id=${item.modelId}`;
-    const card = document.createElement("div");
-    card.className = "card";
-    card.innerHTML = `
-      <model-viewer src="${src}" disable-zoom></model-viewer>
-      <div class="card-name">${item.name}</div>
-      <div class="card-tag">${item.folderLabel}</div>
-    `;
-    card.onclick = () => openModal(src);
-    grid.appendChild(card);
-  });
-}
+    // ===== API =====
+    async function fetchJSON(url){
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    }
 
-/* ---------- MODAL ---------- */
-function openModal(src) {
-  viewer.src = src;
-  modal.classList.add("open");
-}
+    async function loadGames(){
+      // provided by Apps Script via Worker: /api/models?list=1
+      const data = await fetchJSON(`${API_MODELS}?list=1`);
+      games = (data.games || []).slice().sort((a,b)=>a.name.localeCompare(b.name));
+    }
 
-function closeModal(e) {
-  if (e.target === modal) {
-    modal.classList.remove("open");
-    viewer.src = "";
-  }
-}
-</script>
+    async function loadGame(gameKey){
+      status.textContent = "Loading…";
+      grid.innerHTML = "";
+      groupRow.innerHTML = "";
+      itemsAll = [];
+      groups = [];
+
+      const data = await fetchJSON(`${API_MODELS}?game=${encodeURIComponent(gameKey)}`);
+      currentGame = data.game?.key || gameKey;
+      groups = data.groups || [];
+      itemsAll = (groups.find(g=>g.key==="all")?.items) ? groups.find(g=>g.key==="all").items : [];
+
+      // Default group = all
+      groupKey = getParam("group") || "all";
+      if (!groups.some(g=>g.key===groupKey)) groupKey = "all";
+
+      renderGroups();
+      render();
+      status.textContent = "";
+    }
+
+    // ===== RENDER =====
+    function renderGames(){
+      gameRow.innerHTML = "";
+      for (const g of games){
+        const b = document.createElement("button");
+        b.className = "pill" + (g.key === currentGame ? " active" : "");
+        b.textContent = g.name.toLowerCase();
+        b.onclick = () => {
+          setParam("game", g.key);
+          setParam("group", "all");
+          location.reload(); // simplest + reliable
+        };
+        gameRow.appendChild(b);
+      }
+    }
+
+    function renderGroups(){
+      groupRow.innerHTML = "";
+      for (const g of groups){
+        const b = document.createElement("button");
+        b.className = "pill" + (g.key === groupKey ? " active" : "");
+        b.textContent = g.label;
+        b.onclick = () => {
+          groupKey = g.key;
+          setParam("group", groupKey);
+          render();
+        };
+        groupRow.appendChild(b);
+      }
+    }
+
+    function matchesSearch(item){
+      if (!searchQ) return true;
+      const q = searchQ.toLowerCase();
+      const hay = `${item.name} ${item.path || ""}`.toLowerCase();
+      return hay.includes(q);
+    }
+
+    function getVisibleItems(){
+      const group = groups.find(g=>g.key===groupKey) || groups.find(g=>g.key==="all");
+      const items = (group?.items || []);
+      return items.filter(matchesSearch);
+    }
+
+    function render(){
+      const items = getVisibleItems();
+      countHint.textContent = `${items.length} shown`;
+      grid.innerHTML = "";
+
+      for (const item of items){
+        const card = document.createElement("div");
+        card.className = "card";
+        card.onclick = () => openModal(item);
+
+        const thumb = document.createElement("div");
+        thumb.className = "thumb";
+
+        if (item.thumbUrl){
+          const img = document.createElement("img");
+          img.loading = "lazy";
+          img.decoding = "async";
+          img.src = item.thumbUrl;
+          img.alt = item.name;
+          thumb.appendChild(img);
+        } else {
+          const fb = document.createElement("div");
+          fb.className = "fallback";
+          fb.textContent = "3D";
+          thumb.appendChild(fb);
+        }
+
+        const body = document.createElement("div");
+        body.className = "card-body";
+
+        // Clicking *name* downloads (and does NOT open modal)
+        const name = document.createElement("a");
+        name.className = "name";
+        name.textContent = item.name;
+        name.href = fileUrl(item.modelId);
+        name.download = "";
+        name.onclick = (e) => e.stopPropagation();
+
+        const meta = document.createElement("div");
+        meta.className = "meta";
+
+        const tag = document.createElement("div");
+        tag.className = "tag";
+        tag.title = item.path || "";
+        tag.textContent = (item.path || "").replace(/\//g, " \\ ");
+
+        const ext = document.createElement("div");
+        ext.className = "ext";
+        ext.textContent = `.${item.ext || "gltf"}`;
+
+        meta.appendChild(tag);
+        meta.appendChild(ext);
+
+        body.appendChild(name);
+        body.appendChild(meta);
+
+        card.appendChild(thumb);
+        card.appendChild(body);
+
+        grid.appendChild(card);
+      }
+    }
+
+    // ===== DOWNLOAD / VIEW =====
+    function fileUrl(id){
+      return `${API_FILE}?id=${encodeURIComponent(id)}`;
+    }
+
+    function openModal(item){
+      modal.classList.add("open");
+      modalName.textContent = item.name;
+      modalPath.textContent = (item.path || "").replace(/\//g, " \\ ");
+
+      // Rotate 180deg so it's not "from behind"
+      // model-viewer supports orientation in degrees
+      viewer.orientation = "0deg 180deg 0deg";
+
+      // Transparent-ish background in viewer
+      viewer.style.backgroundColor = "transparent";
+
+      // Set the src via Worker proxy (CORS safe)
+      viewer.src = fileUrl(item.modelId);
+
+      modalDownload.textContent = `Download .${item.ext || "gltf"}`;
+      modalDownload.onclick = () => {
+        window.open(fileUrl(item.modelId), "_blank");
+      };
+    }
+
+    function closeModal(){
+      modal.classList.remove("open");
+      // Stop GPU work
+      viewer.src = "";
+    }
+
+    modalClose.onclick = closeModal;
+    modal.onclick = (e) => {
+      if (e.target === modal) closeModal();
+    };
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeModal();
+    });
+
+    // ===== Search =====
+    search.addEventListener("input", () => {
+      searchQ = search.value.trim();
+      render();
+    });
+
+    // ===== Boot =====
+    (async () => {
+      try{
+        await loadGames();
+
+        // Pick game
+        const fromURL = getParam("game");
+        const fallback = games[0]?.key || "bedwars";
+        currentGame = (fromURL && games.some(g=>g.key===fromURL)) ? fromURL : fallback;
+        setParam("game", currentGame);
+
+        renderGames();
+        await loadGame(currentGame);
+
+      } catch (err){
+        console.error(err);
+        status.textContent = `Failed to load: ${err.message}`;
+      }
+    })();
+  </script>
 </body>
 </html>
