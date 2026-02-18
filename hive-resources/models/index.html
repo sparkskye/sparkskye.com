@@ -1,186 +1,54 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-type="models">
 <head>
-<meta charset="UTF-8" />
-<title>Hive Models</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-
-<script type="module"
-  src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js">
-</script>
-
-<style>
-:root {
-  --bg: #0b0e14;
-  --card: #121826;
-  --text: #e5e7eb;
-  --muted: #9aa4b2;
-  --accent: #22c55e;
-}
-
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: system-ui, sans-serif;
-}
-
-header {
-  padding: 24px;
-  font-size: 28px;
-  font-weight: 700;
-}
-
-.controls {
-  display: flex;
-  gap: 12px;
-  padding: 0 24px 16px;
-  flex-wrap: wrap;
-}
-
-.controls a {
-  color: var(--muted);
-  text-decoration: none;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: #0f1629;
-}
-
-.controls a.active {
-  color: #000;
-  background: var(--accent);
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 16px;
-  padding: 24px;
-}
-
-.card {
-  background: var(--card);
-  border-radius: 14px;
-  padding: 12px;
-  cursor: pointer;
-}
-
-.card-name {
-  margin-top: 8px;
-  font-weight: 600;
-}
-
-.card-tag {
-  font-size: 12px;
-  color: var(--muted);
-}
-
-model-viewer {
-  width: 100%;
-  height: 160px;
-  background: #0f172a;
-  border-radius: 10px;
-}
-
-/* MODAL */
-.modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,.75);
-  display: none;
-  align-items: center;
-  justify-content: center;
-}
-
-.modal.open { display: flex; }
-
-.modal-content {
-  width: min(90vw, 900px);
-  height: min(90vh, 700px);
-  background: #020617;
-  border-radius: 16px;
-  padding: 16px;
-}
-
-.modal model-viewer {
-  height: 100%;
-}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Hive Models</title>
+  <link rel="stylesheet" href="../css/hive-browser.css" />
 </head>
-
 <body>
-<header>Hive Models</header>
+  <div class="wrap">
+    <div class="h1">Hive Models</div>
+    <p class="sub">Dynamic + fast: data from Google Drive, served through your Worker, rendered like a real asset browser.</p>
 
-<div class="controls" id="games"></div>
-<div class="grid" id="grid"></div>
+    <div class="panel">
+      <div class="row" data-games></div>
 
-<div class="modal" id="modal" onclick="closeModal(event)">
-  <div class="modal-content">
-    <model-viewer id="viewer"
-      camera-controls
-      auto-rotate
-      shadow-intensity="1">
-    </model-viewer>
+      <div class="searchRow">
+        <div class="search">
+          <input data-search placeholder="search models..." autocomplete="off" spellcheck="false" />
+        </div>
+        <div class="count" data-count>0 shown</div>
+      </div>
+
+      <div class="sectionSpacer"></div>
+
+      <div class="row" data-folders></div>
+    </div>
+
+    <div class="grid" data-grid></div>
+    <div class="sub" data-status style="margin-top:14px;"></div>
   </div>
-</div>
 
-<script>
-const API_BASE = "/api/models";
-const FILE_PROXY = "/api/file";
+  <!-- Modal -->
+  <div class="modalBack" data-modal-back>
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modalTop">
+        <div class="modalTitle" data-modal-title>preview</div>
+        <button class="modalClose" data-modal-close>✕</button>
+      </div>
 
-const params = new URLSearchParams(location.search);
-const game = params.get("game") || "bedwars";
+      <div class="modalViewer" data-modal-viewer></div>
 
-const grid = document.getElementById("grid");
-const modal = document.getElementById("modal");
-const viewer = document.getElementById("viewer");
+      <div class="modalBottom">
+        <div>
+          <div class="smallMuted" data-modal-path></div>
+        </div>
+        <button class="btn" data-modal-download>download .gltf</button>
+      </div>
+    </div>
+  </div>
 
-/* ---------- LOAD MODELS ---------- */
-(async () => {
-  const res = await fetch(`${API_BASE}?game=${game}`);
-  const data = await res.json();
-
-  renderGames(data.game.key);
-  renderItems(data.groups[0].items);
-})();
-
-/* ---------- UI ---------- */
-function renderGames(active) {
-  const games = ["bedwars", "skywars", "murder", "survival"]; // add freely
-  const el = document.getElementById("games");
-  el.innerHTML = games.map(g =>
-    `<a href="?game=${g}" class="${g===active?"active":""}">${g}</a>`
-  ).join("");
-}
-
-function renderItems(items) {
-  grid.innerHTML = "";
-  items.forEach(item => {
-    const src = `${FILE_PROXY}?id=${item.modelId}`;
-    const card = document.createElement("div");
-    card.className = "card";
-    card.innerHTML = `
-      <model-viewer src="${src}" disable-zoom></model-viewer>
-      <div class="card-name">${item.name}</div>
-      <div class="card-tag">${item.folderLabel}</div>
-    `;
-    card.onclick = () => openModal(src);
-    grid.appendChild(card);
-  });
-}
-
-/* ---------- MODAL ---------- */
-function openModal(src) {
-  viewer.src = src;
-  modal.classList.add("open");
-}
-
-function closeModal(e) {
-  if (e.target === modal) {
-    modal.classList.remove("open");
-    viewer.src = "";
-  }
-}
-</script>
+  <script src="../js/hive-browser.js"></script>
 </body>
 </html>
