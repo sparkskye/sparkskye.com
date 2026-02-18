@@ -1,54 +1,89 @@
-<!DOCTYPE html>
-<html lang="en" data-type="models">
+<!doctype html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Hive Models</title>
-  <link rel="stylesheet" href="../css/hive-browser.css" />
-</head>
-<body>
-  <div class="wrap">
-    <div class="h1">Hive Models</div>
-    <p class="sub">Dynamic + fast: data from Google Drive, served through your Worker, rendered like a real asset browser.</p>
+  <title>Models • Hive Resources</title>
 
-    <div class="panel">
-      <div class="row" data-games></div>
+  <!-- Model Viewer -->
+  <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+
+  <link rel="stylesheet" href="/hive-resources/css/models.css" />
+</head>
+
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="/" aria-label="Sparkskye Home">
+        <span class="brand-dot"></span>
+        <span class="brand-text">sparkskye</span>
+      </a>
+
+      <nav class="nav">
+        <a class="navlink" href="/hive-resources/models/">Models</a>
+        <a class="navlink" href="/hive-resources/maps/">Maps</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <h1 class="title">MODELS</h1>
+    <p class="subtitle">3D models for every Hive gamemode, including entities, NPCs, items, and more.</p>
+
+    <section class="panel">
+      <div class="row">
+        <div class="row-label">Gamemodes</div>
+        <div id="gamePills" class="pills"></div>
+      </div>
 
       <div class="searchRow">
-        <div class="search">
-          <input data-search placeholder="search models..." autocomplete="off" spellcheck="false" />
-        </div>
-        <div class="count" data-count>0 shown</div>
+        <input id="searchInput" class="search" type="search" placeholder="search models…" autocomplete="off" />
+        <div id="countBadge" class="count">0 shown</div>
       </div>
 
-      <div class="sectionSpacer"></div>
+      <div class="row foldersRow">
+        <div class="row-label">Folders</div>
+        <div id="folderPills" class="pills pills-folders"></div>
+      </div>
+    </section>
 
-      <div class="row" data-folders></div>
-    </div>
+    <section id="grid" class="grid" aria-live="polite"></section>
 
-    <div class="grid" data-grid></div>
-    <div class="sub" data-status style="margin-top:14px;"></div>
-  </div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </main>
 
   <!-- Modal -->
-  <div class="modalBack" data-modal-back>
-    <div class="modal" role="dialog" aria-modal="true">
-      <div class="modalTop">
-        <div class="modalTitle" data-modal-title>preview</div>
-        <button class="modalClose" data-modal-close>✕</button>
+  <div id="modal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" data-close="1"></div>
+
+    <div class="modal-card" role="dialog" aria-modal="true" aria-label="Model preview">
+      <button class="modal-close" type="button" aria-label="Close" data-close="1">✕</button>
+
+      <div class="modal-stage">
+        <model-viewer
+          id="modalViewer"
+          class="modal-viewer"
+          camera-controls
+          interaction-prompt="none"
+          shadow-intensity="0"
+          environment-image="neutral"
+          exposure="1"
+          ar="false"
+        ></model-viewer>
       </div>
 
-      <div class="modalViewer" data-modal-viewer></div>
+      <div class="modal-meta">
+        <div class="modal-name" id="modalName">—</div>
+        <div class="modal-path" id="modalPath">—</div>
 
-      <div class="modalBottom">
-        <div>
-          <div class="smallMuted" data-modal-path></div>
+        <div class="modal-actions">
+          <a id="modalDownload" class="btn" href="#" download>Download</a>
+          <button id="modalCopy" class="btn btn-ghost" type="button">Copy link</button>
         </div>
-        <button class="btn" data-modal-download>download .gltf</button>
       </div>
     </div>
   </div>
 
-  <script src="../js/hive-browser.js"></script>
+  <script src="/hive-resources/js/models.js"></script>
 </body>
 </html>
