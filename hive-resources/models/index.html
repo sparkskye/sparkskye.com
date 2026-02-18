@@ -5,7 +5,7 @@
   <title>Hive Resources — Models</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- Model Viewer -->
+  <!-- model-viewer -->
   <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 
   <style>
@@ -118,67 +118,76 @@
 </div>
 
 <script>
-  // 🔁 REPLACE with your deployed Apps Script URL
-  const API_BASE =
-    "https://script.google.com/macros/s/AKfycbxwo50cJWxjW95aoG1QeoxBRIUAIVrYPC3VHuaDUw2Vkst-2k05fltZ8s__nIku7JL7IQ/exec";
+  const API_URL =
+    "https://script.google.com/macros/s/AKfycbxwo50cJWxjW95aoG1QeoxBRlUAIVrYPc3VHuaDUw2Vkst-2k05fltz8s__nIku7JL7lQ/exec";
 
-  let data = null;
-  let currentGroup = "all";
+  let DATA = null;
+  let CURRENT_GROUP = null;
+  const PAGE_SIZE = 24;
 
-  fetch(API_BASE)
-    .then(r => r.json())
+  const pills = document.getElementById("pills");
+  const grid = document.getElementById("grid");
+
+  fetch(API_URL)
+    .then(r => {
+      if (!r.ok) throw new Error("API error " + r.status);
+      return r.json();
+    })
     .then(json => {
-      data = json;
+      DATA = json;
+      CURRENT_GROUP = DATA.groups[0];
       renderPills();
       renderGrid();
+    })
+    .catch(err => {
+      console.error(err);
+      grid.innerHTML = `
+        <div class="loading">
+          Failed to load models.<br>
+          Check console for details.
+        </div>`;
     });
 
   function renderPills() {
-    const wrap = document.getElementById("pills");
-    wrap.innerHTML = "";
-
-    data.groups.forEach(g => {
+    pills.innerHTML = "";
+    DATA.groups.forEach(g => {
       const p = document.createElement("div");
-      p.className = "pill" + (g.key === currentGroup ? " active" : "");
+      p.className = "pill" + (g === CURRENT_GROUP ? " active" : "");
       p.textContent = g.label;
       p.onclick = () => {
-        currentGroup = g.key;
+        CURRENT_GROUP = g;
         renderPills();
         renderGrid();
       };
-      wrap.appendChild(p);
+      pills.appendChild(p);
     });
   }
 
   function renderGrid() {
-    const grid = document.getElementById("grid");
     grid.innerHTML = "";
+    CURRENT_GROUP.items
+      .slice(0, PAGE_SIZE)
+      .forEach(item => {
+        const card = document.createElement("div");
+        card.className = "card";
+        card.onclick = () => window.open(item.downloadUrl, "_blank");
 
-    const group = data.groups.find(g => g.key === currentGroup);
-    if (!group) return;
+        card.innerHTML = `
+          <model-viewer
+            src="${item.modelUrl}"
+            camera-controls
+            auto-rotate
+            shadow-intensity="1">
+          </model-viewer>
 
-    group.items.forEach(i => {
-      const card = document.createElement("div");
-      card.className = "card";
-      card.onclick = () => window.open(i.downloadUrl, "_blank");
+          <div class="meta">
+            <div class="name">${item.name}</div>
+            ${item.folderLabel ? `<div class="badge">${item.folderLabel}</div>` : ""}
+          </div>
+        `;
 
-      card.innerHTML = `
-        <model-viewer
-          src="${i.modelUrl}"
-          camera-controls
-          auto-rotate
-          shadow-intensity="1"
-          exposure="1.1">
-        </model-viewer>
-
-        <div class="meta">
-          <div class="name">${i.name}</div>
-          ${i.folderLabel ? `<div class="badge">${i.folderLabel}</div>` : ""}
-        </div>
-      `;
-
-      grid.appendChild(card);
-    });
+        grid.appendChild(card);
+      });
   }
 </script>
 
