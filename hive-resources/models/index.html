@@ -1,197 +1,186 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Hive Resources — Models</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta charset="UTF-8" />
+<title>Hive Models</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- model-viewer -->
-  <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+<script type="module"
+  src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js">
+</script>
 
-  <style>
-    :root {
-      --bg: #0e0e11;
-      --card: #1a1a20;
-      --muted: #9aa0a6;
-      --accent: #5fd35f;
-      --text: #ffffff;
-    }
+<style>
+:root {
+  --bg: #0b0e14;
+  --card: #121826;
+  --text: #e5e7eb;
+  --muted: #9aa4b2;
+  --accent: #22c55e;
+}
 
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-    }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, sans-serif;
+}
 
-    header {
-      padding: 20px;
-      border-bottom: 1px solid #222;
-    }
+header {
+  padding: 24px;
+  font-size: 28px;
+  font-weight: 700;
+}
 
-    h1 {
-      margin: 0;
-      font-size: 22px;
-    }
+.controls {
+  display: flex;
+  gap: 12px;
+  padding: 0 24px 16px;
+  flex-wrap: wrap;
+}
 
-    .pills {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      padding: 16px;
-    }
+.controls a {
+  color: var(--muted);
+  text-decoration: none;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #0f1629;
+}
 
-    .pill {
-      padding: 6px 12px;
-      border-radius: 999px;
-      background: #222;
-      cursor: pointer;
-      font-size: 13px;
-      color: var(--muted);
-    }
+.controls a.active {
+  color: #000;
+  background: var(--accent);
+}
 
-    .pill.active {
-      background: var(--accent);
-      color: #000;
-    }
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  padding: 24px;
+}
 
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 16px;
-      padding: 16px;
-    }
+.card {
+  background: var(--card);
+  border-radius: 14px;
+  padding: 12px;
+  cursor: pointer;
+}
 
-    .card {
-      background: var(--card);
-      border-radius: 10px;
-      overflow: hidden;
-      cursor: pointer;
-      transition: transform 0.15s ease;
-    }
+.card-name {
+  margin-top: 8px;
+  font-weight: 600;
+}
 
-    .card:hover {
-      transform: translateY(-2px);
-    }
+.card-tag {
+  font-size: 12px;
+  color: var(--muted);
+}
 
-    model-viewer {
-      width: 100%;
-      height: 200px;
-      background: #111;
-    }
+model-viewer {
+  width: 100%;
+  height: 160px;
+  background: #0f172a;
+  border-radius: 10px;
+}
 
-    .meta {
-      padding: 10px;
-    }
+/* MODAL */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.75);
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
 
-    .name {
-      font-size: 14px;
-      font-weight: 600;
-    }
+.modal.open { display: flex; }
 
-    .badge {
-      display: inline-block;
-      margin-top: 6px;
-      font-size: 11px;
-      color: #000;
-      background: var(--accent);
-      padding: 2px 6px;
-      border-radius: 6px;
-    }
+.modal-content {
+  width: min(90vw, 900px);
+  height: min(90vh, 700px);
+  background: #020617;
+  border-radius: 16px;
+  padding: 16px;
+}
 
-    .loading {
-      padding: 40px;
-      text-align: center;
-      color: var(--muted);
-    }
-  </style>
+.modal model-viewer {
+  height: 100%;
+}
+</style>
 </head>
+
 <body>
+<header>Hive Models</header>
 
-<header>
-  <h1>Hive Models</h1>
-</header>
+<div class="controls" id="games"></div>
+<div class="grid" id="grid"></div>
 
-<div class="pills" id="pills"></div>
-<div class="grid" id="grid">
-  <div class="loading">Loading models…</div>
+<div class="modal" id="modal" onclick="closeModal(event)">
+  <div class="modal-content">
+    <model-viewer id="viewer"
+      camera-controls
+      auto-rotate
+      shadow-intensity="1">
+    </model-viewer>
+  </div>
 </div>
 
 <script>
-  const API_URL =
-    "https://script.google.com/macros/s/AKfycbxwo50cJWxjW95aoG1QeoxBRlUAIVrYPc3VHuaDUw2Vkst-2k05fltz8s__nIku7JL7lQ/exec";
+const API_BASE = "/api/models";
+const FILE_PROXY = "/api/file";
 
-  let DATA = null;
-  let CURRENT_GROUP = null;
-  const PAGE_SIZE = 24;
+const params = new URLSearchParams(location.search);
+const game = params.get("game") || "bedwars";
 
-  const pills = document.getElementById("pills");
-  const grid = document.getElementById("grid");
+const grid = document.getElementById("grid");
+const modal = document.getElementById("modal");
+const viewer = document.getElementById("viewer");
 
-  fetch(API_URL)
-    .then(r => {
-      if (!r.ok) throw new Error("API error " + r.status);
-      return r.json();
-    })
-    .then(json => {
-      DATA = json;
-      CURRENT_GROUP = DATA.groups[0];
-      renderPills();
-      renderGrid();
-    })
-    .catch(err => {
-      console.error(err);
-      grid.innerHTML = `
-        <div class="loading">
-          Failed to load models.<br>
-          Check console for details.
-        </div>`;
-    });
+/* ---------- LOAD MODELS ---------- */
+(async () => {
+  const res = await fetch(`${API_BASE}?game=${game}`);
+  const data = await res.json();
 
-  function renderPills() {
-    pills.innerHTML = "";
-    DATA.groups.forEach(g => {
-      const p = document.createElement("div");
-      p.className = "pill" + (g === CURRENT_GROUP ? " active" : "");
-      p.textContent = g.label;
-      p.onclick = () => {
-        CURRENT_GROUP = g;
-        renderPills();
-        renderGrid();
-      };
-      pills.appendChild(p);
-    });
+  renderGames(data.game.key);
+  renderItems(data.groups[0].items);
+})();
+
+/* ---------- UI ---------- */
+function renderGames(active) {
+  const games = ["bedwars", "skywars", "murder", "survival"]; // add freely
+  const el = document.getElementById("games");
+  el.innerHTML = games.map(g =>
+    `<a href="?game=${g}" class="${g===active?"active":""}">${g}</a>`
+  ).join("");
+}
+
+function renderItems(items) {
+  grid.innerHTML = "";
+  items.forEach(item => {
+    const src = `${FILE_PROXY}?id=${item.modelId}`;
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <model-viewer src="${src}" disable-zoom></model-viewer>
+      <div class="card-name">${item.name}</div>
+      <div class="card-tag">${item.folderLabel}</div>
+    `;
+    card.onclick = () => openModal(src);
+    grid.appendChild(card);
+  });
+}
+
+/* ---------- MODAL ---------- */
+function openModal(src) {
+  viewer.src = src;
+  modal.classList.add("open");
+}
+
+function closeModal(e) {
+  if (e.target === modal) {
+    modal.classList.remove("open");
+    viewer.src = "";
   }
-
-  function renderGrid() {
-    grid.innerHTML = "";
-    CURRENT_GROUP.items
-      .slice(0, PAGE_SIZE)
-      .forEach(item => {
-        const card = document.createElement("div");
-        card.className = "card";
-        card.onclick = () => window.open(item.downloadUrl, "_blank");
-
-        card.innerHTML = `
-          <model-viewer
-            src="${item.modelUrl}"
-            camera-controls
-            auto-rotate
-            shadow-intensity="1">
-          </model-viewer>
-
-          <div class="meta">
-            <div class="name">${item.name}</div>
-            ${item.folderLabel ? `<div class="badge">${item.folderLabel}</div>` : ""}
-          </div>
-        `;
-
-        grid.appendChild(card);
-      });
-  }
+}
 </script>
-
 </body>
 </html>
-
-
