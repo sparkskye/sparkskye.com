@@ -1,245 +1,186 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Hive Resources — Models</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta charset="UTF-8" />
+<title>Hive Models</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+<script type="module"
+  src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js">
+</script>
 
-  <style>
-    :root{
-      --bg:#070a0f; --card:#0f1420; --muted:#9aa6b2; --text:#fff;
-      --accent:#5fd35f; --pill:#151c2a; --pillOn:#1e2a1e;
-      --line:rgba(255,255,255,.08);
-    }
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--text)}
-    .wrap{max-width:1200px;margin:0 auto;padding:20px}
-    h1{margin:0 0 14px 0;font-size:34px}
-    .topbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0 18px}
-    .pill{padding:8px 12px;border-radius:999px;background:var(--pill);border:1px solid var(--line);cursor:pointer;color:var(--muted);user-select:none}
-    .pill.on{background:var(--pillOn);color:#c8ffd0;border-color:rgba(95,211,95,.35)}
-    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0 18px}
-    input{background:#0b1020;border:1px solid var(--line);border-radius:12px;padding:10px 12px;color:var(--text);min-width:260px}
-    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
-    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden;cursor:pointer}
-    .mvbox{height:160px;background:#0b1020}
-    model-viewer{width:100%;height:100%;background:#0b1020}
-    .meta{padding:12px}
-    .name{font-weight:700;margin-bottom:8px}
-    .tag{display:inline-flex;gap:6px;align-items:center;padding:4px 10px;border-radius:999px;background:rgba(95,211,95,.12);border:1px solid rgba(95,211,95,.25);color:#bfffc6;font-size:12px}
+<style>
+:root {
+  --bg: #0b0e14;
+  --card: #121826;
+  --text: #e5e7eb;
+  --muted: #9aa4b2;
+  --accent: #22c55e;
+}
 
-    .status{color:var(--muted);padding:20px 0}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, sans-serif;
+}
 
-    /* modal */
-    .modalBack{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;padding:18px}
-    .modalBack.on{display:flex}
-    .modal{width:min(1100px,96vw);background:#0b1020;border:1px solid var(--line);border-radius:18px;overflow:hidden}
-    .modalTop{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line)}
-    .btn{background:#111a2a;border:1px solid var(--line);color:var(--text);padding:8px 10px;border-radius:12px;cursor:pointer}
-    .modalBody{height:min(70vh,720px)}
-    .modalBody model-viewer{height:100%;width:100%}
-  </style>
+header {
+  padding: 24px;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.controls {
+  display: flex;
+  gap: 12px;
+  padding: 0 24px 16px;
+  flex-wrap: wrap;
+}
+
+.controls a {
+  color: var(--muted);
+  text-decoration: none;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #0f1629;
+}
+
+.controls a.active {
+  color: #000;
+  background: var(--accent);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  padding: 24px;
+}
+
+.card {
+  background: var(--card);
+  border-radius: 14px;
+  padding: 12px;
+  cursor: pointer;
+}
+
+.card-name {
+  margin-top: 8px;
+  font-weight: 600;
+}
+
+.card-tag {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+model-viewer {
+  width: 100%;
+  height: 160px;
+  background: #0f172a;
+  border-radius: 10px;
+}
+
+/* MODAL */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.75);
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal.open { display: flex; }
+
+.modal-content {
+  width: min(90vw, 900px);
+  height: min(90vh, 700px);
+  background: #020617;
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.modal model-viewer {
+  height: 100%;
+}
+</style>
 </head>
 
 <body>
-  <div class="wrap">
-    <h1>Hive Models</h1>
+<header>Hive Models</header>
 
-    <div class="topbar" id="gamesBar"></div>
+<div class="controls" id="games"></div>
+<div class="grid" id="grid"></div>
 
-    <div class="row">
-      <input id="q" placeholder="Search models…" />
-      <div class="topbar" id="groupsBar" style="margin:0"></div>
-    </div>
-
-    <div class="status" id="status">Loading…</div>
-    <div class="grid" id="grid"></div>
+<div class="modal" id="modal" onclick="closeModal(event)">
+  <div class="modal-content">
+    <model-viewer id="viewer"
+      camera-controls
+      auto-rotate
+      shadow-intensity="1">
+    </model-viewer>
   </div>
-
-  <!-- modal -->
-  <div class="modalBack" id="modalBack">
-    <div class="modal">
-      <div class="modalTop">
-        <div id="modalTitle" style="font-weight:800"></div>
-        <div style="display:flex;gap:10px">
-          <a class="btn" id="modalDownload" target="_blank" rel="noopener">Download</a>
-          <button class="btn" id="modalClose">Close</button>
-        </div>
-      </div>
-      <div class="modalBody">
-        <model-viewer id="modalMV"
-          camera-controls
-          auto-rotate
-          shadow-intensity="1"
-          exposure="1.1"
-          loading="eager"
-          crossorigin="anonymous">
-        </model-viewer>
-      </div>
-    </div>
-  </div>
+</div>
 
 <script>
-  const API_LIST = "/api/models?list=1";
-  const API_GAME = (game) => `/api/models?game=${encodeURIComponent(game || "")}`;
-  const FILE = (id) => `/api/file?id=${encodeURIComponent(id)}`;
+const API_BASE = "/api/models";
+const FILE_PROXY = "/api/file";
 
-  const gamesBar = document.getElementById("gamesBar");
-  const groupsBar = document.getElementById("groupsBar");
-  const grid = document.getElementById("grid");
-  const statusEl = document.getElementById("status");
-  const q = document.getElementById("q");
+const params = new URLSearchParams(location.search);
+const game = params.get("game") || "bedwars";
 
-  const modalBack = document.getElementById("modalBack");
-  const modalClose = document.getElementById("modalClose");
-  const modalTitle = document.getElementById("modalTitle");
-  const modalMV = document.getElementById("modalMV");
-  const modalDownload = document.getElementById("modalDownload");
+const grid = document.getElementById("grid");
+const modal = document.getElementById("modal");
+const viewer = document.getElementById("viewer");
 
-  let data = null;
-  let activeGroup = "all";
-  let activeGame = new URL(location.href).searchParams.get("game") || "";
+/* ---------- LOAD MODELS ---------- */
+(async () => {
+  const res = await fetch(`${API_BASE}?game=${game}`);
+  const data = await res.json();
 
-  // ---- modal
-  function openModal(item){
-    modalTitle.textContent = item.name;
-    modalMV.src = FILE(item.modelId);
-    modalDownload.href = FILE(item.modelId);
-    modalBack.classList.add("on");
+  renderGames(data.game.key);
+  renderItems(data.groups[0].items);
+})();
+
+/* ---------- UI ---------- */
+function renderGames(active) {
+  const games = ["bedwars", "skywars", "murder", "survival"]; // add freely
+  const el = document.getElementById("games");
+  el.innerHTML = games.map(g =>
+    `<a href="?game=${g}" class="${g===active?"active":""}">${g}</a>`
+  ).join("");
+}
+
+function renderItems(items) {
+  grid.innerHTML = "";
+  items.forEach(item => {
+    const src = `${FILE_PROXY}?id=${item.modelId}`;
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <model-viewer src="${src}" disable-zoom></model-viewer>
+      <div class="card-name">${item.name}</div>
+      <div class="card-tag">${item.folderLabel}</div>
+    `;
+    card.onclick = () => openModal(src);
+    grid.appendChild(card);
+  });
+}
+
+/* ---------- MODAL ---------- */
+function openModal(src) {
+  viewer.src = src;
+  modal.classList.add("open");
+}
+
+function closeModal(e) {
+  if (e.target === modal) {
+    modal.classList.remove("open");
+    viewer.src = "";
   }
-  function closeModal(){
-    modalBack.classList.remove("on");
-    modalMV.src = "";
-  }
-  modalClose.onclick = closeModal;
-  modalBack.onclick = (e)=>{ if(e.target===modalBack) closeModal(); };
-
-  // ---- UI: games
-  async function loadGames(){
-    const res = await fetch(API_LIST);
-    const j = await res.json();
-
-    gamesBar.innerHTML = "";
-    j.games.forEach(g=>{
-      const b = document.createElement("div");
-      b.className = "pill" + (g.key === activeGame ? " on" : "");
-      b.textContent = g.name;
-      b.onclick = ()=>{
-        const u = new URL(location.href);
-        u.searchParams.set("game", g.key);
-        location.href = u.toString();
-      };
-      gamesBar.appendChild(b);
-    });
-
-    // default if none
-    if(!activeGame && j.games.length){
-      const u = new URL(location.href);
-      u.searchParams.set("game", j.games[0].key);
-      location.href = u.toString();
-    }
-  }
-
-  // ---- UI: groups
-  function renderGroups(){
-    groupsBar.innerHTML = "";
-    data.groups.forEach(g=>{
-      const b = document.createElement("div");
-      b.className = "pill" + (g.key === activeGroup ? " on" : "");
-      b.textContent = g.label;
-      b.onclick = ()=>{ activeGroup = g.key; render(); };
-      groupsBar.appendChild(b);
-    });
-  }
-
-  // ---- cards (lazy-load model preview)
-  function cardEl(item){
-    const c = document.createElement("div");
-    c.className = "card";
-
-    const mvbox = document.createElement("div");
-    mvbox.className = "mvbox";
-
-    // We'll set src later when visible (IntersectionObserver)
-    const mv = document.createElement("model-viewer");
-    mv.setAttribute("loading", "lazy");
-    mv.setAttribute("reveal", "interaction"); // doesn’t auto-spin until interacted
-    mv.setAttribute("camera-controls", "");
-    mv.setAttribute("disable-pan", "");
-    mv.setAttribute("interaction-prompt", "none");
-    mv.setAttribute("shadow-intensity", "0.8");
-    mv.setAttribute("exposure", "1.1");
-    mv.setAttribute("crossorigin", "anonymous");
-
-    mvbox.appendChild(mv);
-
-    const meta = document.createElement("div");
-    meta.className = "meta";
-
-    const name = document.createElement("div");
-    name.className = "name";
-    name.textContent = item.name;
-
-    const tag = document.createElement("div");
-    tag.className = "tag";
-    tag.textContent = (item.folderLabel || "model");
-
-    meta.appendChild(name);
-    meta.appendChild(tag);
-
-    c.appendChild(mvbox);
-    c.appendChild(meta);
-
-    c.onclick = ()=>openModal(item);
-
-    // lazy-load only when card enters viewport
-    io.observe(mv);
-    mv._modelId = item.modelId;
-
-    return c;
-  }
-
-  const io = new IntersectionObserver((entries)=>{
-    entries.forEach(e=>{
-      if(!e.isIntersecting) return;
-      const mv = e.target;
-      if(mv.src) return;
-      mv.src = FILE(mv._modelId);
-      io.unobserve(mv);
-    });
-  }, { rootMargin: "250px" });
-
-  function getActiveItems(){
-    const g = data.groups.find(x=>x.key===activeGroup) || data.groups[0];
-    const term = (q.value||"").trim().toLowerCase();
-    let items = g.items || [];
-    if(term) items = items.filter(i=> (i.name||"").toLowerCase().includes(term));
-    return items;
-  }
-
-  function render(){
-    grid.innerHTML = "";
-    const items = getActiveItems();
-    statusEl.textContent = items.length ? "" : "No matches.";
-    items.forEach(i=>grid.appendChild(cardEl(i)));
-  }
-
-  async function loadGame(){
-    statusEl.textContent = "Loading…";
-    const res = await fetch(API_GAME(activeGame));
-    data = await res.json();
-    activeGroup = "all";
-    renderGroups();
-    render();
-  }
-
-  q.addEventListener("input", ()=>render());
-
-  (async ()=>{
-    await loadGames();
-    await loadGame();
-  })();
+}
 </script>
 </body>
 </html>
