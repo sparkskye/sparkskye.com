@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Hive Resources — Models</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Model Viewer -->
+  <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #0e0e11;
+      --card: #1a1a20;
+      --muted: #9aa0a6;
+      --accent: #5fd35f;
+      --text: #ffffff;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    header {
+      padding: 20px;
+      border-bottom: 1px solid #222;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 22px;
+    }
+
+    .pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 16px;
+    }
+
+    .pill {
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: #222;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .pill.active {
+      background: var(--accent);
+      color: #000;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 16px;
+      padding: 16px;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: 10px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+    }
+
+    model-viewer {
+      width: 100%;
+      height: 200px;
+      background: #111;
+    }
+
+    .meta {
+      padding: 10px;
+    }
+
+    .name {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .badge {
+      display: inline-block;
+      margin-top: 6px;
+      font-size: 11px;
+      color: #000;
+      background: var(--accent);
+      padding: 2px 6px;
+      border-radius: 6px;
+    }
+
+    .loading {
+      padding: 40px;
+      text-align: center;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Hive Models</h1>
+</header>
+
+<div class="pills" id="pills"></div>
+<div class="grid" id="grid">
+  <div class="loading">Loading models…</div>
+</div>
+
+<script>
+  // 🔁 REPLACE with your deployed Apps Script URL
+  const API_BASE =
+    "https://script.google.com/macros/s/AKfycbxwo50cJWxjW95aoG1QeoxBRIUAIVrYPC3VHuaDUw2Vkst-2k05fltZ8s__nIku7JL7IQ/exec";
+
+  let data = null;
+  let currentGroup = "all";
+
+  fetch(API_BASE)
+    .then(r => r.json())
+    .then(json => {
+      data = json;
+      renderPills();
+      renderGrid();
+    });
+
+  function renderPills() {
+    const wrap = document.getElementById("pills");
+    wrap.innerHTML = "";
+
+    data.groups.forEach(g => {
+      const p = document.createElement("div");
+      p.className = "pill" + (g.key === currentGroup ? " active" : "");
+      p.textContent = g.label;
+      p.onclick = () => {
+        currentGroup = g.key;
+        renderPills();
+        renderGrid();
+      };
+      wrap.appendChild(p);
+    });
+  }
+
+  function renderGrid() {
+    const grid = document.getElementById("grid");
+    grid.innerHTML = "";
+
+    const group = data.groups.find(g => g.key === currentGroup);
+    if (!group) return;
+
+    group.items.forEach(i => {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.onclick = () => window.open(i.downloadUrl, "_blank");
+
+      card.innerHTML = `
+        <model-viewer
+          src="${i.modelUrl}"
+          camera-controls
+          auto-rotate
+          shadow-intensity="1"
+          exposure="1.1">
+        </model-viewer>
+
+        <div class="meta">
+          <div class="name">${i.name}</div>
+          ${i.folderLabel ? `<div class="badge">${i.folderLabel}</div>` : ""}
+        </div>
+      `;
+
+      grid.appendChild(card);
+    });
+  }
+</script>
+
+</body>
+</html>
