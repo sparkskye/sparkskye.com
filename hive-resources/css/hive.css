@@ -1,0 +1,614 @@
+/* =========================
+   Fonts (local repo)
+========================= */
+@font-face {
+  font-family: "Minecraftia";
+  src: url("/fonts/minecraftia.ttf") format("truetype");
+  font-display: swap;
+}
+@font-face {
+  font-family: "MCFive";
+  src: url("/fonts/mc-five.ttf") format("truetype");
+  font-display: swap;
+}
+@font-face {
+  font-family: "MCTen";
+  src: url("/fonts/mc-ten-lowercase-alt.ttf") format("truetype");
+  font-display: swap;
+}
+
+/* =========================
+   Theme
+========================= */
+:root{
+  --bg: #141414;          /* hive backpack-ish dark */
+  --bg2:#1b1b1b;
+  --panel:#202020;
+  --panel2:#252525;
+  --stroke:#2e2e2e;
+  --stroke2:#3a3a3a;
+  --text:#f2f2f2;
+  --muted:#b7b7b7;
+  --muted2:#8b8b8b;
+
+  --accent:#00aaff;       /* sparkskye blue */
+  --accent2:#0bb7ff;
+
+  --radius: 18px;
+  --radius2: 22px;
+  --shadow: none;
+}
+
+*{ box-sizing:border-box; }
+html,body{ height:100%; }
+body{
+  margin:0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Minecraftia, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  letter-spacing: .2px;
+  overflow-x: hidden;
+}
+
+a{ color:inherit; text-decoration:none; }
+
+.page{
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 26px 18px 80px;
+}
+
+/* =========================
+   Topbar
+========================= */
+.topbar{
+  position: sticky;
+  top:0;
+  z-index: 10;
+  backdrop-filter: blur(10px);
+  background: rgba(16,16,16,.85);
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  padding: 10px 14px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+
+.brand{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+}
+.brand__logo{
+  width: 18px;
+  height: 18px;
+  image-rendering: pixelated;
+}
+.brand__name{
+  font-family: MCFive, Minecraftia, sans-serif;
+  font-size: 14px;
+  opacity: .95;
+}
+
+.topnav{ display:flex; gap:10px; align-items:center; }
+.topnav__links{ display:flex; gap:10px; align-items:center; }
+
+/* Mobile nav dropdown */
+.topnav__burger{
+  display:none;
+  font-family: MCFive, Minecraftia, sans-serif;
+  font-size: 16px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.08);
+}
+.topnav__dropdown{
+  display:none;
+  position:absolute;
+  right: 14px;
+  top: 58px;
+  background: rgba(22,22,22,.98);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 16px;
+  padding: 10px;
+  min-width: 170px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.45);
+}
+.topnav__dropdown.is-open{ display:block; }
+.topnav__dropitem{
+  display:block;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-family: MCFive, Minecraftia, sans-serif;
+  font-size: 12px;
+  color: var(--text);
+  background: rgba(255,255,255,.03);
+  border: 1px solid rgba(255,255,255,.06);
+}
+.topnav__dropitem + .topnav__dropitem{ margin-top: 8px; }
+.topnav__dropitem:hover{
+  border-color: rgba(0,170,255,.55);
+  box-shadow: 0 0 0 2px rgba(0,170,255,.15) inset;
+}
+
+@media (max-width: 680px){
+  .topnav__links{ display:none; }
+  .topnav__burger{ display:inline-flex; }
+}
+.topnav__btn{
+  font-family: MCFive, Minecraftia, sans-serif;
+  font-size: 12px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.08);
+}
+.topnav__btn:hover{
+  border-color: rgba(0,170,255,.55);
+  box-shadow: 0 0 0 2px rgba(0,170,255,.15) inset;
+}
+.topnav__btn.is-active{
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #041018;
+}
+
+/* =========================
+   Hero
+========================= */
+.hero{ padding: 28px 6px 16px; }
+.hero__title{
+  margin:0;
+  font-family: MCTen, Minecraftia, sans-serif;
+  font-size: clamp(44px, 6vw, 64px);
+  line-height: 1;
+}
+.hero__sub{
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-family: MCFive, Minecraftia, sans-serif;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* =========================
+   Panel / Filters
+========================= */
+.panel{
+  margin-top: 18px;
+  background: var(--panel);
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: var(--radius2);
+  padding: 16px;
+  box-shadow: none;
+}
+
+.panel__row{
+  display:flex;
+  gap: 12px;
+  align-items:center;
+  flex-wrap: wrap;
+}
+
+.panel__row--center{
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.panel__label{
+  font-family: MCFive, Minecraftia, sans-serif;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--muted2);
+}
+
+.panel__divider{
+  height: 1px;
+  background: rgba(255,255,255,.06);
+  margin: 14px 0;
+}
+
+.panel__row--search{
+  margin-top: 14px;
+  display:flex;
+  align-items:center;
+  gap: 12px;
+}
+
+.search{
+  flex: 1;
+  width: 100%;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(0,0,0,.18);
+  padding: 12px 14px;
+  color: var(--text);
+  outline: none;
+  font-family: Minecraftia, sans-serif;
+  font-size: 12px;
+}
+.search:focus{
+  border-color: rgba(0,170,255,.8);
+  box-shadow: 0 0 0 3px rgba(0,170,255,.15);
+}
+
+.count{
+  font-family: MCFive, Minecraftia, sans-serif;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* =========================
+   Chips
+========================= */
+.chips{
+  display:flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.chip{
+  font-family: MCFive, Minecraftia, sans-serif;
+  font-size: 12px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.10);
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+.chip:hover{
+  border-color: rgba(0,170,255,.60);
+  box-shadow: 0 0 0 2px rgba(0,170,255,.12) inset;
+}
+.chip.is-active{
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #041018;
+  box-shadow: none;
+}
+
+/* folder chips use same active behavior (requested) */
+.chip--folder.is-active{
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #041018;
+}
+
+/* =========================
+   Grid / Cards
+========================= */
+.grid{
+  margin-top: 18px;
+  display:grid;
+  gap: 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* Centered gallery loading indicator (requested) */
+.grid__loading{
+  grid-column: 1 / -1;
+  min-height: 220px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-family: MCFive, Minecraftia, sans-serif;
+  font-size: 12px;
+  color: rgba(255,255,255,.55);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+@media (min-width: 720px){
+  .grid{ grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (min-width: 1100px){
+  .grid{ grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+.card{
+  background: var(--panel2);
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: var(--radius2);
+  overflow:hidden;
+  box-shadow: none;
+  cursor: pointer;
+  min-height: 280px;
+  display:flex;
+  flex-direction: column;
+}
+
+.card:hover{
+  border-color: rgba(0,170,255,.35);
+}
+
+.card__viewer{
+  position: relative;
+  height: 180px;
+  background: rgba(0,0,0,.16);
+}
+.card__viewer canvas{
+  width:100%;
+  height:100%;
+  display:block;
+  pointer-events: none; /* IMPORTANT: no interaction on card previews */
+}
+.card__viewer img.card__thumb{
+  width: 100%;
+  height: 100%;
+  display:block;
+  object-fit: contain;
+  pointer-events: none;
+}
+.card__placeholder{
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-family: MCFive, Minecraftia, sans-serif;
+  font-size: 11px;
+  color: rgba(255,255,255,.55);
+  text-align:center;
+  padding: 10px;
+  user-select:none;
+}
+.card__reload{
+  position:absolute;
+  right: 10px;
+  top: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(0,0,0,.25);
+  color: var(--text);
+  font-family: MCFive, Minecraftia, sans-serif;
+  font-size: 11px;
+  padding: 8px 10px;
+  display:none;
+}
+.card__reload:hover{
+  border-color: rgba(0,170,255,.6);
+}
+
+.card__meta{
+  /* slightly tighter so the bottom bar doesn't feel tall */
+  padding: 12px 14px 12px;
+  display:flex;
+  gap: 8px;
+  flex-direction: column;
+}
+
+.card__top{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap: 10px;
+}
+
+.card__name{
+  font-size: 14px;
+  line-height: 1.2;
+  margin:0;
+}
+
+/* Make it obvious the name is clickable (direct-download link) */
+.card__name a{
+  color: inherit;
+}
+.card__name a:hover{
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+
+.badge{
+  font-family: MCFive, Minecraftia, sans-serif;
+  font-size: 11px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.10);
+  color: rgba(255,255,255,.85);
+  flex: 0 0 auto;
+}
+
+/* Path line */
+.card__path{
+  font-family: MCFive, Minecraftia, sans-serif;
+  font-size: 11px;
+  color: rgba(255,255,255,.55);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* =========================
+   Modal
+========================= */
+.modal{
+  position: fixed;
+  inset:0;
+  display:none;
+  z-index: 50;
+}
+.modal.is-open{ display:block; }
+
+.modal__backdrop{
+  position:absolute;
+  inset:0;
+  background: rgba(0,0,0,.6);
+}
+
+.modal__card{
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%); /* centers vertically */
+  width: min(1000px, calc(100% - 24px));
+  max-height: calc(100% - 24px);
+  background: var(--panel2);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: var(--radius2);
+  overflow:hidden;
+  box-shadow: none;
+  display:flex;
+  flex-direction: column;
+}
+
+.modal__close{
+  position:absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(0,0,0,.25);
+  color: var(--text);
+  font-size: 18px;
+  cursor:pointer;
+}
+.modal__close:hover{
+  border-color: rgba(0,170,255,.55);
+}
+
+.modal__viewer{
+  position: relative;
+  height: min(62vh, 520px);
+  background: rgba(0,0,0,.16); /* keep what you said is perfect */
+}
+.modal__viewer canvas{
+  width:100%;
+  height:100%;
+  display:block;
+}
+.modal__viewer img.modal__thumb{
+  width: 100%;
+  height: 100%;
+  display:block;
+  object-fit: contain;
+}
+.viewer__loading{
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-family: MCFive, Minecraftia, sans-serif;
+  font-size: 12px;
+  color: rgba(255,255,255,.65);
+}
+
+.modal__meta{
+  padding: 16px;
+  border-top: 1px solid rgba(255,255,255,.06);
+  background: rgba(0,0,0,.10);
+}
+.modal__name{
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+.modal__path{
+  font-family: MCFive, Minecraftia, sans-serif;
+  font-size: 11px;
+  color: rgba(255,255,255,.55);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+}
+
+.modal__actions{
+  display:flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Buttons */
+.btn{
+  font-family: MCFive, Minecraftia, sans-serif;
+  font-size: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.04);
+  color: var(--text);
+  cursor:pointer;
+}
+.btn:hover{
+  border-color: rgba(0,170,255,.55);
+}
+.btn--primary{
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #041018;
+}
+
+/* Pixel-art minimaps should never be blurred */
+.maps-page img.card__thumb,
+.maps-page img.modal__thumb{
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* Home page contributors */
+.contributors{
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:center;
+  gap:10px;
+  padding: 14px 0 2px;
+}
+.contrib{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px 12px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.04);
+}
+.contrib:hover{
+  border-color: rgba(0,170,255,.45);
+}
+.contrib__avatar{
+  width:28px;
+  height:28px;
+  border-radius:8px;
+  image-rendering: pixelated;
+}
+.contrib__name{
+  font-family: MCFive, Minecraftia, sans-serif;
+  font-size: 12px;
+  letter-spacing: .8px;
+}
+
+/* Footer shared across Hive Resources pages */
+.footer{
+  margin-top: 44px;
+  padding: 24px 18px 36px;
+  text-align:center;
+  font-family: MCFive, Minecraftia, sans-serif;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.footer__ai{
+  color: #6f6f6f;
+}
+.footer a{
+  color: var(--accent);
+}
+.footer a:hover{
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
