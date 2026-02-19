@@ -3,87 +3,108 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Models • Hive Resources</title>
+  <title>Models • Sparkskye</title>
 
-  <!-- Model Viewer -->
-  <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+  <!-- Favicon -->
+  <link rel="icon" href="/public/img/favicon.png" />
 
-  <link rel="stylesheet" href="/hive-resources/css/models.css" />
+  <!-- Shared CSS -->
+  <link rel="stylesheet" href="/hive-resources/css/hive.css" />
+
+  <!-- Use local fonts in /fonts -->
+  <style>
+    /* (kept minimal — main font rules live in hive.css) */
+  </style>
+
+  <!-- Three.js (module) -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <script>
+    // Worker base (can override later without editing code)
+    window.__HIVE_API_BASE = "https://delicate-bush-cf6f.sparkskye-minecraft.workers.dev";
+  </script>
 </head>
 
 <body>
+  <!-- Top Bar -->
   <header class="topbar">
-    <div class="topbar-inner">
-      <a class="brand" href="/" aria-label="Sparkskye Home">
-        <span class="brand-dot"></span>
-        <span class="brand-text">sparkskye</span>
-      </a>
+    <a class="brand" href="https://sparkskye.com">
+      <img class="brand__logo" src="/public/img/favicon.png" alt="Sparkskye" />
+      <span class="brand__name">SPARKSKYE</span>
+    </a>
 
-      <nav class="nav">
-        <a class="navlink" href="/hive-resources/models/">Models</a>
-        <a class="navlink" href="/hive-resources/maps/">Maps</a>
-      </nav>
-    </div>
+    <nav class="topnav">
+      <a class="topnav__btn is-active" href="/hive-resources/models/">MODELS</a>
+      <a class="topnav__btn" href="/hive-resources/maps/">MAPS</a>
+    </nav>
   </header>
 
-  <main class="wrap">
-    <h1 class="title">MODELS</h1>
-    <p class="subtitle">3D models for every Hive gamemode, including entities, NPCs, items, and more.</p>
+  <main class="page">
+    <section class="hero">
+      <h1 class="hero__title">MODELS</h1>
+      <p class="hero__sub">
+        3D MODELS FOR EVERY HIVE GAMEMODE, INCLUDING ENTITIES, NPCS, ITEMS, AND MORE.
+      </p>
+    </section>
 
-    <section class="panel">
-      <div class="row">
-        <div class="row-label">Gamemodes</div>
-        <div id="gamePills" class="pills"></div>
+    <!-- Filters panel -->
+    <section class="panel" id="filtersPanel">
+      <div class="panel__row panel__row--center">
+        <div class="panel__label">GAMEMODES</div>
+        <div class="chips" id="gameChips"></div>
       </div>
 
-      <div class="searchRow">
-        <input id="searchInput" class="search" type="search" placeholder="search models…" autocomplete="off" />
-        <div id="countBadge" class="count">0 shown</div>
+      <div class="panel__divider"></div>
+
+      <div class="panel__row panel__row--center">
+        <div class="panel__label">FOLDERS</div>
+        <div class="chips" id="folderChips"></div>
       </div>
 
-      <div class="row foldersRow">
-        <div class="row-label">Folders</div>
-        <div id="folderPills" class="pills pills-folders"></div>
+      <div class="panel__row panel__row--search">
+        <input id="searchInput" class="search" placeholder="search models..." autocomplete="off" />
+        <div class="count" id="countLabel">0 shown</div>
       </div>
     </section>
 
-    <section id="grid" class="grid" aria-live="polite"></section>
-
-    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <!-- Grid -->
+    <section class="grid" id="grid"></section>
   </main>
 
   <!-- Modal -->
-  <div id="modal" class="modal hidden" aria-hidden="true">
-    <div class="modal-backdrop" data-close="1"></div>
+  <div class="modal" id="modal" aria-hidden="true">
+    <div class="modal__backdrop" id="modalBackdrop"></div>
 
-    <div class="modal-card" role="dialog" aria-modal="true" aria-label="Model preview">
-      <button class="modal-close" type="button" aria-label="Close" data-close="1">✕</button>
+    <div class="modal__card" role="dialog" aria-modal="true" aria-label="Model preview">
+      <button class="modal__close" id="modalClose" aria-label="Close">✕</button>
 
-      <div class="modal-stage">
-        <model-viewer
-          id="modalViewer"
-          class="modal-viewer"
-          camera-controls
-          interaction-prompt="none"
-          shadow-intensity="0"
-          environment-image="neutral"
-          exposure="1"
-          ar="false"
-        ></model-viewer>
+      <div class="modal__viewer" id="modalViewer">
+        <div class="viewer__loading" id="modalLoading">Loading…</div>
       </div>
 
-      <div class="modal-meta">
-        <div class="modal-name" id="modalName">—</div>
-        <div class="modal-path" id="modalPath">—</div>
+      <div class="modal__meta">
+        <div class="modal__name" id="modalName">—</div>
+        <div class="modal__path" id="modalPath">—</div>
 
-        <div class="modal-actions">
-          <a id="modalDownload" class="btn" href="#" download>Download</a>
-          <button id="modalCopy" class="btn btn-ghost" type="button">Copy link</button>
+        <div class="modal__actions">
+          <a class="btn btn--primary" id="modalDownload" href="#" download>DOWNLOAD .GLTF</a>
+          <button class="btn" id="modalCopy">COPY LINK</button>
         </div>
       </div>
     </div>
   </div>
 
-  <script src="/hive-resources/js/models.js"></script>
+  <!-- JS -->
+  <script type="module" src="/hive-resources/js/api.js"></script>
+  <script type="module" src="/hive-resources/js/ui.js"></script>
+  <script type="module" src="/hive-resources/js/preview3d.js"></script>
+  <script type="module" src="/hive-resources/js/models.js"></script>
 </body>
 </html>
