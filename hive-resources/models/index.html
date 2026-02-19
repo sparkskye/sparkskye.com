@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Models • Sparkskye</title>
+
+  <!-- Favicon -->
+  <link rel="icon" href="/public/img/favicon.png" />
+
+  <!-- Shared CSS -->
+  <link rel="stylesheet" href="/hive-resources/css/hive.css" />
+
+  <!-- Use local fonts in /fonts -->
+  <style>
+    /* (kept minimal — main font rules live in hive.css) */
+  </style>
+
+  <!-- Three.js (module) -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <script>
+    // Worker base (can override later without editing code)
+    window.__HIVE_API_BASE = "https://delicate-bush-cf6f.sparkskye-minecraft.workers.dev";
+  </script>
+  <script>
+    window.__HIVE_GAMES = [
+      "bedwars","block drop","block party","bridge","capture the flag","common","deathrun",
+      "ghost invasion","gravity","ground wars","hide and seek","hub","mob game","murder mystery",
+      "pets","skywars","survival games"
+    ];
+  </script>
+</head>
+
+<body>
+  <!-- Top Bar -->
+  <header class="topbar">
+    <a class="brand" href="/">
+      <img class="brand__logo" src="/public/img/favicon.png" alt="Sparkskye" />
+      <span class="brand__name">SPARKSKYE</span>
+    </a>
+
+    <nav class="topnav">
+      <a class="topnav__btn" href="/hive-resources/">HOME</a>
+      <a class="topnav__btn is-active" href="/hive-resources/models/">MODELS</a>
+      <a class="topnav__btn" href="/hive-resources/maps/">MAPS</a>
+      <a class="topnav__btn" href="/hive-resources/rewind/">REWIND</a>
+    </nav>
+  </header>
+
+  <main class="page">
+    <section class="hero">
+      <h1 class="hero__title">MODELS</h1>
+      <p class="hero__sub">
+        3D MODELS FOR EVERY HIVE GAMEMODE, INCLUDING ENTITIES, NPCS, ITEMS, AND MORE.
+      </p>
+    </section>
+
+    <!-- Filters panel -->
+    <section class="panel" id="filtersPanel">
+      <div class="panel__row panel__row--center">
+        <div class="panel__label">GAMEMODES</div>
+        <div class="chips" id="gameChips"></div>
+      </div>
+
+      <div class="panel__divider"></div>
+
+      <div class="panel__row panel__row--center">
+        <div class="panel__label">FOLDERS</div>
+        <div class="chips" id="folderChips"></div>
+      </div>
+
+      <div class="panel__row panel__row--search">
+        <input id="searchInput" class="search" placeholder="search models..." autocomplete="off" />
+        <div class="count" id="countLabel">0 shown</div>
+      </div>
+    </section>
+
+    <!-- Grid -->
+    <section class="grid" id="grid"></section>
+  </main>
+
+  <footer class="footer">
+    <div>
+      All assets are owned by Hive Games LTD, which is not affiliated with this project. Only GLTF/GLB models are provided to comply with the
+      <a href="https://support.playhive.com/terms-of-service/" target="_blank" rel="noopener">Terms of Service</a>.
+    </div>
+    <div class="footer__ai">This website was made with the help of AI tools.</div>
+  </footer>
+
+  <!-- Modal -->
+  <div class="modal" id="modal" aria-hidden="true">
+    <div class="modal__backdrop" id="modalBackdrop"></div>
+
+    <div class="modal__card" role="dialog" aria-modal="true" aria-label="Model preview">
+      <button class="modal__close" id="modalClose" aria-label="Close">✕</button>
+
+      <div class="modal__viewer" id="modalViewer">
+        <div class="viewer__loading" id="modalLoading">Loading…</div>
+      </div>
+
+      <div class="modal__meta">
+        <div class="modal__name" id="modalName">—</div>
+        <div class="modal__path" id="modalPath">—</div>
+
+        <div class="modal__actions">
+          <a class="btn btn--primary" id="modalDownload" href="#" download>DOWNLOAD .GLTF</a>
+          <button class="btn" id="modalCopy">COPY LINK</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JS -->
+  <script type="module" src="/hive-resources/js/api.js"></script>
+  <script type="module" src="/hive-resources/js/ui.js"></script>
+  <script type="module" src="/hive-resources/js/preview3d.js"></script>
+  <script type="module" src="/hive-resources/js/models.js"></script>
+</body>
+</html>
+
