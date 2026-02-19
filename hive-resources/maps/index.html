@@ -16,18 +16,15 @@
     // rather than the Worker (models uses the Worker base).
   </script>
   <script>
-    window.__HIVE_GAMES = [
-      "bedwars","block drop","block party","bridge","capture the flag","common","deathrun",
-      "ghost invasion","gravity","ground wars","hide and seek","hub","mob game","murder mystery",
-      "pets","skywars","survival games"
-    ];
+    // Optional fallback list (kept empty to avoid showing model-only gamemodes).
+    window.__HIVE_GAMES = [];
   </script>
 </head>
 
-<body>
+<body class="maps-page">
   <!-- Top Bar -->
   <header class="topbar">
-    <a class="brand" href="https://sparkskye.com">
+    <a class="brand" href="/hive-resources/">
       <img class="brand__logo" src="/public/img/favicon.png" alt="Sparkskye" />
       <span class="brand__name">SPARKSKYE</span>
     </a>
@@ -35,15 +32,14 @@
     <nav class="topnav">
       <a class="topnav__btn" href="/hive-resources/models/">MODELS</a>
       <a class="topnav__btn is-active" href="/hive-resources/maps/">MAPS</a>
+      <a class="topnav__btn" href="/hive-resources/rewind/">REWIND</a>
     </nav>
   </header>
 
   <main class="page">
     <section class="hero">
       <h1 class="hero__title">MAPS</h1>
-      <p class="hero__sub">
-        MAP ASSETS FOR EVERY HIVE GAMEMODE — FAST BROWSING WITH MINIMAP THUMBNAILS.
-      </p>
+      <p class="hero__sub">3D MAP MODELS FOR EVERY HIVE GAMEMODE, HUB, &amp; LOBBY.</p>
     </section>
 
     <!-- Filters panel -->
@@ -69,6 +65,14 @@
     <!-- Grid -->
     <section class="grid" id="grid"></section>
   </main>
+
+  <footer class="footer">
+    <div>
+      All assets are owned by Hive Games LTD, which is not affiliated with this project. Only GLTF/GLB models are provided to comply with the
+      <a href="https://support.playhive.com/terms-of-service/" target="_blank" rel="noopener">Terms of Service</a>.
+    </div>
+    <div>This website was made with the help of AI tools.</div>
+  </footer>
 
   <!-- Modal -->
   <div class="modal" id="modal" aria-hidden="true">
