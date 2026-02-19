@@ -11,15 +11,17 @@
 <body>
   <header class="topbar">
     <a class="brand" href="/">
-      <img class="brand__logo" src="/public/img/favicon.png" alt="Sparkskye" />
+      <img class="brand__logo" src="/img/favicon.png" alt="Sparkskye" />
       <span class="brand__name">SPARKSKYE</span>
     </a>
 
     <nav class="topnav">
-      <a class="topnav__btn is-active" href="/hive-resources/">HOME</a>
-      <a class="topnav__btn" href="/hive-resources/models/">MODELS</a>
-      <a class="topnav__btn" href="/hive-resources/maps/">MAPS</a>
-      <a class="topnav__btn" href="/hive-resources/rewind/">REWIND</a>
+      <div class="topnav__links">
+        <a class="topnav__btn is-active" href="/hive-resources/">HOME</a>
+        <a class="topnav__btn" href="/hive-resources/models/">MODELS</a>
+        <a class="topnav__btn" href="/hive-resources/maps/">MAPS</a>
+        <a class="topnav__btn" href="/hive-resources/rewind/">REWIND</a>
+      </div>
     </nav>
   </header>
 
@@ -31,26 +33,35 @@
 
     <section class="panel">
       <div class="panel__row panel__row--center">
-        <div class="panel__label">CONTRIBUTORS</div>
+        <div class="panel__label" style="text-align:center;width:100%">CONTRIBUTORS</div>
 
         <div class="contributors">
         <a class="contrib" href="https://www.youtube.com/@sparkskye" target="_blank" rel="noopener">
-          <img class="contrib__avatar" src="/public/contributors/sparkskye.png" alt="sparkskye" />
+          <img class="contrib__avatar" src="/contributors/sparkskye.png" alt="sparkskye" />
           <span class="contrib__name">SPARKSKYE</span>
         </a>
         <a class="contrib" href="https://www.youtube.com/@OrTajiX" target="_blank" rel="noopener">
-          <img class="contrib__avatar" src="/public/contributors/faceless.png" alt="The Faceless (OrTajiX)" />
+          <img class="contrib__avatar" src="/contributors/faceless.png" alt="The Faceless (OrTajiX)" />
           <span class="contrib__name">THE FACELESS (ORTAJIX)</span>
         </a>
         <a class="contrib" href="https://www.youtube.com/@mightiemarshall" target="_blank" rel="noopener">
-          <img class="contrib__avatar" src="/public/contributors/marshall.png" alt="MightyMarshall" />
+          <img class="contrib__avatar" src="/contributors/marshall.png" alt="MightyMarshall" />
           <span class="contrib__name">MIGHTYMARSHALL</span>
         </a>
         <a class="contrib" href="https://www.youtube.com/@Elite" target="_blank" rel="noopener">
-          <img class="contrib__avatar" src="/public/contributors/elite.png" alt="Elite" />
+          <img class="contrib__avatar" src="/contributors/elite.png" alt="Elite" />
           <span class="contrib__name">ELITE</span>
         </a>
       </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel__row">
+        <div class="panel__label" style="text-align:center;width:100%">LATEST UPDATES</div>
+      </div>
+      <div class="panel__row" style="justify-content:center">
+        <div class="latest" data-latest-news>Loading…</div>
       </div>
     </section>
 
@@ -68,5 +79,11 @@
       <div class="footer__ai">This website was made with the help of AI tools.</div>
     </footer>
   </main>
+
+  <script type="module">
+    import { initMobileNav, initLatestNews } from "/hive-resources/js/ui.js";
+    initMobileNav();
+    initLatestNews();
+  </script>
 </body>
 </html>
