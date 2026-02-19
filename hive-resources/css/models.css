@@ -492,3 +492,32 @@ body{
   transition: opacity .15s ease;
 }
 .toast.show{ opacity: 1; }
+
+.card__viewer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.card__overlay {
+  position: absolute;
+  inset: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-family: "Minecraftia", monospace;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+
+  color: #9aa3ab;
+  pointer-events: none;
+}
+
+.card__overlay:not(:empty) {
+  background: transparent;
+}
