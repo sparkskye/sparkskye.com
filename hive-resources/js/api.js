@@ -27,9 +27,24 @@ export async function fetchMapGames() {
   return await res.json();
 }
 
-export function fileDownloadUrl(modelId, filename) {
-  const name = filename ? `&name=${encodeURIComponent(filename)}` : "";
-  return apiUrl(`/api/file?id=${encodeURIComponent(modelId)}${name}`);
+export function absoluteUrl(pathOrUrl) {
+  try {
+    return new URL(pathOrUrl, window.location.origin).toString();
+  } catch {
+    return String(pathOrUrl);
+  }
+}
+
+// Download URL (forces attachment naming). Use ext to ensure correct filename on Safari/iOS.
+export function fileDownloadUrl(fileId, filename, ext = "") {
+  let outName = filename || "";
+  const cleanExt = String(ext || "").replace(/^\./, "");
+  if (outName && cleanExt && !outName.toLowerCase().endsWith(`.${cleanExt.toLowerCase()}`)) {
+    outName = `${outName}.${cleanExt}`;
+  }
+  const name = outName ? `&name=${encodeURIComponent(outName)}` : "";
+  const extQ = cleanExt ? `&ext=${encodeURIComponent(cleanExt)}` : "";
+  return apiUrl(`/api/file?id=${encodeURIComponent(fileId)}${name}${extQ}`);
 }
 
 // For image/video previews (no forced attachment name)

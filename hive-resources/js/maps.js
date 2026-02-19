@@ -1,5 +1,5 @@
 import { fetchMaps, fetchMapGames, fileDownloadUrl, fileViewUrl } from "./api.js";
-import { qs, debounce, setUrlParam, getUrlParam, copyToClipboard, titleCase } from "./ui.js";
+import { qs, debounce, setUrlParam, getUrlParam, copyToClipboard, titleCase, initMobileNav } from "./ui.js";
 
 const els = {
   gameChips: qs("#gameChips"),
@@ -81,9 +81,17 @@ async function loadGameListIfNeeded() {
         return key ? { key, label: normalizeGameLabel(g) } : null;
       }
       if (g && typeof g === "object") {
-        const key = slugify(String(g.key || g.slug || g.name || g.label || ""));
-        const label = String(g.label || g.name || g.key || "");
-        return key ? { key, label: normalizeGameLabel(label) } : null;
+        const labelCandidate =
+          (typeof g.label === "string" ? g.label : (g.label && (g.label.label || g.label.name))) ||
+          (typeof g.name === "string" ? g.name : (g.name && (g.name.label || g.name.name))) ||
+          (typeof g.title === "string" ? g.title : "") ||
+          (typeof g.key === "string" ? g.key : "") ||
+          (typeof g.slug === "string" ? g.slug : "");
+
+        let key = slugify(String(g.key || g.slug || labelCandidate || ""));
+        const label = normalizeGameLabel(String(labelCandidate || key || ""));
+        if (!key) key = slugify(label);
+        return key ? { key, label } : null;
       }
       return null;
     }).filter(Boolean);
@@ -100,7 +108,12 @@ async function loadGameListIfNeeded() {
     // Fallback (if the Apps Script list endpoint isn't deployed yet).
     const provided = window.__HIVE_GAMES;
     if (Array.isArray(provided) && provided.length) {
-      state.games = provided.map(x => ({ key: slugify(x), label: normalizeGameLabel(x) }));
+      state.games = provided.map((x) => {
+        if (typeof x === "string") return { key: slugify(x), label: normalizeGameLabel(x) };
+        const label = String(x?.label || x?.name || x?.title || x?.key || "");
+        const key = slugify(String(x?.key || x?.slug || label));
+        return { key, label: normalizeGameLabel(label || key) };
+      }).filter(g => g.key);
       return;
     }
     state.games = [];
@@ -132,7 +145,7 @@ function renderGameChips() {
   for (const g of sorted) {
     const active = g.key === state.game;
     els.gameChips.appendChild(makeChip({
-      label: g.label,
+      label: String(g.label || g.key || "").toUpperCase(),
       active,
       onClick: () => {
         if (state.game === g.key) return;
@@ -331,35 +344,35 @@ function renderGrid(items) {
     ph.className = "card__placeholder";
     ph.textContent = "";
 
-    const img = document.createElement("img");
-    img.className = "card__thumb";
-    img.alt = it.name;
-
     const thumbSrc = it.thumbUrl
       ? it.thumbUrl
       : (it.thumbId ? fileViewUrl(it.thumbId) : "");
 
     // Lazy-load the thumbnail to keep this page fast.
     if (thumbSrc) {
+      const img = document.createElement("img");
+      img.className = "card__thumb";
+      img.alt = it.name;
       img.dataset.src = thumbSrc;
       imgIO.observe(img);
       ph.style.display = "flex";
       ph.textContent = "";
+
+      img.addEventListener("load", () => {
+        ph.style.display = "none";
+      });
+      img.addEventListener("error", () => {
+        // If the PNG is missing, match the modal behavior.
+        ph.style.display = "flex";
+        ph.textContent = "NO PREVIEW";
+      });
+
+      viewer.appendChild(img);
     } else {
       // Match modal behavior: show NO PREVIEW when missing.
       ph.style.display = "flex";
       ph.textContent = "NO PREVIEW";
     }
-
-    img.addEventListener("load", () => {
-      ph.style.display = "none";
-    });
-    img.addEventListener("error", () => {
-      ph.style.display = "flex";
-      ph.textContent = "FAILED TO LOAD";
-    });
-
-    viewer.appendChild(img);
     viewer.appendChild(ph);
 
     const meta = document.createElement("div");
@@ -439,8 +452,9 @@ function openModal(it) {
     els.modalLoading.textContent = "NO PREVIEW";
   }
 
-  const filename = `${slugify(it.name) || "map"}.glb`;
-  const dl = it.glbId ? fileDownloadUrl(it.glbId, filename) : "";
+  const baseName = slugify(it.name) || "map";
+  const filename = `${baseName}.glb`;
+  const dl = it.glbId ? fileDownloadUrl(it.glbId, baseName, "glb") : "";
 
   els.modalDownload.href = dl || "#";
   els.modalDownload.download = filename;
@@ -453,7 +467,7 @@ function openModal(it) {
 
   els.modalCopy.onclick = async () => {
     if (!dl) return;
-    const absolute = new URL(dl, window.location.href).href;
+    const absolute = new URL(dl, window.location.origin).href;
     await copyToClipboard(absolute);
     els.modalCopy.textContent = "COPIED!";
     setTimeout(() => (els.modalCopy.textContent = "COPY LINK"), 900);
@@ -572,6 +586,8 @@ async function loadDataAndRender() {
 }
 
 (async function init() {
+  initMobileNav();
+
   if (!state.game) {
     state.game = "bedwars";
     setUrlParam("game", state.game);

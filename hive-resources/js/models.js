@@ -1,5 +1,5 @@
 import { fetchModels, fileDownloadUrl, fileViewUrl } from "./api.js";
-import { qs, debounce, setUrlParam, getUrlParam, copyToClipboard, titleCase } from "./ui.js";
+import { qs, debounce, setUrlParam, getUrlParam, copyToClipboard, titleCase, initMobileNav } from "./ui.js";
 import { CardPreview, ModalPreview } from "./preview3d.js";
 
 // Keep WebGL contexts under the browser limit (prevents "Too many active WebGL contexts")
@@ -443,6 +443,15 @@ function renderGrid(items) {
   }, { root: null, threshold: 0.01, rootMargin: "520px 0px 520px 0px" });
 
   for (const card of els.grid.querySelectorAll(".card")) io.observe(card);
+
+  // On desktop, scrolling back and forth may not trigger new IntersectionObserver
+  // events (cards remain within rootMargin). We still need to re-prioritize which
+  // previews are allocated to WebGL slots so visible rows always load.
+  if (!window.__HIVE_MODEL_SCROLL_PUMP__) {
+    window.__HIVE_MODEL_SCROLL_PUMP__ = true;
+    window.addEventListener("scroll", schedulePump, { passive: true });
+    window.addEventListener("resize", schedulePump, { passive: true });
+  }
 }
 
 function schedulePump() {
@@ -550,8 +559,9 @@ async function openModal(it) {
   // Move focus into the modal (prevents aria-hidden focus warnings)
   try { els.modalClose?.focus?.(); } catch {}
 
-  const filename = `${slugify(it.name) || "model"}.gltf`;
-  const dl = fileDownloadUrl(it.modelId, filename);
+  const baseName = slugify(it.name) || "model";
+  const filename = `${baseName}.gltf`;
+  const dl = fileDownloadUrl(it.modelId, baseName, "gltf");
   const view = fileViewUrl(it.modelId);
 
   els.modalName.textContent = it.name;
@@ -566,7 +576,7 @@ async function openModal(it) {
   };
 
   els.modalCopy.onclick = async () => {
-    const absolute = new URL(dl, window.location.href).href;
+    const absolute = new URL(dl, window.location.origin).href;
     await copyToClipboard(absolute);
     els.modalCopy.textContent = "COPIED!";
     setTimeout(() => (els.modalCopy.textContent = "COPY LINK"), 900);
@@ -653,6 +663,8 @@ async function loadDataAndRender() {
 
 // Init
 (async function init() {
+  initMobileNav();
+
   if (!state.game) {
     state.game = "bedwars";
     setUrlParam("game", state.game);
