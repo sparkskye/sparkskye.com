@@ -1,10 +1,13 @@
-import { fetchModels, fileDownloadUrl } from "./api.js";
+import { fetchModels, fileDownloadUrl, fileViewUrl } from "./api.js";
 import { qs, debounce, setUrlParam, getUrlParam, copyToClipboard, titleCase } from "./ui.js";
 import { CardPreview, ModalPreview } from "./preview3d.js";
 
 // Keep WebGL contexts under the browser limit (prevents "Too many active WebGL contexts")
 // Slightly higher than before so most screens can fill the visible grid.
-const MAX_ACTIVE_CARD_PREVIEWS = 14;
+// Base WebGL preview budget. We'll dynamically raise this just enough to cover
+// all currently-visible cards so the last row doesn't get stuck on desktop.
+const BASE_ACTIVE_CARD_PREVIEWS = 14;
+const HARD_ACTIVE_CARD_PREVIEWS = 20;
 
 const els = {
   gameChips: qs("#gameChips"),
@@ -107,7 +110,10 @@ function renderGameChips() {
         if (state.game === g.key) return;
         state.game = g.key;
         setUrlParam("game", state.game);
-        await loadDataAndRender();
+        // Update the chip highlight immediately (don't wait for the fetch).
+        renderGameChips();
+        // Kick off load without blocking the click handler.
+        loadDataAndRender();
       }
     }));
   }
@@ -302,8 +308,11 @@ function renderGrid(items) {
 
     const filename = `${slugify(it.name)}.gltf`;
     const dl = fileDownloadUrl(it.modelId, filename);
+    const view = fileViewUrl(it.modelId);
 
-    viewer.dataset.modelUrl = dl;
+    // Use the non-download URL for previews (mobile Safari can get "stuck" on
+    // Content-Disposition: attachment responses after a failed load).
+    viewer.dataset.modelUrl = view;
     viewer.dataset.filename = filename;
 
     const ph = document.createElement("div");
@@ -465,7 +474,14 @@ function pumpVisiblePreviews() {
       return a.dist - b.dist;
     });
 
-  const desired = new Set(candidates.slice(0, MAX_ACTIVE_CARD_PREVIEWS).map(x => x.card));
+  const onScreenCount = candidates.filter(x => x.onScreen).length;
+  // Ensure we can always render every currently-visible card preview on desktop.
+  const cap = Math.min(
+    HARD_ACTIVE_CARD_PREVIEWS,
+    Math.max(BASE_ACTIVE_CARD_PREVIEWS, onScreenCount + 4)
+  );
+
+  const desired = new Set(candidates.slice(0, cap).map(x => x.card));
 
   // Evict previews that are no longer in the desired window.
   for (const [c, prev] of previewByCard) {
@@ -536,6 +552,7 @@ async function openModal(it) {
 
   const filename = `${slugify(it.name) || "model"}.gltf`;
   const dl = fileDownloadUrl(it.modelId, filename);
+  const view = fileViewUrl(it.modelId);
 
   els.modalName.textContent = it.name;
   els.modalPath.textContent = buildPathText(state.game, it.relPath || it.folderLabel || "");
@@ -555,7 +572,7 @@ async function openModal(it) {
   };
 
   try {
-    await modalPreview.open(dl);
+    await modalPreview.open(view);
     els.modalLoading.style.display = "none";
   } catch (err) {
     console.error(err);
@@ -603,6 +620,18 @@ async function loadDataAndRender() {
 
     const groups = json.groups || [];
     state.groups = groups;
+
+    // Some gamemodes store many models directly in the gamemode folder (no subfolders).
+    // If the API exposes those as a separate root list, merge them into the ALL group.
+    const rootItems = json.rootItems || json.items || json.models || [];
+    if (Array.isArray(rootItems) && rootItems.length) {
+      let allGroup = groups.find(g => folderKeyFromGroup(g) === "all");
+      if (!allGroup) {
+        allGroup = { key: "all", label: "ALL", items: [] };
+        groups.unshift(allGroup);
+      }
+      allGroup.items = (allGroup.items || []).concat(rootItems);
+    }
     groups.sort((a, b) =>
       (a.key === "all" ? -1 : b.key === "all" ? 1 : (a.label || "").localeCompare(b.label || ""))
     );

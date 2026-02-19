@@ -1,4 +1,4 @@
-import { fetchMaps, fileDownloadUrl, fileViewUrl } from "./api.js";
+import { fetchMaps, fetchMapGames, fileDownloadUrl, fileViewUrl } from "./api.js";
 import { qs, debounce, setUrlParam, getUrlParam, copyToClipboard, titleCase } from "./ui.js";
 
 const els = {
@@ -34,6 +34,7 @@ const state = {
 let gridLoadingEl = null;
 let gridLoadingStop = null;
 let imgIO = null;
+let loadSeq = 0;
 
 function slugify(s) {
   return (s || "")
@@ -68,12 +69,24 @@ function makeChip({ label, active, onClick, extraClass = "" }) {
 }
 
 async function loadGameListIfNeeded() {
-  const provided = window.__HIVE_GAMES;
-  if (Array.isArray(provided) && provided.length) {
-    state.games = provided.map(x => ({ key: slugify(x), label: normalizeGameLabel(x) }));
+  // Prefer the maps drive root (prevents showing model-only gamemodes like "pets").
+  try {
+    const res = await fetchMapGames();
+    const games = Array.isArray(res?.games) ? res.games : Array.isArray(res) ? res : [];
+    state.games = games
+      .map((x) => String(x))
+      .filter(Boolean)
+      .map((x) => ({ key: slugify(x), label: normalizeGameLabel(x) }));
     return;
+  } catch {
+    // Fallback (if the Apps Script list endpoint isn't deployed yet).
+    const provided = window.__HIVE_GAMES;
+    if (Array.isArray(provided) && provided.length) {
+      state.games = provided.map(x => ({ key: slugify(x), label: normalizeGameLabel(x) }));
+      return;
+    }
+    state.games = [];
   }
-  state.games = [];
 }
 
 function renderGameChips() {
@@ -83,17 +96,33 @@ function renderGameChips() {
     ? state.games
     : [{ key: state.game || "bedwars", label: normalizeGameLabel(state.game || "bedwars") }];
 
+  // ALL MAPS (aggregates across all gamemodes)
+  els.gameChips.appendChild(makeChip({
+    label: "ALL MAPS",
+    active: state.game === "all",
+    onClick: () => {
+      if (state.game === "all") return;
+      state.game = "all";
+      setUrlParam("game", state.game);
+      // Immediate visual feedback
+      renderGameChips();
+      loadDataAndRender();
+    }
+  }));
+
   const sorted = [...games].sort((a, b) => a.label.localeCompare(b.label));
   for (const g of sorted) {
     const active = g.key === state.game;
     els.gameChips.appendChild(makeChip({
       label: g.label,
       active,
-      onClick: async () => {
+      onClick: () => {
         if (state.game === g.key) return;
         state.game = g.key;
         setUrlParam("game", state.game);
-        await loadDataAndRender();
+        // Immediate visual feedback
+        renderGameChips();
+        loadDataAndRender();
       }
     }));
   }
@@ -106,9 +135,9 @@ function modeKeyFromGroup(group) {
 function renderModeChips(groups) {
   clearNode(els.modeChips);
 
-  // Always include ALL MAPS
+  // Always include ALL MODES
   els.modeChips.appendChild(makeChip({
-    label: "ALL MAPS",
+    label: "ALL MODES",
     active: (state.mode || "all") === "all",
     extraClass: "chip--folder",
     onClick: () => {
@@ -151,7 +180,7 @@ function pickThumb(it) {
   return { id, url };
 }
 
-function flattenItemsFromGroups(groups) {
+function flattenItemsFromGroups(groups, gameKey) {
   const out = [];
 
   // Prefer non-"all" groups
@@ -165,6 +194,7 @@ function flattenItemsFromGroups(groups) {
       const thumb = pickThumb(it);
       out.push({
         name: it.name || it.title || "(untitled)",
+        gameKey: gameKey || state.game,
         glbId,
         thumbId: thumb.id,
         thumbUrl: thumb.url,
@@ -184,6 +214,7 @@ function flattenItemsFromGroups(groups) {
       const thumb = pickThumb(it);
       out.push({
         name: it.name || it.title || "(untitled)",
+        gameKey: gameKey || state.game,
         glbId,
         thumbId: thumb.id,
         thumbUrl: thumb.url,
@@ -294,6 +325,12 @@ function renderGrid(items) {
     if (thumbSrc) {
       img.dataset.src = thumbSrc;
       imgIO.observe(img);
+      ph.style.display = "flex";
+      ph.textContent = "";
+    } else {
+      // Match modal behavior: show NO PREVIEW when missing.
+      ph.style.display = "flex";
+      ph.textContent = "NO PREVIEW";
     }
 
     img.addEventListener("load", () => {
@@ -333,7 +370,7 @@ function renderGrid(items) {
 
     const path = document.createElement("div");
     path.className = "card__path";
-    path.textContent = buildPathText(state.game, it.relPath || it.modeLabel || "");
+    path.textContent = buildPathText(it.gameKey || state.game, it.relPath || it.modeLabel || "");
 
     meta.appendChild(nameRow);
     meta.appendChild(path);
@@ -357,7 +394,7 @@ function openModal(it) {
   els.modalLoading.textContent = "Loading…";
 
   els.modalName.textContent = it.name;
-  els.modalPath.textContent = buildPathText(state.game, it.relPath || it.modeLabel || "");
+  els.modalPath.textContent = buildPathText(it.gameKey || state.game, it.relPath || it.modeLabel || "");
 
   // Clear viewer
   while (els.modalViewer.firstChild) els.modalViewer.removeChild(els.modalViewer.firstChild);
@@ -426,16 +463,74 @@ els.search.addEventListener("input", debounce(() => {
 }, 120));
 
 async function loadDataAndRender() {
+  const mySeq = ++loadSeq;
   showGridLoading(true);
 
+  const mapLimit = async (arr, limit, fn) => {
+    const out = new Array(arr.length);
+    let i = 0;
+    const workers = new Array(Math.min(limit, arr.length)).fill(0).map(async () => {
+      while (i < arr.length) {
+        const idx = i++;
+        out[idx] = await fn(arr[idx]);
+      }
+    });
+    await Promise.all(workers);
+    return out;
+  };
+
+  const groupsFromItems = (items) => {
+    const m = new Map();
+    for (const it of items) {
+      if (!it?.modeKey || it.modeKey === "all") continue;
+      if (!m.has(it.modeKey)) m.set(it.modeKey, (it.modeLabel || it.modeKey).toUpperCase());
+    }
+    const groups = [...m.entries()].map(([key, label]) => ({ key, label }));
+    groups.sort((a, b) => (a.label || "").localeCompare(b.label || ""));
+    return groups;
+  };
+
   try {
+    await loadGameListIfNeeded();
+    if (mySeq !== loadSeq) return;
+    renderGameChips();
+
+    // ALL MAPS aggregates across every gamemode in the maps drive.
+    if (state.game === "all") {
+      const gameKeys = state.games.map(g => g.key).filter(Boolean);
+      const results = await mapLimit(gameKeys, 4, async (gk) => {
+        try {
+          const json = await fetchMaps(gk);
+          const groups = json.groups || json.modes || json.folders || [];
+          return flattenItemsFromGroups(groups, gk);
+        } catch {
+          return [];
+        }
+      });
+      if (mySeq !== loadSeq) return;
+
+      state.data = { game: { key: "all" } };
+      state.items = results.flat();
+      state.groups = groupsFromItems(state.items);
+
+      // Mode validity check
+      const modeKeys = new Set(state.groups.map(g => modeKeyFromGroup(g)).concat(["all"]));
+      if (!modeKeys.has(state.mode)) {
+        state.mode = "all";
+        setUrlParam("mode", "all");
+      }
+
+      renderModeChips(state.groups);
+      applyFiltersAndRenderGrid();
+      return;
+    }
+
+    // Single gamemode
     const json = await fetchMaps(state.game);
+    if (mySeq !== loadSeq) return;
     state.data = json;
 
     if (json?.game?.key) state.game = slugify(json.game.key);
-
-    await loadGameListIfNeeded();
-    renderGameChips();
 
     const groups = json.groups || json.modes || json.folders || [];
     state.groups = groups;
@@ -450,10 +545,10 @@ async function loadDataAndRender() {
     }
 
     renderModeChips(groups);
-    state.items = flattenItemsFromGroups(groups);
+    state.items = flattenItemsFromGroups(groups, state.game);
     applyFiltersAndRenderGrid();
   } finally {
-    showGridLoading(false);
+    if (mySeq === loadSeq) showGridLoading(false);
   }
 }
 

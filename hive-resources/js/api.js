@@ -19,6 +19,14 @@ export async function fetchMaps(gameKey) {
   return await res.json();
 }
 
+// List available map gamemodes from the MAPS drive root (requires Apps Script support).
+export async function fetchMapGames() {
+  const url = apiUrl(`/api/maps?list=1`);
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+  return await res.json();
+}
+
 export function fileDownloadUrl(modelId, filename) {
   const name = filename ? `&name=${encodeURIComponent(filename)}` : "";
   return apiUrl(`/api/file?id=${encodeURIComponent(modelId)}${name}`);
