@@ -1,95 +1,56 @@
-// 3D preview helpers (Three.js)
-// - CardPreview: lightweight, non-interactive, renders once while card is visible
-// - ModalPreview: interactive orbit controls, renders continuously while modal is open
+import * as THREE from "https://unpkg.com/three@0.158.0/build/three.module.js";
+import { GLTFLoader } from "https://unpkg.com/three@0.158.0/examples/jsm/loaders/GLTFLoader.js";
+import { OrbitControls } from "https://unpkg.com/three@0.158.0/examples/jsm/controls/OrbitControls.js";
 
-import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
-import { GLTFLoader } from "https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
-import { OrbitControls } from "https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js";
-
-function applyNearestNeighborTextures(root) {
-  root.traverse((obj) => {
-    if (!obj.isMesh) return;
-    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+function setNearestFiltering(root) {
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
     for (const m of mats) {
       if (!m) continue;
-      // Any texture-like slot we commonly care about
-      const texKeys = ["map", "emissiveMap", "metalnessMap", "roughnessMap", "normalMap", "aoMap", "alphaMap"];
-      for (const k of texKeys) {
+      const maps = ["map", "emissiveMap", "metalnessMap", "roughnessMap", "normalMap", "aoMap", "alphaMap"];
+      for (const k of maps) {
         const t = m[k];
         if (t && t.isTexture) {
           t.magFilter = THREE.NearestFilter;
-          t.minFilter = THREE.NearestFilter;
-          t.generateMipmaps = false;
+          // keep mips, but nearest to preserve pixel look
+          t.minFilter = THREE.NearestMipmapNearestFilter;
+          t.anisotropy = 1;
           t.needsUpdate = true;
         }
       }
-      // Keep shading clean + simple (no fancy highlights)
-      m.toneMapped = false;
+      m.needsUpdate = true;
     }
   });
 }
 
-async function loadGltfFromUrl(url) {
-  const loader = new GLTFLoader();
-  return await new Promise((resolve, reject) => {
-    loader.load(
-      url,
-      (gltf) => resolve(gltf),
-      undefined,
-      (err) => reject(err)
-    );
-  });
-}
+function fitCameraToObject(camera, object, { padding = 1.25, yBias = 0.15 } = {}) {
+  const box = new THREE.Box3().setFromObject(object);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
 
-function centerAndScale(root, targetSize = 1.2) {
-  const box = new THREE.Box3().setFromObject(root);
-  const size = new THREE.Vector3();
-  const center = new THREE.Vector3();
-  box.getSize(size);
-  box.getCenter(center);
+  // Recenter object at origin
+  object.position.x += (object.position.x - center.x);
+  object.position.y += (object.position.y - center.y);
+  object.position.z += (object.position.z - center.z);
 
-  // Center at origin
-  root.position.sub(center);
+  // Use largest dimension for a stable "fits everything" framing
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const fov = THREE.MathUtils.degToRad(camera.fov);
+  const dist = (maxDim / (2 * Math.tan(fov / 2))) * padding;
 
-  const maxDim = Math.max(size.x, size.y, size.z) || 1;
-  const s = targetSize / maxDim;
-  root.scale.setScalar(s);
+  camera.position.set(0, maxDim * yBias, dist);
+  camera.near = Math.max(0.01, dist / 100);
+  camera.far = dist * 100;
+  camera.lookAt(0, 0, 0);
+  camera.updateProjectionMatrix();
 
-  // Recompute for camera framing
-  const box2 = new THREE.Box3().setFromObject(root);
-  const size2 = new THREE.Vector3();
-  box2.getSize(size2);
-  const maxDim2 = Math.max(size2.x, size2.y, size2.z) || 1;
-
-  return { maxDim: maxDim2 };
-}
-
-function makeRenderer(canvas) {
-  const r = new THREE.WebGLRenderer({
-    canvas,
-    antialias: true,
-    alpha: true,
-    powerPreference: "high-performance",
-    preserveDrawingBuffer: false,
-  });
-  r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  r.outputColorSpace = THREE.SRGBColorSpace;
-  r.toneMapping = THREE.NoToneMapping;
-  r.setClearColor(0x000000, 0); // transparent
-  r.shadowMap.enabled = false;
-  return r;
-}
-
-function addFlatLights(scene) {
-  // Mostly ambient / soft so pixel art stays clean
-  scene.add(new THREE.AmbientLight(0xffffff, 2.2));
-  const hemi = new THREE.HemisphereLight(0xffffff, 0x000000, 0.6);
-  scene.add(hemi);
+  return { maxDim };
 }
 
 export class CardPreview {
   constructor(container, opts = {}) {
-    this.container = container; // .preview
+    this.container = container;
     this.opts = opts;
 
     this.canvas = null;
@@ -98,129 +59,125 @@ export class CardPreview {
     this.camera = null;
     this.root = null;
 
-    this.phEl = null;       // .ph placeholder
-    this.retryEl = null;    // .reloadBtn
+    // Use the existing placeholder (preferred), otherwise create one.
+    this.loadingEl = this.container.querySelector(".ph") || null;
 
-    this.resizeObserver = null;
     this._disposed = false;
+
+    this._setup();
   }
 
-  _attachUi() {
-    this.phEl = this.container.querySelector(".ph") || null;
-    this.retryEl = this.container.querySelector(".reloadBtn") || null;
-    if (this.retryEl) this.retryEl.style.display = "none";
-    if (this.phEl) this.phEl.textContent = "Loading…";
-  }
+  _setup() {
+    // Don't nuke the container (it already has placeholder + reload button)
+    if (!this.canvas) {
+      this.canvas = document.createElement("canvas");
+      this.canvas.className = "pvCanvas";
+      this.container.prepend(this.canvas);
+    }
 
-  _resize() {
-    if (!this.renderer || !this.camera) return;
-    const rect = this.container.getBoundingClientRect();
-    const w = Math.max(1, Math.floor(rect.width));
-    const h = Math.max(1, Math.floor(rect.height));
-    this.renderer.setSize(w, h, false);
-    this.camera.aspect = w / h;
-    this.camera.updateProjectionMatrix();
-    this.renderOnce();
-  }
+    this.renderer = new THREE.WebGLRenderer({
+      canvas: this.canvas,
+      antialias: false, // crisp pixels
+      alpha: true,
+      powerPreference: "low-power",
+    });
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.NoToneMapping;
+    this.renderer.setClearColor(0x000000, 0);
 
-  async init(modelUrl) {
-    this._disposed = false;
-    this._attachUi();
-    if (this.phEl) this.phEl.textContent = "Loading…";
-
-    // Canvas
-    this.canvas = document.createElement("canvas");
-    this.canvas.className = "thumbCanvas";
-    this.canvas.style.pointerEvents = "none"; // not interactable in grid
-    this.container.appendChild(this.canvas);
-
-    // Scene
     this.scene = new THREE.Scene();
-    addFlatLights(this.scene);
 
-    // Camera
-    this.camera = new THREE.PerspectiveCamera(35, 1, 0.01, 100);
-    this.camera.up.set(0, 1, 0);
+    // Flat lighting: ambient only (no dramatic shading)
+    const amb = new THREE.AmbientLight(0xffffff, 1.0);
+    this.scene.add(amb);
 
-    // Renderer
-    this.renderer = makeRenderer(this.canvas);
+    const w = this.container.clientWidth || 320;
+    const h = this.container.clientHeight || 220;
 
-    // Robust sizing (prevents "off screen" framing when layout is 0px)
-    this.resizeObserver = new ResizeObserver(() => this._resize());
-    this.resizeObserver.observe(this.container);
+    this.camera = new THREE.PerspectiveCamera(35, w / h, 0.01, 1000);
+    this.renderer.setSize(w, h, false);
+  }
 
-    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-    this._resize();
-
-    const gltf = await loadGltfFromUrl(modelUrl);
+  _renderOnce() {
     if (this._disposed) return;
+    const w = this.container.clientWidth || 320;
+    const h = this.container.clientHeight || 220;
+    if (this.camera && this.renderer) {
+      this.camera.aspect = w / h;
+      this.camera.updateProjectionMatrix();
+      this.renderer.setSize(w, h, false);
+      this.renderer.render(this.scene, this.camera);
+    }
+  }
+
+  async init(modelId, filename) {
+    if (!modelId) return;
+    const apiBase = this.opts.apiBase || window.__HIVE_API_BASE || "";
+    const url = apiBase.replace(/\/$/, "") + `/api/file?id=${encodeURIComponent(modelId)}&name=${encodeURIComponent(filename || "model.gltf")}`;
+
+    if (this.loadingEl) this.loadingEl.textContent = "Loading…";
+
+    // Load GLTF
+    const loader = new GLTFLoader();
+    const gltf = await new Promise((resolve, reject) => {
+      loader.load(url, resolve, undefined, reject);
+    });
+
+    // Clear previous
+    if (this.root) {
+      this.scene.remove(this.root);
+      this.root = null;
+    }
 
     this.root = gltf.scene || gltf.scenes?.[0];
-    if (!this.root) throw new Error("No scene in GLTF/GLB");
+    if (!this.root) throw new Error("No scene in GLTF");
 
-    // Keep default orientation; only face forward
+    // Face front: rotate 180° around vertical axis ONLY
     this.root.rotation.set(0, Math.PI, 0);
 
     this.scene.add(this.root);
-    applyNearestNeighborTextures(this.root);
 
-    const { maxDim } = centerAndScale(this.root, 1.4);
+    // Nearest-neighbor textures
+    setNearestFiltering(this.root);
 
-    // Frame from the front
-    this.camera.position.set(0, maxDim * 0.25, maxDim * 2.2);
-    this.camera.lookAt(0, 0, 0);
+    // Fit + center
+    fitCameraToObject(this.camera, this.root);
 
-    this.renderOnce();
-    if (this.phEl) this.phEl.textContent = "";
+    // First render
+    this._renderOnce();
+
+    if (this.loadingEl) this.loadingEl.textContent = "";
   }
 
-  renderOnce() {
-    if (!this.renderer || !this.scene || !this.camera) return;
-    this.renderer.render(this.scene, this.camera);
-  }
-
-  destroy(removeDom = true) {
+  destroy(keepPlaceholder = true) {
     this._disposed = true;
 
-    try { this.resizeObserver?.disconnect(); } catch {}
-    this.resizeObserver = null;
-
-    if (this.root && this.scene) this.scene.remove(this.root);
-
-    if (this.root) {
-      this.root.traverse((obj) => {
-        if (obj.isMesh) {
-          obj.geometry?.dispose?.();
-          const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-          for (const m of mats) {
-            if (!m) continue;
-            for (const k in m) {
-              const v = m[k];
-              if (v && v.isTexture) v.dispose?.();
-            }
-            m.dispose?.();
-          }
-        }
-      });
+    if (this.root && this.scene) {
+      this.scene.remove(this.root);
+      this.root = null;
     }
 
-    try { this.renderer?.dispose?.(); } catch {}
-
-    if (removeDom) {
-      try { this.canvas?.remove(); } catch {}
+    if (this.renderer) {
+      this.renderer.dispose();
+      this.renderer = null;
     }
 
-    this.canvas = null;
-    this.renderer = null;
-    this.scene = null;
-    this.camera = null;
-    this.root = null;
+    if (this.canvas && this.canvas.parentNode) {
+      this.canvas.parentNode.removeChild(this.canvas);
+      this.canvas = null;
+    }
+
+    if (!keepPlaceholder && this.loadingEl) {
+      this.loadingEl.textContent = "";
+    }
   }
 }
 
 export class ModalPreview {
-  constructor(container) {
+  constructor(container, opts = {}) {
     this.container = container;
+    this.opts = opts;
+
     this.canvas = null;
     this.renderer = null;
     this.scene = null;
@@ -228,147 +185,111 @@ export class ModalPreview {
     this.controls = null;
     this.root = null;
 
-    this._raf = null;
-    this._open = false;
-    this._currentUrl = null;
+    this._onResize = () => this._render();
+    this._disposed = false;
 
-    this._resizeObserver = null;
-    this._loadingEl = null;
+    this._setup();
   }
 
-  _ensureCanvas() {
-    if (this.canvas) return;
-    this.canvas = document.createElement("canvas");
-    this.canvas.className = "modalCanvas";
+  _setup() {
     this.container.innerHTML = "";
+
+    this.canvas = document.createElement("canvas");
+    this.canvas.className = "mvCanvas";
     this.container.appendChild(this.canvas);
 
-    this._loadingEl = document.createElement("div");
-    this._loadingEl.className = "modalLoading";
-    this._loadingEl.textContent = "Loading…";
-    this.container.appendChild(this._loadingEl);
-
-    this.renderer = makeRenderer(this.canvas);
+    this.renderer = new THREE.WebGLRenderer({
+      canvas: this.canvas,
+      antialias: false,
+      alpha: true,
+      powerPreference: "high-performance",
+    });
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.NoToneMapping;
+    this.renderer.setClearColor(0x000000, 0);
 
     this.scene = new THREE.Scene();
-    addFlatLights(this.scene);
+    this.scene.add(new THREE.AmbientLight(0xffffff, 1.0));
 
-    this.camera = new THREE.PerspectiveCamera(35, 1, 0.01, 200);
-    this.camera.up.set(0, 1, 0);
+    const w = this.container.clientWidth || 800;
+    const h = this.container.clientHeight || 500;
+    this.camera = new THREE.PerspectiveCamera(35, w / h, 0.01, 2000);
+    this.renderer.setSize(w, h, false);
 
     this.controls = new OrbitControls(this.camera, this.canvas);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.08;
-    this.controls.rotateSpeed = 0.8;
+    this.controls.rotateSpeed = 0.6;
     this.controls.zoomSpeed = 0.8;
-    this.controls.panSpeed = 0.7;
-    this.controls.target.set(0, 0, 0);
+    this.controls.panSpeed = 0.6;
+    this.controls.addEventListener("change", () => this._render());
 
-    this._resizeObserver = new ResizeObserver(() => this._resize());
-    this._resizeObserver.observe(this.container);
-    this._resize();
-  }
-
-  _resize() {
-    if (!this.renderer || !this.camera) return;
-    const rect = this.container.getBoundingClientRect();
-    const w = Math.max(1, Math.floor(rect.width));
-    const h = Math.max(1, Math.floor(rect.height));
-    this.renderer.setSize(w, h, false);
-    this.camera.aspect = w / h;
-    this.camera.updateProjectionMatrix();
-    this._render();
-  }
-
-  async open(modelUrl) {
-    this._open = true;
-    this._currentUrl = modelUrl;
-    this._ensureCanvas();
-    this._loadingEl.style.display = "flex";
-    this._loadingEl.textContent = "Loading…";
-
-    // Cleanup existing
-    if (this.root) this.scene.remove(this.root);
-    this.root = null;
-
-    try {
-      const gltf = await loadGltfFromUrl(modelUrl);
-      if (!this._open) return;
-
-      this.root = gltf.scene || gltf.scenes?.[0];
-      if (!this.root) throw new Error("No scene in GLTF/GLB");
-
-      // Face forward (Y 180) only
-      this.root.rotation.set(0, Math.PI, 0);
-
-      this.scene.add(this.root);
-      applyNearestNeighborTextures(this.root);
-
-      const { maxDim } = centerAndScale(this.root, 2.0);
-
-      this.camera.position.set(0, maxDim * 0.25, maxDim * 2.6);
-      this.controls.target.set(0, 0, 0);
-      this.controls.update();
-
-      this._loadingEl.style.display = "none";
-      this._loop();
-    } catch (err) {
-      console.error("ModalPreview failed:", err);
-      this._loadingEl.style.display = "flex";
-      this._loadingEl.textContent = "Failed to load";
-    }
-  }
-
-  _loop() {
-    if (!this._open) return;
-    this._raf = requestAnimationFrame(() => this._loop());
-    this.controls?.update();
-    this._render();
+    window.addEventListener("resize", this._onResize);
   }
 
   _render() {
-    try { this.renderer?.render(this.scene, this.camera); } catch {}
+    if (this._disposed) return;
+    const w = this.container.clientWidth || 800;
+    const h = this.container.clientHeight || 500;
+    this.camera.aspect = w / h;
+    this.camera.updateProjectionMatrix();
+    this.renderer.setSize(w, h, false);
+
+    if (this.controls) this.controls.update();
+    this.renderer.render(this.scene, this.camera);
+  }
+
+  async open(url) {
+    if (!url) return;
+
+    // Remove old
+    if (this.root) {
+      this.scene.remove(this.root);
+      this.root = null;
+    }
+
+    const loader = new GLTFLoader();
+    const gltf = await new Promise((resolve, reject) => {
+      loader.load(url, resolve, undefined, reject);
+    });
+
+    this.root = gltf.scene || gltf.scenes?.[0];
+    if (!this.root) throw new Error("No scene in GLTF");
+
+    // Face front only
+    this.root.rotation.set(0, Math.PI, 0);
+
+    this.scene.add(this.root);
+    setNearestFiltering(this.root);
+
+    fitCameraToObject(this.camera, this.root, { padding: 1.15, yBias: 0.10 });
+
+    // Orbit target stays at origin since we recentered model
+    this.controls.target.set(0, 0, 0);
+    this.controls.update();
+
+    this._render();
   }
 
   close() {
-    this._open = false;
-    if (this._raf) cancelAnimationFrame(this._raf);
-    this._raf = null;
-    this._currentUrl = null;
-    // keep scene around; model removed on next open
-  }
+    this._disposed = true;
+    window.removeEventListener("resize", this._onResize);
 
-  destroy() {
-    this.close();
-    try { this._resizeObserver?.disconnect(); } catch {}
-    this._resizeObserver = null;
-
-    if (this.root && this.scene) this.scene.remove(this.root);
-
-    if (this.root) {
-      this.root.traverse((obj) => {
-        if (obj.isMesh) {
-          obj.geometry?.dispose?.();
-          const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-          for (const m of mats) {
-            if (!m) continue;
-            for (const k in m) {
-              const v = m[k];
-              if (v && v.isTexture) v.dispose?.();
-            }
-            m.dispose?.();
-          }
-        }
-      });
-    }
-
-    try { this.renderer?.dispose?.(); } catch {}
-    this.container.innerHTML = "";
-    this.canvas = null;
-    this.renderer = null;
-    this.scene = null;
-    this.camera = null;
+    try { this.controls?.dispose(); } catch {}
     this.controls = null;
-    this.root = null;
+
+    if (this.root && this.scene) {
+      this.scene.remove(this.root);
+      this.root = null;
+    }
+    if (this.renderer) {
+      this.renderer.dispose();
+      this.renderer = null;
+    }
+    if (this.canvas && this.canvas.parentNode) {
+      this.canvas.parentNode.removeChild(this.canvas);
+      this.canvas = null;
+    }
+    this.container.innerHTML = "";
   }
 }
