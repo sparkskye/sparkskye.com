@@ -20,16 +20,38 @@ export async function onRequest(context) {
   }
 
   const headers = new Headers();
-  headers.set("Content-Type", driveRes.headers.get("Content-Type") || "application/octet-stream");
+  // Use Drive's content-type unless we can confidently infer it from the requested filename.
+  const inferred = contentTypeFromName(safeName);
+  headers.set(
+    "Content-Type",
+    inferred || driveRes.headers.get("Content-Type") || "application/octet-stream"
+  );
   headers.set("Access-Control-Allow-Origin", "*");
   headers.set("Cache-Control", "public, max-age=86400");
 
   // Force a consistent filename for downloads.
   if (safeName) {
-    headers.set("Content-Disposition", `attachment; filename=\"${safeName}\"`);
+    // iOS/Safari is picky — include both filename and filename* to avoid odd ".bin" naming.
+    const enc = encodeURIComponent(safeName);
+    headers.set(
+      "Content-Disposition",
+      `attachment; filename=\"${safeName}\"; filename*=UTF-8''${enc}`
+    );
   }
 
   return new Response(driveRes.body, { headers });
+}
+
+function contentTypeFromName(name) {
+  const n = String(name || "").toLowerCase();
+  if (!n) return null;
+  if (n.endsWith(".gltf")) return "model/gltf+json; charset=utf-8";
+  if (n.endsWith(".glb")) return "model/gltf-binary";
+  if (n.endsWith(".png")) return "image/png";
+  if (n.endsWith(".jpg") || n.endsWith(".jpeg")) return "image/jpeg";
+  if (n.endsWith(".webp")) return "image/webp";
+  if (n.endsWith(".json")) return "application/json; charset=utf-8";
+  return null;
 }
 
 function sanitizeFilename(name) {
