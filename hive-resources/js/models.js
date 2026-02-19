@@ -3,7 +3,8 @@ import { qs, debounce, setUrlParam, getUrlParam, copyToClipboard, titleCase } fr
 import { CardPreview, ModalPreview } from "./preview3d.js";
 
 // Keep WebGL contexts under the browser limit (prevents "Too many active WebGL contexts")
-const MAX_ACTIVE_CARD_PREVIEWS = 12;
+// Slightly higher than before so most screens can fill the visible grid.
+const MAX_ACTIVE_CARD_PREVIEWS = 14;
 
 const els = {
   gameChips: qs("#gameChips"),
@@ -405,7 +406,7 @@ function renderGrid(items) {
         schedulePump();
       }
     }
-  }, { root: null, threshold: 0.01, rootMargin: "280px 0px 280px 0px" });
+  }, { root: null, threshold: 0.01, rootMargin: "520px 0px 520px 0px" });
 
   for (const card of els.grid.querySelectorAll(".card")) io.observe(card);
 }
@@ -419,11 +420,47 @@ function schedulePump() {
 }
 
 function pumpVisiblePreviews() {
-  // Fill up to MAX_ACTIVE_CARD_PREVIEWS using currently visible cards.
-  if (previewByCard.size >= MAX_ACTIVE_CARD_PREVIEWS) return;
+  // Always prioritize cards closest to the viewport.
+  // This prevents the "previews lag behind scroll" feeling where offscreen cards
+  // (still within rootMargin) hog the WebGL budget.
+  const vh = window.innerHeight || 800;
+  const vc = vh / 2;
 
-  for (const card of visibleCards) {
-    if (previewByCard.size >= MAX_ACTIVE_CARD_PREVIEWS) break;
+  const candidates = Array.from(visibleCards)
+    .map((card) => {
+      const r = card.getBoundingClientRect();
+      const center = (r.top + r.bottom) / 2;
+      const dist = Math.abs(center - vc);
+      // Prefer actually-on-screen cards over merely-near cards.
+      const onScreen = (r.bottom > 0 && r.top < vh);
+      return { card, dist, onScreen };
+    })
+    .sort((a, b) => {
+      if (a.onScreen !== b.onScreen) return a.onScreen ? -1 : 1;
+      return a.dist - b.dist;
+    });
+
+  const desired = new Set(candidates.slice(0, MAX_ACTIVE_CARD_PREVIEWS).map(x => x.card));
+
+  // Evict previews that are no longer in the desired window.
+  for (const [c, prev] of previewByCard) {
+    if (desired.has(c)) continue;
+    try { prev.destroy(true); } catch {}
+    previewByCard.delete(c);
+    const viewer = c.querySelector(".card__viewer");
+    const ph = viewer?.querySelector(".card__placeholder");
+    const reload = viewer?.querySelector(".card__reload");
+    if (c._phStop) c._phStop();
+    c._phStop = null;
+    if (ph) {
+      ph.style.display = "flex";
+      ph.textContent = (c.dataset.failed === "1") ? "PREVIEW FAILED" : "";
+    }
+    if (reload) reload.style.display = (c.dataset.failed === "1") ? "inline-flex" : "none";
+  }
+
+  // Fill missing previews inside desired set.
+  for (const card of desired) {
     if (previewByCard.has(card)) continue;
     if (card.dataset.failed === "1") continue;
 
@@ -431,19 +468,6 @@ function pumpVisiblePreviews() {
     if (!viewer) continue;
     const modelUrl = viewer.dataset.modelUrl;
     if (!modelUrl) continue;
-
-    // If we're at the cap, evict one that's not visible (best effort)
-    if (previewByCard.size >= MAX_ACTIVE_CARD_PREVIEWS) {
-      for (const [c, prev] of previewByCard) {
-        if (visibleCards.has(c)) continue;
-        try { prev.destroy(true); } catch {}
-        previewByCard.delete(c);
-        break;
-      }
-    }
-
-    // Still capped? stop.
-    if (previewByCard.size >= MAX_ACTIVE_CARD_PREVIEWS) break;
 
     const ph = viewer.querySelector(".card__placeholder");
     const reload = viewer.querySelector(".card__reload");
