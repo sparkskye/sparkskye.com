@@ -2,12 +2,21 @@ export async function onRequest(context) {
   const url = new URL(context.request.url);
   const id = url.searchParams.get("id");
   const requestedName = url.searchParams.get("name") || url.searchParams.get("filename") || "";
+  const ext = (url.searchParams.get("ext") || "").replace(/^\./, "");
 
   if (!id) {
     return new Response("Missing id", { status: 400 });
   }
 
-  const safeName = sanitizeFilename(requestedName);
+  let safeName = sanitizeFilename(requestedName);
+  // If the caller provided a basename plus ext, enforce it so Safari/iOS doesn't
+  // treat this as a generic binary and append ".bin".
+  if (ext) {
+    const lower = safeName.toLowerCase();
+    const want = `.${ext.toLowerCase()}`;
+    if (safeName && !lower.endsWith(want)) safeName = `${safeName}${want}`;
+    if (!safeName) safeName = `download${want}`;
+  }
   const driveRes = await fetchDriveFile(id);
 
   if (!driveRes || !driveRes.ok) {
