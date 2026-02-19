@@ -237,7 +237,10 @@ export class CardPreview {
     }
     this.root = null;
 
-    // DO NOT forceContextLoss() here — it can cause white previews / flicker.
+    // In long scrolling galleries, Chrome can hold onto WebGL contexts even after dispose().
+    // Best-effort: explicitly release the context when destroying card previews to avoid
+    // "Too many active WebGL contexts" (which causes stuck/white previews).
+    try { this.renderer?.forceContextLoss?.(); } catch {}
     try { this.renderer?.dispose?.(); } catch {}
     this.renderer = null;
     this.scene = null;
