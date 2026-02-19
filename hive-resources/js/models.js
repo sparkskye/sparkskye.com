@@ -1,445 +1,362 @@
-/* =========================
-   Config
-   ========================= */
-const API_BASE = "https://delicate-bush-cf6f.sparkskye-minecraft.workers.dev";
+import { fetchModels, fileDownloadUrl } from "./api.js";
+import { qs, debounce, setUrlParam, getUrlParam, copyToClipboard, titleCase } from "./ui.js";
+import { CardPreview, ModalPreview } from "./preview3d.js";
 
 const els = {
-  gamePills: document.getElementById("gamePills"),
-  folderPills: document.getElementById("folderPills"),
-  search: document.getElementById("searchInput"),
-  count: document.getElementById("countBadge"),
-  grid: document.getElementById("grid"),
+  gameChips: qs("#gameChips"),
+  folderChips: qs("#folderChips"),
+  search: qs("#searchInput"),
+  count: qs("#countLabel"),
+  grid: qs("#grid"),
 
-  modal: document.getElementById("modal"),
-  modalViewer: document.getElementById("modalViewer"),
-  modalName: document.getElementById("modalName"),
-  modalPath: document.getElementById("modalPath"),
-  modalDownload: document.getElementById("modalDownload"),
-  modalCopy: document.getElementById("modalCopy"),
-
-  toast: document.getElementById("toast"),
+  modal: qs("#modal"),
+  modalBackdrop: qs("#modalBackdrop"),
+  modalClose: qs("#modalClose"),
+  modalViewer: qs("#modalViewer"),
+  modalLoading: qs("#modalLoading"),
+  modalName: qs("#modalName"),
+  modalPath: qs("#modalPath"),
+  modalDownload: qs("#modalDownload"),
+  modalCopy: qs("#modalCopy"),
 };
 
-let state = {
+const state = {
   games: [],
-  game: "",
-  groups: [],
+  game: getUrlParam("game", ""),
+  folder: getUrlParam("folder", "all"),
+  q: getUrlParam("q", ""),
+  data: null,
   items: [],
-  folderKey: "all",
-  q: "",
+  filtered: [],
 };
 
+const modalPreview = new ModalPreview(els.modalViewer);
+
+// per-card preview instances
+const previewByCard = new WeakMap();
 let io = null;
 
-/* =========================
-   Utils
-   ========================= */
-function qs(name) {
-  const u = new URL(location.href);
-  return u.searchParams.get(name);
-}
-
-function setQS(name, value, replace = false) {
-  const u = new URL(location.href);
-  if (!value) u.searchParams.delete(name);
-  else u.searchParams.set(name, value);
-  const next = u.pathname + u.search;
-  if (replace) history.replaceState({}, "", next);
-  else history.pushState({}, "", next);
-}
-
-function toast(msg) {
-  els.toast.textContent = msg;
-  els.toast.classList.add("show");
-  clearTimeout(toast._t);
-  toast._t = setTimeout(() => els.toast.classList.remove("show"), 1200);
-}
-
-function safeFileName(name) {
-  return (name || "model")
+function slugify(s) {
+  return (s || "")
     .toLowerCase()
-    .replace(/[^a-z0-9\-_ ]+/g, "")
-    .trim()
-    .replace(/\s+/g, "_")
-    .slice(0, 80) || "model";
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
-function buildDownloadUrl(item, ext) {
-  // Worker will set Content-Disposition to the right filename
-  const fname = safeFileName(item.name);
-  return `${API_BASE}/api/file?id=${encodeURIComponent(item.modelId)}&name=${encodeURIComponent(fname)}&ext=${encodeURIComponent(ext)}`;
+function normalizeGameLabel(key) {
+  return titleCase(key).toUpperCase();
 }
 
-/* =========================
-   API
-   ========================= */
-async function fetchJSON(url) {
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-  return await res.json();
+function buildPathText(gameKey, folderLabel) {
+  const g = (gameKey || "").toUpperCase();
+  const f = (folderLabel || "").toUpperCase();
+  return `${g} \\ ${f}`;
 }
 
-async function loadGames() {
-  // Prefer dynamic list from worker. Falls back gracefully if not implemented.
-  try {
-    const data = await fetchJSON(`${API_BASE}/api/games`);
-    if (Array.isArray(data.games) && data.games.length) return data.games;
-  } catch (e) {
-    // ignore
-  }
-
-  // Fallback: minimal list (you can add to this if needed)
-  return [
-    { key: "bedwars", name: "bedwars" },
-    { key: "skywars", name: "skywars" },
-    { key: "murder", name: "murder" },
-    { key: "survival", name: "survival games" },
-  ];
+function clearNode(node) {
+  while (node.firstChild) node.removeChild(node.firstChild);
 }
 
-async function loadModels(gameKey) {
-  const url = `${API_BASE}/api/models${gameKey ? `?game=${encodeURIComponent(gameKey)}` : ""}`;
-  return await fetchJSON(url);
-}
-
-/* =========================
-   Render pills
-   ========================= */
-function pill(label, key, active, onClick) {
+function makeChip({ label, active, onClick, extraClass = "" }) {
   const b = document.createElement("button");
-  b.className = "pill" + (active ? " is-active" : "");
+  b.className = `chip ${extraClass} ${active ? "is-active" : ""}`.trim();
   b.type = "button";
   b.textContent = label;
-  b.dataset.key = key;
   b.addEventListener("click", onClick);
   return b;
 }
 
-function renderGamePills() {
-  els.gamePills.innerHTML = "";
-  for (const g of state.games) {
-    els.gamePills.appendChild(
-      pill(g.name, g.key, g.key === state.game, async () => {
+async function loadGameListIfNeeded() {
+  // We’ll derive games from root listing by asking API with no game,
+  // then using returned game + also allowing user to switch by querying different keys.
+  // Your current API returns chosen game + groups; the worker currently supports ?game=.
+  // So we keep a curated list from folder names in Drive by calling the API once per session:
+  // BUT to avoid N calls, we store a static list here and still let API validate.
+  //
+  // If your API already returns full list elsewhere, we can upgrade later.
+  //
+  // For now: the list appears to be working already on your site (from earlier screenshot),
+  // so we’ll accept it from the first response (it includes chosen.key/name only),
+  // and also allow a “known games” array via window.__HIVE_GAMES.
+  const provided = window.__HIVE_GAMES;
+  if (Array.isArray(provided) && provided.length) {
+    state.games = provided.map(x => ({ key: slugify(x), label: normalizeGameLabel(x) }));
+    return;
+  }
+  // fallback: minimal list if none provided (still works if user switches URL manually)
+  state.games = [];
+}
+
+function renderGameChips() {
+  clearNode(els.gameChips);
+
+  // If we don't have a list, at least show current game as active so UI isn't empty
+  const games = state.games.length
+    ? state.games
+    : [{ key: state.game || "bedwars", label: normalizeGameLabel(state.game || "bedwars") }];
+
+  // Ensure alphabetical
+  const sorted = [...games].sort((a, b) => a.label.localeCompare(b.label));
+
+  for (const g of sorted) {
+    const active = g.key === state.game;
+    els.gameChips.appendChild(makeChip({
+      label: g.label,
+      active,
+      onClick: async () => {
         if (state.game === g.key) return;
-        await switchGame(g.key, false);
-      })
-    );
+        state.game = g.key;
+        setUrlParam("game", state.game);
+        await loadDataAndRender(); // IMPORTANT: no full page reload
+      }
+    }));
   }
 }
 
-function renderFolderPills() {
-  els.folderPills.innerHTML = "";
+function folderKeyFromGroup(group) {
+  return group.key || slugify(group.label);
+}
 
-  // Always include "all models"
-  els.folderPills.appendChild(
-    pill("all models", "all", state.folderKey === "all", () => {
-      state.folderKey = "all";
-      renderFolderPills();
-      renderGrid();
-    })
-  );
+function renderFolderChips(groups) {
+  clearNode(els.folderChips);
 
-  for (const grp of state.groups) {
-    if (grp.key === "all") continue;
-    els.folderPills.appendChild(
-      pill(grp.label, grp.key, grp.key === state.folderKey, () => {
-        state.folderKey = grp.key;
-        renderFolderPills();
-        renderGrid();
-      })
-    );
+  // groups includes "all"
+  for (const grp of groups) {
+    const key = folderKeyFromGroup(grp);
+    const label = (grp.label || key).toUpperCase();
+    const active = key === state.folder;
+
+    els.folderChips.appendChild(makeChip({
+      label,
+      active,
+      extraClass: "chip--folder",
+      onClick: () => {
+        state.folder = key;
+        setUrlParam("folder", state.folder);
+        applyFiltersAndRenderGrid();
+      }
+    }));
   }
 }
 
-/* =========================
-   Grid + Lazy previews
-   ========================= */
-function destroyObserver() {
-  if (io) {
-    io.disconnect();
-    io = null;
-  }
+function flattenItemsFromGroups(groups) {
+  const allGroup = groups.find(g => (g.key || "").toLowerCase() === "all");
+  if (!allGroup) return [];
+
+  const items = (allGroup.items || []).map((it) => ({
+    name: it.name,
+    modelId: it.modelId || it.id || it.fileId,
+    folderLabel: it.folderLabel || "",
+    ext: "gltf", // models page: always gltf for you
+  }));
+
+  // Stable sort by name then folderLabel
+  items.sort((a, b) => (a.name || "").localeCompare(b.name || "") || (a.folderLabel || "").localeCompare(b.folderLabel || ""));
+  return items;
 }
 
-function setupObserver() {
-  destroyObserver();
-  io = new IntersectionObserver(onIntersect, {
-    root: null,
-    rootMargin: "600px 0px",
-    threshold: 0.01,
+function applyFiltersAndRenderGrid() {
+  const q = (state.q || "").trim().toLowerCase();
+  const folder = (state.folder || "all").toLowerCase();
+
+  const items = state.items.filter((it) => {
+    const okFolder = folder === "all" ? true : (slugify(it.folderLabel) === folder || (it.folderLabel || "").toLowerCase() === folder);
+    if (!okFolder) return false;
+    if (!q) return true;
+    return (it.name || "").toLowerCase().includes(q) || (it.folderLabel || "").toLowerCase().includes(q);
   });
 
-  document.querySelectorAll("[data-preview]").forEach((el) => io.observe(el));
+  state.filtered = items;
+  els.count.textContent = `${items.length} shown`;
+  renderGrid(items);
 }
 
-function onIntersect(entries) {
-  for (const ent of entries) {
-    const host = ent.target;
-    const viewer = host.querySelector("model-viewer");
-    const phIdle = host.querySelector(".ph.idle");
-    const phLoading = host.querySelector(".ph.loading");
+function renderGrid(items) {
+  // stop all previews
+  if (io) io.disconnect();
 
-    if (!viewer) continue;
+  clearNode(els.grid);
 
-    if (ent.isIntersecting) {
-      // Load preview
-      if (!viewer.getAttribute("src")) {
-        phIdle?.classList.add("hidden");
-        phLoading?.classList.remove("hidden");
+  // new observer for this render
+  io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      const card = e.target;
+      const preview = previewByCard.get(card);
+      if (!preview) continue;
 
-        viewer.setAttribute("src", host.dataset.src);
-        viewer.setAttribute("poster", ""); // ensure no default poster
-      }
-    } else {
-      // Unload to keep memory low (and reload properly when scrolling back)
-      if (viewer.getAttribute("src")) {
-        viewer.removeAttribute("src");
-        phLoading?.classList.add("hidden");
-        phIdle?.classList.remove("hidden");
+      if (e.isIntersecting) {
+        preview.start();
+      } else {
+        preview.stop();
       }
     }
+  }, { root: null, threshold: 0.15 });
+
+  for (const it of items) {
+    const card = document.createElement("article");
+    card.className = "card";
+
+    const viewer = document.createElement("div");
+    viewer.className = "card__viewer";
+
+    const placeholder = document.createElement("div");
+    placeholder.className = "card__placeholder";
+    placeholder.textContent = "SELECT TO PREVIEW";
+    viewer.appendChild(placeholder);
+
+    const reload = document.createElement("button");
+    reload.className = "card__reload";
+    reload.type = "button";
+    reload.textContent = "RELOAD";
+    viewer.appendChild(reload);
+
+    const meta = document.createElement("div");
+    meta.className = "card__meta";
+
+    const top = document.createElement("div");
+    top.className = "card__top";
+
+    const name = document.createElement("h3");
+    name.className = "card__name";
+    name.textContent = it.name;
+
+    const badge = document.createElement("div");
+    badge.className = "badge";
+    badge.textContent = ".GLTF";
+
+    top.appendChild(name);
+    top.appendChild(badge);
+
+    const path = document.createElement("div");
+    path.className = "card__path";
+    path.textContent = buildPathText(state.game, it.folderLabel);
+
+    meta.appendChild(top);
+    meta.appendChild(path);
+
+    card.appendChild(viewer);
+    card.appendChild(meta);
+    els.grid.appendChild(card);
+
+    // card click opens modal (but not reload button)
+    card.addEventListener("click", (ev) => {
+      if (ev.target === reload) return;
+      openModal(it);
+    });
+
+    // preview instance
+    const filename = `${slugify(it.name) || "model"}.gltf`;
+    const preview = new CardPreview(viewer, { modelId: it.modelId, filename });
+    previewByCard.set(card, preview);
+
+    reload.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      preview.resetAndRetry();
+    });
+
+    io.observe(card);
   }
 }
 
-function cardTemplate(item) {
-  const ext = "gltf"; // models page = gltf only
-  const src = buildDownloadUrl(item, ext);
-
-  const card = document.createElement("article");
-  card.className = "card";
-  card.dataset.item = "1";
-
-  // Clicking the card opens modal
-  card.addEventListener("click", (ev) => {
-    // If they clicked the name (download link), don't open modal
-    if (ev.target && ev.target.closest && ev.target.closest("a[data-download-name]")) return;
-    openModal(item);
-  });
-
-  const preview = document.createElement("div");
-  preview.className = "preview";
-  preview.dataset.preview = "1";
-  preview.dataset.src = src;
-
-  // Placeholders
-  const phIdle = document.createElement("div");
-  phIdle.className = "ph idle";
-  phIdle.textContent = "select to preview";
-
-  const phLoading = document.createElement("div");
-  phLoading.className = "ph loading hidden";
-  phLoading.textContent = "loading…";
-
-  const mv = document.createElement("model-viewer");
-  mv.setAttribute("reveal", "auto");
-  mv.setAttribute("shadow-intensity", "0");
-  mv.setAttribute("environment-image", "neutral");
-  mv.setAttribute("interaction-prompt", "none");
-  mv.setAttribute("exposure", "1");
-  mv.setAttribute("camera-controls", "false");
-  mv.setAttribute("disable-zoom", "true");
-  mv.setAttribute("disable-pan", "true");
-  mv.setAttribute("disable-tap", "true");
-  mv.setAttribute("touch-action", "none");
-  mv.setAttribute("ar", "false");
-
-  // Correct rotation: 180deg around Y to face front
-  mv.setAttribute("orientation", "0deg 180deg 0deg");
-
-  // When loaded, remove loading placeholder
-  mv.addEventListener("load", () => {
-    phLoading.classList.add("hidden");
-  });
-  mv.addEventListener("error", () => {
-    phLoading.classList.add("hidden");
-    phIdle.classList.remove("hidden");
-    phIdle.textContent = "preview failed";
-  });
-
-  preview.appendChild(mv);
-  preview.appendChild(phIdle);
-  preview.appendChild(phLoading);
-
-  const meta = document.createElement("div");
-  meta.className = "meta";
-
-  const nameRow = document.createElement("div");
-  nameRow.className = "nameRow";
-
-  // Name is a download link (only clicking the name downloads)
-  const a = document.createElement("a");
-  a.className = "modelName";
-  a.href = src;
-  a.download = `${safeFileName(item.name)}.gltf`;
-  a.textContent = item.name;
-  a.dataset.downloadName = "1";
-  a.addEventListener("click", (ev) => {
-    ev.stopPropagation();
-  });
-
-  const extTag = document.createElement("span");
-  extTag.className = "extTag";
-  extTag.textContent = ".gltf";
-
-  nameRow.appendChild(a);
-  nameRow.appendChild(extTag);
-
-  const badges = document.createElement("div");
-  badges.className = "badges";
-
-  const b1 = document.createElement("span");
-  b1.className = "badge";
-  b1.textContent = item.folderLabel || "—";
-  badges.appendChild(b1);
-
-  const path = document.createElement("div");
-  path.className = "path";
-  path.textContent = `${state.game} \\ ${item.folderLabel || "—"}`;
-
-  meta.appendChild(nameRow);
-  meta.appendChild(badges);
-  meta.appendChild(path);
-
-  card.appendChild(preview);
-  card.appendChild(meta);
-
-  return card;
-}
-
-function filteredItems() {
-  const q = (state.q || "").trim().toLowerCase();
-
-  let list = state.items;
-
-  // Folder filter
-  if (state.folderKey && state.folderKey !== "all") {
-    const grp = state.groups.find(g => g.key === state.folderKey);
-    list = grp ? grp.items : list;
-  }
-
-  // Search filter
-  if (q) {
-    list = list.filter(it => (it.name || "").toLowerCase().includes(q));
-  }
-
-  return list;
-}
-
-function renderGrid() {
-  const list = filteredItems();
-  els.count.textContent = `${list.length} shown`;
-
-  els.grid.innerHTML = "";
-  const frag = document.createDocumentFragment();
-
-  for (const item of list) {
-    frag.appendChild(cardTemplate(item));
-  }
-
-  els.grid.appendChild(frag);
-  setupObserver();
-}
-
-/* =========================
-   Modal
-   ========================= */
-function openModal(item) {
-  const ext = "gltf";
-  const src = buildDownloadUrl(item, ext);
-
-  els.modal.classList.remove("hidden");
+async function openModal(it) {
+  els.modal.classList.add("is-open");
   els.modal.setAttribute("aria-hidden", "false");
+  els.modalLoading.style.display = "flex";
 
-  els.modalName.textContent = item.name;
-  els.modalPath.textContent = `${state.game} \\ ${item.folderLabel || "—"}`;
-  els.modalDownload.textContent = "Download .gltf";
-  els.modalDownload.href = src;
-  els.modalDownload.download = `${safeFileName(item.name)}.gltf`;
+  const filename = `${slugify(it.name) || "model"}.gltf`;
+  const dl = fileDownloadUrl(it.modelId, filename);
 
-  // Modal model viewer: interactive
-  els.modalViewer.setAttribute("src", src);
-  els.modalViewer.setAttribute("orientation", "0deg 180deg 0deg");
+  els.modalName.textContent = it.name;
+  els.modalPath.textContent = buildPathText(state.game, it.folderLabel);
+
+  els.modalDownload.href = dl;
+  els.modalDownload.download = filename;
+
+  els.modalCopy.onclick = async () => {
+    await copyToClipboard(dl);
+    els.modalCopy.textContent = "COPIED!";
+    setTimeout(() => (els.modalCopy.textContent = "COPY LINK"), 900);
+  };
+
+  try {
+    await modalPreview.open(it.modelId, filename);
+  } finally {
+    els.modalLoading.style.display = "none";
+  }
 }
 
 function closeModal() {
-  els.modal.classList.add("hidden");
+  els.modal.classList.remove("is-open");
   els.modal.setAttribute("aria-hidden", "true");
-  els.modalViewer.removeAttribute("src");
+  els.modalLoading.style.display = "flex";
+  modalPreview.close();
 }
 
-document.addEventListener("click", (ev) => {
-  const close = ev.target?.dataset?.close;
-  if (close) closeModal();
+els.modalBackdrop.addEventListener("click", closeModal);
+els.modalClose.addEventListener("click", closeModal);
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && els.modal.classList.contains("is-open")) closeModal();
 });
 
-document.addEventListener("keydown", (ev) => {
-  if (ev.key === "Escape") closeModal();
-});
+// Search wiring
+els.search.value = state.q || "";
+els.search.addEventListener("input", debounce(() => {
+  state.q = els.search.value || "";
+  setUrlParam("q", state.q || "");
+  applyFiltersAndRenderGrid();
+}, 120));
 
-els.modalCopy.addEventListener("click", async () => {
-  try {
-    await navigator.clipboard.writeText(location.href);
-    toast("copied link");
-  } catch {
-    toast("copy failed");
-  }
-});
-
-/* =========================
-   Switching + Init
-   ========================= */
-async function switchGame(nextGame, replace) {
-  state.game = nextGame;
-  state.folderKey = "all";
-  state.q = "";
-  els.search.value = "";
-
-  setQS("game", nextGame, replace);
-
-  // Fetch data + render
+async function loadDataAndRender() {
+  // keep UI responsive
   els.grid.innerHTML = "";
-  els.count.textContent = "loading…";
 
-  const data = await loadModels(nextGame);
+  const json = await fetchModels(state.game);
+  state.data = json;
 
-  // groups includes "all" and subfolders
-  state.groups = Array.isArray(data.groups) ? data.groups : [];
-  state.items = (state.groups.find(g => g.key === "all")?.items) || [];
+  // Track current game from server response (canonical)
+  if (json?.game?.key) state.game = json.game.key;
 
-  renderGamePills();
-  renderFolderPills();
-  renderGrid();
+  // If we don't have a games list, we can infer just current.
+  await loadGameListIfNeeded();
+  renderGameChips();
+
+  // folders from groups
+  const groups = json.groups || [];
+  // ensure "all" first
+  groups.sort((a, b) => (a.key === "all" ? -1 : b.key === "all" ? 1 : (a.label || "").localeCompare(b.label || "")));
+
+  // If URL folder is missing in new game, reset to all
+  const folderKeys = new Set(groups.map(g => folderKeyFromGroup(g)));
+  if (!folderKeys.has(state.folder)) {
+    state.folder = "all";
+    setUrlParam("folder", "all");
+  }
+
+  renderFolderChips(groups);
+
+  // items
+  state.items = flattenItemsFromGroups(groups);
+
+  // count + grid
+  applyFiltersAndRenderGrid();
 }
 
-async function init() {
-  state.games = (await loadGames())
-    .slice()
-    .sort((a, b) => (a.name || a.key).localeCompare(b.name || b.key));
+// Init
+(async function init() {
+  if (!state.game) {
+    // default: first tag should be bedwars if user didn't specify
+    state.game = "bedwars";
+    setUrlParam("game", state.game);
+  }
 
-  // use ?game or default first game
-  const initial = (qs("game") || state.games[0]?.key || "").toLowerCase();
-  state.game = initial;
-
-  renderGamePills();
-
-  // Search input
-  els.search.addEventListener("input", () => {
-    state.q = els.search.value || "";
-    renderGrid();
+  // Listen to back/forward
+  window.addEventListener("popstate", async () => {
+    state.game = getUrlParam("game", "bedwars");
+    state.folder = getUrlParam("folder", "all");
+    state.q = getUrlParam("q", "");
+    els.search.value = state.q;
+    await loadDataAndRender();
   });
 
-  // Load initial game
-  await switchGame(state.game, true);
-}
-
-window.addEventListener("popstate", async () => {
-  const g = (qs("game") || state.games[0]?.key || "").toLowerCase();
-  if (g && g !== state.game) {
-    await switchGame(g, true);
-  }
-});
-
-init().catch((e) => {
-  console.error(e);
-  els.grid.innerHTML = `<div style="padding:14px;color:#bbb;font-family:MC Five">Failed to load models. Check console.</div>`;
-});
+  await loadDataAndRender();
+})();
