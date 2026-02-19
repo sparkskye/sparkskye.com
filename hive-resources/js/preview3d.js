@@ -81,6 +81,7 @@ function forceNearestAndUnlit(root) {
           alphaTest: m.alphaTest ?? 0,
           side: m.side ?? THREE.FrontSide,
           depthWrite: m.depthWrite ?? true,
+          vertexColors: m.vertexColors ?? false,
         })
       );
     }
@@ -117,9 +118,17 @@ function centerAndFrame(root, camera) {
 }
 
 async function loadScene(url) {
+  // Force ABS URL so three resolves buffers/resources correctly
+  const absUrl = new URL(url, window.location.href).href;
+
   const loader = new GLTFLoader();
   loader.setCrossOrigin("anonymous");
-  const gltf = await loader.loadAsync(url);
+
+  // Important: resource base for relative URIs inside glTF (buffers, etc.)
+  // This prevents the browser from trying /hive-resources/models/<id> on Pages.
+  loader.setResourcePath(new URL("./", absUrl).href);
+
+  const gltf = await loader.loadAsync(absUrl);
   return gltf.scene;
 }
 
@@ -148,6 +157,12 @@ export class CardPreview {
 
   async init(modelUrl) {
     if (this.disposed) return;
+
+    // Ensure one canvas per preview container
+    // (prevents stacking canvases if init is called twice)
+    const existing = this.container.querySelector("canvas.previewCanvas");
+    if (existing) existing.remove();
+
     this.container.appendChild(this.canvas);
 
     this.renderer = makeRenderer(this.canvas);
@@ -168,6 +183,8 @@ export class CardPreview {
     resize();
 
     this.root = await loadScene(modelUrl);
+    if (this.disposed) return;
+
     forceNearestAndUnlit(this.root);
     this.scene.add(this.root);
     centerAndFrame(this.root, this.camera);
@@ -191,7 +208,7 @@ export class CardPreview {
     }
     this.root = null;
 
-    try { this.renderer?.forceContextLoss?.(); } catch {}
+    // DO NOT forceContextLoss() here — it can cause white previews / flicker.
     try { this.renderer?.dispose?.(); } catch {}
     this.renderer = null;
     this.scene = null;
@@ -249,6 +266,8 @@ export class ModalPreview {
     this.controls.enablePan = false;
 
     this.root = await loadScene(modelUrl);
+    if (this.disposed) return;
+
     forceNearestAndUnlit(this.root);
     this.scene.add(this.root);
     centerAndFrame(this.root, this.camera);
@@ -283,7 +302,6 @@ export class ModalPreview {
     try { this.controls?.dispose(); } catch {}
     this.controls = null;
 
-    try { this.renderer?.forceContextLoss?.(); } catch {}
     try { this.renderer?.dispose?.(); } catch {}
     this.renderer = null;
     this.scene = null;
