@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en" data-type="maps">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Hive Maps</title>
+  <link rel="stylesheet" href="../css/hive-browser.css" />
+</head>
+<body>
+  <div class="wrap">
+    <div class="h1">Hive Maps</div>
+    <p class="sub">Dynamic + fast: data from Google Drive, served through your Worker, rendered like a real asset browser.</p>
+
+    <div class="panel">
+      <div class="row" data-games></div>
+
+      <div class="searchRow">
+        <div class="search">
+          <input data-search placeholder="search maps..." autocomplete="off" spellcheck="false" />
+        </div>
+        <div class="count" data-count>0 shown</div>
+      </div>
+
+      <div class="sectionSpacer"></div>
+
+      <div class="row" data-folders></div>
+    </div>
+
+    <div class="grid" data-grid></div>
+    <div class="sub" data-status style="margin-top:14px;"></div>
+  </div>
+
+  <!-- Modal -->
+  <div class="modalBack" data-modal-back>
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modalTop">
+        <div class="modalTitle" data-modal-title>preview</div>
+        <button class="modalClose" data-modal-close>✕</button>
+      </div>
+
+      <div class="modalViewer" data-modal-viewer></div>
+
+      <div class="modalBottom">
+        <div>
+          <div class="smallMuted" data-modal-path></div>
+        </div>
+        <button class="btn" data-modal-download>download .glb</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/hive-browser.js"></script>
+</body>
+</html>
