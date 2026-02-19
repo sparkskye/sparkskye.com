@@ -353,6 +353,14 @@ a{ color:inherit; text-decoration:none; }
   margin:0;
 }
 
+/* Make it obvious the name is clickable (direct-download link) */
+.card__name:hover{
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+
 .badge{
   font-family: MCFive, Minecraftia, sans-serif;
   font-size: 11px;
@@ -493,4 +501,60 @@ a{ color:inherit; text-decoration:none; }
   background: var(--accent);
   border-color: var(--accent);
   color: #041018;
+}
+
+/* Pixel-art minimaps should never be blurred */
+.maps-page img.card__thumb,
+.maps-page img.modal__thumb{
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* Home page contributors */
+.contributors{
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:center;
+  gap:10px;
+  padding: 14px 0 2px;
+}
+.contrib{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px 12px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.04);
+}
+.contrib:hover{
+  border-color: rgba(0,170,255,.45);
+}
+.contrib__avatar{
+  width:28px;
+  height:28px;
+  border-radius:8px;
+  image-rendering: pixelated;
+}
+.contrib__name{
+  font-family: var(--font-pixel);
+  font-size: 12px;
+  letter-spacing: .5px;
+}
+
+/* Footer shared across Hive Resources pages */
+.footer{
+  margin-top: 44px;
+  padding: 24px 18px 36px;
+  text-align:center;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.footer a{
+  color: var(--accent);
+}
+.footer a:hover{
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
