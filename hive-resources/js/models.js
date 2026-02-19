@@ -157,6 +157,7 @@ function renderFolderChips(groups) {
 
 function flattenItemsFromGroups(groups) {
   const out = [];
+  const seen = new Set();
 
   // Prefer non-"all" groups so each item carries its folder grouping cleanly.
   for (const g of (groups || [])) {
@@ -166,9 +167,13 @@ function flattenItemsFromGroups(groups) {
     const groupLabel = g.label || groupKey;
 
     for (const it of (g.items || [])) {
+      const modelId = it.modelId || it.id || it.fileId;
+      const dedupeKey = modelId || `${it.name || ""}::${it.path || it.folderLabel || groupLabel || ""}`;
+      seen.add(dedupeKey);
+
       out.push({
         name: it.name,
-        modelId: it.modelId || it.id || it.fileId,
+        modelId,
         // Full relative path if provided by Apps Script (preferred)
         relPath: it.path || it.folderLabel || groupLabel || "",
         folderKey: groupKey,
@@ -178,9 +183,29 @@ function flattenItemsFromGroups(groups) {
     }
   }
 
+  // Include any un-grouped / root-level items that only appear in the ALL group.
+  // (Common when models live directly inside the gamemode folder.)
+  const allGroup = (groups || []).find(g => (g.key || "").toLowerCase() === "all");
+  for (const it of (allGroup?.items || [])) {
+    const modelId = it.modelId || it.id || it.fileId;
+    const dedupeKey = modelId || `${it.name || ""}::${it.path || it.folderLabel || ""}`;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+
+    out.push({
+      name: it.name,
+      modelId,
+      relPath: it.path || it.folderLabel || "",
+      // Put these in a neutral bucket so they still show in ALL,
+      // but don't show up under a specific folder chip.
+      folderKey: slugify(it.folderLabel || "") || "root",
+      folderLabel: it.folderLabel || "",
+      ext: "gltf",
+    });
+  }
+
   // Fallback: if the API only provided an "all" group, use it.
   if (!out.length) {
-    const allGroup = (groups || []).find(g => (g.key || "").toLowerCase() === "all");
     for (const it of (allGroup?.items || [])) {
       out.push({
         name: it.name,

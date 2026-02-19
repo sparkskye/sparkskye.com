@@ -256,8 +256,10 @@ export class CardPreview {
 export class ModalPreview {
   constructor(container) {
     this.container = container;
-    this.canvas = document.createElement("canvas");
-    this.canvas.className = "previewCanvas previewCanvas--modal";
+
+    // Always create a fresh canvas per-open. Mobile browsers can keep a dead WebGL context
+    // around even after dispose(), which can break subsequent opens until a page reload.
+    this.canvas = null;
 
     this.renderer = null;
     this.scene = null;
@@ -267,11 +269,15 @@ export class ModalPreview {
     this.ro = null;
     this.raf = null;
     this.disposed = false;
+    this._onContextLost = null;
   }
 
   async open(modelUrl) {
     this.close();
     this.disposed = false;
+
+    this.canvas = document.createElement("canvas");
+    this.canvas.className = "previewCanvas previewCanvas--modal";
 
     // Keep any existing overlay elements (e.g. the loading text) in the container.
     // Only swap canvases.
@@ -279,6 +285,17 @@ export class ModalPreview {
       for (const c of this.container.querySelectorAll("canvas")) c.remove();
     } catch {}
     this.container.appendChild(this.canvas);
+
+    // If the WebGL context gets lost (common on mobile), tear down cleanly so the next open works.
+    this._onContextLost = (ev) => {
+      try { ev.preventDefault(); } catch {}
+      try { this.close(); } catch {}
+    };
+    try {
+      this.canvas.addEventListener("webglcontextlost", this._onContextLost, { passive: false });
+    } catch {
+      this.canvas.addEventListener("webglcontextlost", this._onContextLost);
+    }
 
     this.renderer = makeRenderer(this.canvas);
     this.scene = new THREE.Scene();
@@ -338,10 +355,19 @@ export class ModalPreview {
     try { this.controls?.dispose(); } catch {}
     this.controls = null;
 
+    try {
+      this.canvas?.removeEventListener?.("webglcontextlost", this._onContextLost);
+    } catch {}
+    this._onContextLost = null;
+
+    // Best-effort: fully release the WebGL context.
+    try { this.renderer?.forceContextLoss?.(); } catch {}
     try { this.renderer?.dispose?.(); } catch {}
+
     this.renderer = null;
     this.scene = null;
     this.camera = null;
+    this.canvas = null;
 
     // Remove only canvases; keep the loading overlay element if present.
     try {
@@ -349,3 +375,4 @@ export class ModalPreview {
     } catch {}
   }
 }
+
