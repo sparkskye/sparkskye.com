@@ -266,40 +266,15 @@ body{
   justify-content:center;
 }
 
-/* 3D preview canvas (Three.js) */
-.preview .thumbCanvas{
-  position:absolute;
-  inset:0;
-  width:100%;
-  height:100%;
-  display:block;
-}
-
-/* reload button for failed previews */
-.reloadBtn{
-  position:absolute;
-  right:12px;
-  bottom:12px;
-  height:30px;
-  padding:0 10px;
-  border-radius:10px;
-  border:1px solid var(--stroke);
-  background:rgba(0,0,0,.35);
-  color:var(--text);
-  font-family:var(--font-ui);
-  font-size:12px;
-  cursor:pointer;
-}
-.reloadBtn:hover{
-  border-color:var(--accent);
-}
-
-/* card model viewer should NOT be interactable */
-.card model-viewer{
+/* card preview canvas should NOT be interactable */
+.card canvas.previewCanvas{
   width: 100%;
   height: 100%;
+  display:block;
   pointer-events: none;
   background: transparent;
+  position:absolute;
+  inset:0;
 }
 
 /* placeholder overlay */
@@ -312,6 +287,9 @@ body{
   font-family: "MC Five";
   color: #a9a9a9;
   opacity: 0.85;
+  text-align:center;
+  padding: 14px;
+  pointer-events:none;
 }
 .ph.loading{ color: var(--accent); }
 .ph.hidden{ display:none; }
@@ -336,6 +314,22 @@ body{
   line-height: 1.2;
   color: var(--text);
   text-decoration: none;
+}
+
+/* modelName is a <button> in the grid; reset native styles */
+.modelName{
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.modelName:focus{ outline: none; }
+.modelName:focus-visible{
+  outline: 2px solid rgba(0,170,255,0.7);
+  outline-offset: 3px;
+  border-radius: 6px;
 }
 .modelName:hover{
   text-decoration: underline;
@@ -492,32 +486,3 @@ body{
   transition: opacity .15s ease;
 }
 .toast.show{ opacity: 1; }
-
-.card__viewer {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-
-.card__overlay {
-  position: absolute;
-  inset: 0;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  font-family: "Minecraftia", monospace;
-  font-size: 12px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-
-  color: #9aa3ab;
-  pointer-events: none;
-}
-
-.card__overlay:not(:empty) {
-  background: transparent;
-}
