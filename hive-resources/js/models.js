@@ -40,6 +40,7 @@ const modalPreview = new ModalPreview(els.modalViewer);
 // per-card preview instances
 const previewByCard = new Map();
 const visibleCards = new Set();
+let pumpRaf = 0;
 let io = null;
 
 // grid loading (game/folder load)
@@ -281,7 +282,9 @@ function renderGrid(items) {
 
     const ph = document.createElement("div");
     ph.className = "card__placeholder";
-    ph.textContent = "SELECT TO PREVIEW";
+    // Keep placeholder but don't show extra text by default.
+    // We'll only show LOADING / FAILED states.
+    ph.textContent = "";
 
     const reload = document.createElement("button");
     reload.className = "card__reload";
@@ -309,12 +312,7 @@ function renderGrid(items) {
       await downloadViaFetch(dl, filename);
     });
 
-    const ext = document.createElement("span");
-    ext.className = "badge";
-    ext.textContent = ".GLTF";
-
     nameRow.appendChild(name);
-    nameRow.appendChild(ext);
 
     const path = document.createElement("div");
     path.className = "card__path";
@@ -382,50 +380,9 @@ function renderGrid(items) {
 
       if (e.isIntersecting) {
         visibleCards.add(card);
-        if (previewByCard.has(card)) continue;
-        if (card.dataset.failed === "1") continue;
-
-        // Cap active previews to avoid WebGL context blowups
-        if (previewByCard.size >= MAX_ACTIVE_CARD_PREVIEWS) {
-          // Evict the oldest preview that is not currently visible
-          for (const [c, prev] of previewByCard) {
-            if (visibleCards.has(c)) continue;
-            try { prev.destroy(true); } catch {}
-            previewByCard.delete(c);
-            break;
-          }
-        }
-
-        // If everything visible is already consuming the cap, don't create more.
-        if (previewByCard.size >= MAX_ACTIVE_CARD_PREVIEWS) continue;
-
-        const modelUrl = viewer.dataset.modelUrl;
-        if (!modelUrl) continue;
-
-        if (reload) reload.style.display = "none";
-        if (ph) {
-          ph.style.display = "flex";
-          if (card._phStop) card._phStop();
-          card._phStop = startDotLoader(ph, "LOADING");
-        }
-
-        const preview = new CardPreview(viewer);
-        previewByCard.set(card, preview);
-
-        preview.init(modelUrl).then(() => {
-          if (card._phStop) card._phStop();
-          card._phStop = null;
-          if (ph) ph.style.display = "none";
-        }).catch(() => {
-          card.dataset.failed = "1";
-          if (card._phStop) card._phStop();
-          card._phStop = null;
-          if (ph) {
-            ph.style.display = "flex";
-            ph.textContent = "PREVIEW FAILED";
-          }
-          if (reload) reload.style.display = "inline-flex";
-        });
+        // We'll fill previews via a pump so cards that were skipped due to the cap
+        // will still load once slots free up (prevents "SELECT TO PREVIEW" getting stuck).
+        schedulePump();
       } else {
         visibleCards.delete(card);
 
@@ -439,20 +396,84 @@ function renderGrid(items) {
         card._phStop = null;
         if (ph) {
           ph.style.display = "flex";
-          if (card.dataset.failed === "1") {
-            ph.textContent = "PREVIEW FAILED";
-          } else {
-            ph.textContent = "SELECT TO PREVIEW";
-          }
+          ph.textContent = (card.dataset.failed === "1") ? "PREVIEW FAILED" : "";
         }
         if (reload) {
           reload.style.display = (card.dataset.failed === "1") ? "inline-flex" : "none";
         }
+
+        schedulePump();
       }
     }
-  }, { root: null, threshold: 0.01, rootMargin: "600px 0px 600px 0px" });
+  }, { root: null, threshold: 0.01, rootMargin: "280px 0px 280px 0px" });
 
   for (const card of els.grid.querySelectorAll(".card")) io.observe(card);
+}
+
+function schedulePump() {
+  if (pumpRaf) return;
+  pumpRaf = requestAnimationFrame(() => {
+    pumpRaf = 0;
+    pumpVisiblePreviews();
+  });
+}
+
+function pumpVisiblePreviews() {
+  // Fill up to MAX_ACTIVE_CARD_PREVIEWS using currently visible cards.
+  if (previewByCard.size >= MAX_ACTIVE_CARD_PREVIEWS) return;
+
+  for (const card of visibleCards) {
+    if (previewByCard.size >= MAX_ACTIVE_CARD_PREVIEWS) break;
+    if (previewByCard.has(card)) continue;
+    if (card.dataset.failed === "1") continue;
+
+    const viewer = card.querySelector(".card__viewer");
+    if (!viewer) continue;
+    const modelUrl = viewer.dataset.modelUrl;
+    if (!modelUrl) continue;
+
+    // If we're at the cap, evict one that's not visible (best effort)
+    if (previewByCard.size >= MAX_ACTIVE_CARD_PREVIEWS) {
+      for (const [c, prev] of previewByCard) {
+        if (visibleCards.has(c)) continue;
+        try { prev.destroy(true); } catch {}
+        previewByCard.delete(c);
+        break;
+      }
+    }
+
+    // Still capped? stop.
+    if (previewByCard.size >= MAX_ACTIVE_CARD_PREVIEWS) break;
+
+    const ph = viewer.querySelector(".card__placeholder");
+    const reload = viewer.querySelector(".card__reload");
+    if (reload) reload.style.display = "none";
+    if (ph) {
+      ph.style.display = "flex";
+      if (card._phStop) card._phStop();
+      card._phStop = startDotLoader(ph, "LOADING");
+    }
+
+    const preview = new CardPreview(viewer);
+    previewByCard.set(card, preview);
+
+    preview.init(modelUrl).then(() => {
+      if (card._phStop) card._phStop();
+      card._phStop = null;
+      if (ph) ph.style.display = "none";
+      schedulePump();
+    }).catch(() => {
+      card.dataset.failed = "1";
+      if (card._phStop) card._phStop();
+      card._phStop = null;
+      if (ph) {
+        ph.style.display = "flex";
+        ph.textContent = "PREVIEW FAILED";
+      }
+      if (reload) reload.style.display = "inline-flex";
+      schedulePump();
+    });
+  }
 }
 
 async function openModal(it) {
@@ -472,6 +493,11 @@ async function openModal(it) {
 
   els.modalDownload.href = dl;
   els.modalDownload.download = filename;
+  els.modalDownload.onclick = async (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    await downloadViaFetch(dl, filename);
+  };
 
   els.modalCopy.onclick = async () => {
     await copyToClipboard(dl);
@@ -486,6 +512,8 @@ async function openModal(it) {
     console.error(err);
     els.modalLoading.style.display = "flex";
     els.modalLoading.textContent = "FAILED TO LOAD";
+    // Ensure we don't leave a half-initialized renderer around.
+    try { modalPreview.close(); } catch {}
   }
 }
 
