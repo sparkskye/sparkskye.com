@@ -67,35 +67,21 @@ function makeChip({ label, active, onClick, extraClass = "" }) {
 }
 
 async function loadGameListIfNeeded() {
-  // We’ll derive games from root listing by asking API with no game,
-  // then using returned game + also allowing user to switch by querying different keys.
-  // Your current API returns chosen game + groups; the worker currently supports ?game=.
-  // So we keep a curated list from folder names in Drive by calling the API once per session:
-  // BUT to avoid N calls, we store a static list here and still let API validate.
-  //
-  // If your API already returns full list elsewhere, we can upgrade later.
-  //
-  // For now: the list appears to be working already on your site (from earlier screenshot),
-  // so we’ll accept it from the first response (it includes chosen.key/name only),
-  // and also allow a “known games” array via window.__HIVE_GAMES.
   const provided = window.__HIVE_GAMES;
   if (Array.isArray(provided) && provided.length) {
     state.games = provided.map(x => ({ key: slugify(x), label: normalizeGameLabel(x) }));
     return;
   }
-  // fallback: minimal list if none provided (still works if user switches URL manually)
   state.games = [];
 }
 
 function renderGameChips() {
   clearNode(els.gameChips);
 
-  // If we don't have a list, at least show current game as active so UI isn't empty
   const games = state.games.length
     ? state.games
     : [{ key: state.game || "bedwars", label: normalizeGameLabel(state.game || "bedwars") }];
 
-  // Ensure alphabetical
   const sorted = [...games].sort((a, b) => a.label.localeCompare(b.label));
 
   for (const g of sorted) {
@@ -107,7 +93,7 @@ function renderGameChips() {
         if (state.game === g.key) return;
         state.game = g.key;
         setUrlParam("game", state.game);
-        await loadDataAndRender(); // IMPORTANT: no full page reload
+        await loadDataAndRender();
       }
     }));
   }
@@ -120,7 +106,6 @@ function folderKeyFromGroup(group) {
 function renderFolderChips(groups) {
   clearNode(els.folderChips);
 
-  // groups includes "all"
   for (const grp of groups) {
     const key = folderKeyFromGroup(grp);
     const label = (grp.label || key).toUpperCase();
@@ -147,11 +132,14 @@ function flattenItemsFromGroups(groups) {
     name: it.name,
     modelId: it.modelId || it.id || it.fileId,
     folderLabel: it.folderLabel || "",
-    ext: "gltf", // models page: always gltf for you
+    ext: "gltf",
   }));
 
-  // Stable sort by name then folderLabel
-  items.sort((a, b) => (a.name || "").localeCompare(b.name || "") || (a.folderLabel || "").localeCompare(b.folderLabel || ""));
+  items.sort((a, b) =>
+    (a.name || "").localeCompare(b.name || "") ||
+    (a.folderLabel || "").localeCompare(b.folderLabel || "")
+  );
+
   return items;
 }
 
@@ -160,10 +148,16 @@ function applyFiltersAndRenderGrid() {
   const folder = (state.folder || "all").toLowerCase();
 
   const items = state.items.filter((it) => {
-    const okFolder = folder === "all" ? true : (slugify(it.folderLabel) === folder || (it.folderLabel || "").toLowerCase() === folder);
+    const okFolder =
+      folder === "all"
+        ? true
+        : (slugify(it.folderLabel) === folder || (it.folderLabel || "").toLowerCase() === folder);
+
     if (!okFolder) return false;
     if (!q) return true;
-    return (it.name || "").toLowerCase().includes(q) || (it.folderLabel || "").toLowerCase().includes(q);
+
+    return (it.name || "").toLowerCase().includes(q) ||
+           (it.folderLabel || "").toLowerCase().includes(q);
   });
 
   state.filtered = items;
@@ -178,7 +172,6 @@ function renderGrid(items) {
   try { io?.disconnect(); } catch {}
   io = null;
 
-  // Map is iterable (WeakMap is not) – we need to cleanly destroy previews
   for (const preview of previewByCard.values()) {
     try { preview.destroy(true); } catch {}
   }
@@ -192,8 +185,12 @@ function renderGrid(items) {
 
     const viewer = document.createElement("div");
     viewer.className = "preview";
-    viewer.dataset.modelId = it.modelId;
-    viewer.dataset.filename = `${slugify(it.name)}.gltf`;
+
+    const filename = `${slugify(it.name)}.gltf`;
+    const dl = fileDownloadUrl(it.modelId, filename);
+
+    viewer.dataset.modelUrl = dl;
+    viewer.dataset.filename = filename;
 
     const ph = document.createElement("div");
     ph.className = "ph";
@@ -221,9 +218,7 @@ function renderGrid(items) {
     name.addEventListener("click", async (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
-      const fn = viewer.dataset.filename;
-      const dl = fileDownloadUrl(it.modelId, fn);
-      await downloadViaFetch(dl, fn);
+      await downloadViaFetch(dl, filename);
     });
 
     const ext = document.createElement("span");
@@ -249,31 +244,39 @@ function renderGrid(items) {
       openModal(it);
     });
 
-    // Reload retries just this preview
-    reload.addEventListener("click", (ev) => {
+    // Reload retries just this preview (manual only)
+    reload.addEventListener("click", async (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
+
+      card.dataset.failed = ""; // clear failure flag
       const prev = previewByCard.get(card);
       if (prev) {
         try { prev.destroy(true); } catch {}
         previewByCard.delete(card);
       }
+
       reload.style.display = "none";
       ph.textContent = "Loading…";
-      const preview = new CardPreview(viewer, { apiBase: window.__HIVE_API_BASE });
+
+      const preview = new CardPreview(viewer);
       previewByCard.set(card, preview);
-      preview.init(it.modelId, viewer.dataset.filename).then(() => {
+
+      try {
+        await preview.init(dl);
         ph.textContent = "";
-      }).catch(() => {
+      } catch {
+        card.dataset.failed = "1";
         ph.textContent = "PREVIEW FAILED";
         reload.style.display = "inline-flex";
-      });
+      }
     });
 
     els.grid.appendChild(card);
   }
 
-  // Lazy 3D previews (create/destroy as you scroll)
+  // Lazy 3D previews (create as you scroll IN)
+  // IMPORTANT: we do NOT destroy on scroll OUT (prevents flashing/retry spam)
   io = new IntersectionObserver((entries) => {
     for (const e of entries) {
       const card = e.target;
@@ -284,36 +287,31 @@ function renderGrid(items) {
 
       if (e.isIntersecting) {
         if (previewByCard.has(card)) continue;
+        if (card.dataset.failed === "1") continue;
 
-        const modelId = viewer.dataset.modelId;
-        const filename = viewer.dataset.filename;
-        if (!modelId || !filename) continue;
+        const modelUrl = viewer.dataset.modelUrl;
+        if (!modelUrl) continue;
 
         if (ph) ph.textContent = "Loading…";
         if (reload) reload.style.display = "none";
 
-        const preview = new CardPreview(viewer, { apiBase: window.__HIVE_API_BASE });
+        const preview = new CardPreview(viewer);
         previewByCard.set(card, preview);
 
-        preview.init(modelId, filename).then(() => {
+        preview.init(modelUrl).then(() => {
           if (ph) ph.textContent = "";
         }).catch(() => {
+          card.dataset.failed = "1";
           if (ph) ph.textContent = "PREVIEW FAILED";
           if (reload) reload.style.display = "inline-flex";
         });
-      } else {
-        const preview = previewByCard.get(card);
-        if (preview) {
-          try { preview.destroy(true); } catch {}
-          previewByCard.delete(card);
-          if (ph) ph.textContent = "SELECT TO PREVIEW";
-        }
       }
     }
   }, { root: null, threshold: 0.15 });
 
   for (const card of els.grid.querySelectorAll(".card")) io.observe(card);
 }
+
 async function openModal(it) {
   els.modal.classList.add("is-open");
   els.modal.setAttribute("aria-hidden", "false");
@@ -336,7 +334,7 @@ async function openModal(it) {
 
   try {
     await modalPreview.open(dl);
-} finally {
+  } finally {
     els.modalLoading.style.display = "none";
   }
 }
@@ -363,25 +361,21 @@ els.search.addEventListener("input", debounce(() => {
 }, 120));
 
 async function loadDataAndRender() {
-  // keep UI responsive
   els.grid.innerHTML = "";
 
   const json = await fetchModels(state.game);
   state.data = json;
 
-  // Track current game from server response (canonical)
   if (json?.game?.key) state.game = json.game.key;
 
-  // If we don't have a games list, we can infer just current.
   await loadGameListIfNeeded();
   renderGameChips();
 
-  // folders from groups
   const groups = json.groups || [];
-  // ensure "all" first
-  groups.sort((a, b) => (a.key === "all" ? -1 : b.key === "all" ? 1 : (a.label || "").localeCompare(b.label || "")));
+  groups.sort((a, b) =>
+    (a.key === "all" ? -1 : b.key === "all" ? 1 : (a.label || "").localeCompare(b.label || ""))
+  );
 
-  // If URL folder is missing in new game, reset to all
   const folderKeys = new Set(groups.map(g => folderKeyFromGroup(g)));
   if (!folderKeys.has(state.folder)) {
     state.folder = "all";
@@ -389,23 +383,17 @@ async function loadDataAndRender() {
   }
 
   renderFolderChips(groups);
-
-  // items
   state.items = flattenItemsFromGroups(groups);
-
-  // count + grid
   applyFiltersAndRenderGrid();
 }
 
 // Init
 (async function init() {
   if (!state.game) {
-    // default: first tag should be bedwars if user didn't specify
     state.game = "bedwars";
     setUrlParam("game", state.game);
   }
 
-  // Listen to back/forward
   window.addEventListener("popstate", async () => {
     state.game = getUrlParam("game", "bedwars");
     state.folder = getUrlParam("folder", "all");
@@ -416,3 +404,17 @@ async function loadDataAndRender() {
 
   await loadDataAndRender();
 })();
+
+async function downloadViaFetch(url, filename) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = objectUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 1500);
+}
