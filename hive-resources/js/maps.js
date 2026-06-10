@@ -575,7 +575,6 @@ function applyMapTransform() {
   const s = overallScale_();
   mapView.img.style.transform = `translate(-50%, -50%) translate(${mapView.x}px, ${mapView.y}px) scale(${s})`;
   const pct = `${Math.round((mapView.zoom || 1) * 100)}%`;
-  if (mapView.helper) mapView.helper.textContent = pct;
   if (mapView.zoomLabel) mapView.zoomLabel.textContent = pct;
 }
 
@@ -720,7 +719,6 @@ function mountMapPreview(it, thumbSrc) {
   viewport.appendChild(img);
   shell.appendChild(viewport);
   shell.appendChild(resolution);
-  shell.appendChild(helper);
   shell.appendChild(controls);
   els.modalViewer.appendChild(shell);
 
