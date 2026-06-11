@@ -27,14 +27,15 @@
   </script>
 
   <script>
-    // Worker base (can override later without editing code)
-    window.__HIVE_API_BASE = "https://delicate-bush-cf6f.sparkskye-minecraft.workers.dev";
+    // IMPORTANT: leave API base unset so this page uses your site Functions (/api/models, /api/file).
+    // That lets the model gamemode tags come from the models Drive folder when the API supports it.
   </script>
   <script>
+    // Fallback list only. The page tries /api/models?list=1 first.
     window.__HIVE_GAMES = [
       "bedwars","block drop","block party","bridge","capture the flag","common","deathrun",
       "ghost invasion","gravity","ground wars","hide and seek","hub","mob game","murder mystery",
-      "pets","skywars","survival games"
+      "pets","replay cinema","skywars","survival games"
     ];
   </script>
 </head>
