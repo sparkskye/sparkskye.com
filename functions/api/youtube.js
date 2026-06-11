@@ -1,4 +1,5 @@
 const DEFAULT_HANDLE = "@sparkskye";
+const DEFAULT_CHANNEL_ID = "UC7goIyC98-qIrlHfto--zWg";
 
 export async function onRequest(context) {
   const requestUrl = new URL(context.request.url);
@@ -8,14 +9,18 @@ export async function onRequest(context) {
   }
 
   const handle = normalizeHandle_(requestUrl.searchParams.get("handle") || DEFAULT_HANDLE);
-  const apiKey = context.env?.YOUTUBE_API_KEY || "";
+  const apiKey = context.env?.GOOGLE_API_KEY || context.env?.YOUTUBE_API_KEY || "";
 
-  let channelId = "";
+  let channelId = handle.toLowerCase() === DEFAULT_HANDLE ? DEFAULT_CHANNEL_ID : "";
   let channelTitle = "Sparkskye";
 
-  try {
-    channelId = apiKey ? await resolveChannelIdWithApi_(handle, apiKey) : "";
-  } catch {}
+  if (apiKey && !channelId) {
+    try {
+      const resolved = await resolveChannelWithApi_(handle, apiKey);
+      channelId = resolved.channelId || channelId;
+      channelTitle = resolved.title || channelTitle;
+    } catch {}
+  }
 
   if (!channelId) {
     try {
@@ -36,28 +41,27 @@ export async function onRequest(context) {
     }, 200, 60);
   }
 
-  const rssItems = await fetchRssItems_(channelId).catch(() => []);
-  const videoIds = rssItems.map((v) => v.id).filter(Boolean);
-
-  let apiDetails = new Map();
-  if (apiKey && videoIds.length) {
+  let items = [];
+  if (apiKey) {
     try {
-      apiDetails = await fetchVideoDetails_(videoIds, apiKey);
-    } catch {}
+      items = await fetchChannelVideosWithApi_(channelId, apiKey);
+    } catch {
+      items = [];
+    }
   }
 
-  const items = rssItems.map((item) => {
-    const detail = apiDetails.get(item.id) || {};
-    return {
+  if (!items.length) {
+    const rssItems = await fetchRssItems_(channelId).catch(() => []);
+    items = rssItems.map((item) => ({
       ...item,
-      ...detail,
+      type: looksLikeShortWithoutApi_(item) ? "short" : "video",
       url: `https://www.youtube.com/watch?v=${item.id}`,
       embedUrl: `https://www.youtube.com/embed/${item.id}`,
-      thumbnail: detail.thumbnail || item.thumbnail || `https://i.ytimg.com/vi/${item.id}/hqdefault.jpg`,
-      publishedLabel: formatDate_(detail.publishedAt || item.publishedAt),
-      statsReady: !!apiKey && !!detail.statsReady,
-    };
-  });
+      thumbnail: item.thumbnail || `https://i.ytimg.com/vi/${item.id}/hqdefault.jpg`,
+      publishedLabel: formatDate_(item.publishedAt),
+      statsReady: false,
+    }));
+  }
 
   return jsonResponse_({
     source: "youtube",
@@ -81,15 +85,53 @@ function normalizeHandle_(raw) {
   return s.startsWith("@") ? s : `@${s}`;
 }
 
-async function resolveChannelIdWithApi_(handle, apiKey) {
+async function resolveChannelWithApi_(handle, apiKey) {
   const url = new URL("https://www.googleapis.com/youtube/v3/channels");
   url.searchParams.set("part", "id,snippet");
   url.searchParams.set("forHandle", handle.replace(/^@/, ""));
   url.searchParams.set("key", apiKey);
   const res = await fetch(url.toString(), { cf: { cacheTtl: 3600, cacheEverything: true } });
-  if (!res.ok) return "";
+  if (!res.ok) return { channelId: "", title: "" };
   const json = await res.json();
-  return json?.items?.[0]?.id || "";
+  const item = json?.items?.[0] || null;
+  return { channelId: item?.id || "", title: item?.snippet?.title || "" };
+}
+
+async function fetchChannelVideosWithApi_(channelId, apiKey) {
+  const channelUrl = new URL("https://www.googleapis.com/youtube/v3/channels");
+  channelUrl.searchParams.set("part", "snippet,contentDetails");
+  channelUrl.searchParams.set("id", channelId);
+  channelUrl.searchParams.set("key", apiKey);
+
+  const channelRes = await fetch(channelUrl.toString(), { cf: { cacheTtl: 3600, cacheEverything: true } });
+  if (!channelRes.ok) return [];
+  const channelJson = await channelRes.json();
+  const uploadsPlaylistId = channelJson?.items?.[0]?.contentDetails?.relatedPlaylists?.uploads || "";
+  if (!uploadsPlaylistId) return [];
+
+  const ids = [];
+  let pageToken = "";
+
+  for (let page = 0; page < 3; page += 1) {
+    const playlistUrl = new URL("https://www.googleapis.com/youtube/v3/playlistItems");
+    playlistUrl.searchParams.set("part", "contentDetails");
+    playlistUrl.searchParams.set("playlistId", uploadsPlaylistId);
+    playlistUrl.searchParams.set("maxResults", "50");
+    playlistUrl.searchParams.set("key", apiKey);
+    if (pageToken) playlistUrl.searchParams.set("pageToken", pageToken);
+
+    const playlistRes = await fetch(playlistUrl.toString(), { cf: { cacheTtl: 600, cacheEverything: true } });
+    if (!playlistRes.ok) break;
+    const playlistJson = await playlistRes.json();
+    for (const item of playlistJson?.items || []) {
+      const id = item?.contentDetails?.videoId || "";
+      if (id) ids.push(id);
+    }
+    pageToken = playlistJson?.nextPageToken || "";
+    if (!pageToken) break;
+  }
+
+  return await fetchVideoDetails_(ids, apiKey);
 }
 
 async function resolveChannelFromHandlePage_(handle) {
@@ -133,11 +175,12 @@ async function fetchRssItems_(channelId) {
 }
 
 async function fetchVideoDetails_(ids, apiKey) {
-  const out = new Map();
+  const out = [];
   for (let i = 0; i < ids.length; i += 50) {
     const chunk = ids.slice(i, i + 50);
+    if (!chunk.length) continue;
     const url = new URL("https://www.googleapis.com/youtube/v3/videos");
-    url.searchParams.set("part", "snippet,statistics,contentDetails");
+    url.searchParams.set("part", "snippet,statistics,contentDetails,liveStreamingDetails");
     url.searchParams.set("id", chunk.join(","));
     url.searchParams.set("key", apiKey);
     const res = await fetch(url.toString(), { cf: { cacheTtl: 600, cacheEverything: true } });
@@ -147,21 +190,41 @@ async function fetchVideoDetails_(ids, apiKey) {
       const stats = item.statistics || {};
       const snip = item.snippet || {};
       const thumbs = snip.thumbnails || {};
-      out.set(item.id, {
+      const durationRaw = item.contentDetails?.duration || "";
+      const durationSeconds = durationSeconds_(durationRaw);
+      const type = classifyVideo_(item, durationSeconds);
+      out.push({
+        id: item.id,
         title: snip.title || "",
         description: snip.description || "",
         publishedAt: snip.publishedAt || "",
-        thumbnail: thumbs.maxres?.url || thumbs.high?.url || thumbs.medium?.url || thumbs.default?.url || "",
-        duration: formatDuration_(item.contentDetails?.duration || ""),
-        durationRaw: item.contentDetails?.duration || "",
+        publishedLabel: formatDate_(snip.publishedAt || ""),
+        thumbnail: thumbs.maxres?.url || thumbs.high?.url || thumbs.medium?.url || thumbs.default?.url || `https://i.ytimg.com/vi/${item.id}/hqdefault.jpg`,
+        duration: formatDuration_(durationRaw),
+        durationRaw,
+        durationSeconds,
+        type,
         viewCount: numberOrNull_(stats.viewCount),
         likeCount: numberOrNull_(stats.likeCount),
         commentCount: numberOrNull_(stats.commentCount),
+        url: `https://www.youtube.com/watch?v=${item.id}`,
+        embedUrl: `https://www.youtube.com/embed/${item.id}`,
         statsReady: true,
       });
     }
   }
-  return out;
+  return out.sort((a, b) => new Date(b.publishedAt || 0).getTime() - new Date(a.publishedAt || 0).getTime());
+}
+
+function classifyVideo_(item, durationSeconds) {
+  const live = item.liveStreamingDetails || item.snippet?.liveBroadcastContent === "live" || item.snippet?.liveBroadcastContent === "upcoming";
+  if (live) return "live";
+  if (durationSeconds > 0 && durationSeconds <= 60) return "short";
+  return "video";
+}
+
+function looksLikeShortWithoutApi_(item) {
+  return /(^|\s)#?shorts?(\s|$)/i.test(`${item?.title || ""}`);
 }
 
 function firstMatch_(text, re) {
@@ -188,12 +251,18 @@ function formatDate_(iso) {
   } catch { return ""; }
 }
 
-function formatDuration_(iso) {
+function durationSeconds_(iso) {
   const m = String(iso || "").match(/^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/);
-  if (!m) return "";
-  const h = Number(m[1] || 0);
-  const min = Number(m[2] || 0);
-  const s = Number(m[3] || 0);
+  if (!m) return 0;
+  return Number(m[1] || 0) * 3600 + Number(m[2] || 0) * 60 + Number(m[3] || 0);
+}
+
+function formatDuration_(iso) {
+  const total = durationSeconds_(iso);
+  if (!total) return "";
+  const h = Math.floor(total / 3600);
+  const min = Math.floor((total % 3600) / 60);
+  const s = total % 60;
   if (h) return `${h}:${String(min).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   return `${min}:${String(s).padStart(2, "0")}`;
 }

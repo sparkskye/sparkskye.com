@@ -19,39 +19,41 @@ const MANUAL_CATEGORIES = [
 const FORMAT_LABELS = {
   blend: "BLEND",
   image: "IMAGE",
+  images: "IMAGE",
+  jpg: "IMAGE",
+  jpeg: "IMAGE",
+  png: "IMAGE",
   nomad: "NOMAD",
   psd: "PSD",
   timelapse: "TIMELAPSE",
+  timelapses: "TIMELAPSE",
 };
 
 export async function onRequest(context) {
   const requestUrl = new URL(context.request.url);
+  const apiKey = context.env?.GOOGLE_API_KEY || context.env?.DRIVE_API_KEY || "";
 
   if (context.request.method === "OPTIONS") {
     return new Response(null, { headers: corsJsonHeaders_(60) });
   }
 
   if (requestUrl.searchParams.get("list") === "1") {
-    return jsonResponse_({ categories: await listCategories_() }, 200, 300);
+    return jsonResponse_({ categories: await listCategories_(apiKey), driveApiEnabled: !!apiKey }, 200, 300);
   }
 
-  const selected = slugify_(requestUrl.searchParams.get("category") || "all");
-  const categories = await listCategories_();
+  const selected = canonicalCategoryKey_(requestUrl.searchParams.get("category") || "all");
+  const categories = await listCategories_(apiKey);
   const wanted = selected && selected !== "all"
-    ? categories.filter((c) => c.key === selected)
+    ? categories.filter((c) => canonicalCategoryKey_(c.key) === selected)
     : categories;
 
   const groups = [];
   const allItems = [];
 
   for (const category of wanted) {
-    const built = await buildCategory_(category).catch(() => ({ items: [] }));
-    if (built.items.length) {
-      groups.push({ key: category.key, label: category.label, folderId: category.folderId, items: built.items });
-      allItems.push(...built.items);
-    } else {
-      groups.push({ key: category.key, label: category.label, folderId: category.folderId, items: [] });
-    }
+    const built = await buildCategory_(category, apiKey).catch(() => ({ items: [] }));
+    groups.push({ key: category.key, label: category.label, folderId: category.folderId, items: built.items });
+    allItems.push(...built.items);
   }
 
   if (selected === "all") groups.unshift({ key: "all", label: "ALL DESIGN", items: allItems });
@@ -61,48 +63,52 @@ export async function onRequest(context) {
     categories,
     groups,
     items: allItems,
+    driveApiEnabled: !!apiKey,
   }, 200, 300);
 }
 
-async function listCategories_() {
+async function listCategories_(apiKey) {
   const merged = new Map();
   const add = (c) => {
     const key = slugify_(c?.key || c?.name || c?.label || "");
-    if (!key) return;
+    const canonical = canonicalCategoryKey_(key || c?.name || c?.label || "");
+    if (!canonical) return;
     const label = String(c?.label || c?.name || key || "").trim().toUpperCase();
-    merged.set(key, {
-      key,
-      label,
-      name: c?.name || titleCase_(label),
-      folderId: c?.folderId || c?.id || "",
-      formats: c?.formats || {},
+    const current = merged.get(canonical) || {};
+    merged.set(canonical, {
+      key: current.key || key || canonical,
+      label: current.label || label,
+      name: current.name || c?.name || titleCase_(label),
+      folderId: current.folderId || c?.folderId || c?.id || "",
+      formats: { ...(c?.formats || {}), ...(current.formats || {}) },
     });
   };
 
   for (const c of MANUAL_CATEGORIES) add(c);
 
   try {
-    const root = await scrapeDriveFolderEntries_(DESIGN_ROOT_FOLDER_ID);
+    const root = await listDriveFolderEntries_(DESIGN_ROOT_FOLDER_ID, apiKey);
     for (const folder of root.folders || []) add({ name: folder.name, folderId: folder.id });
   } catch {}
 
   return [...merged.values()].sort((a, b) => a.label.localeCompare(b.label));
 }
 
-async function buildCategory_(category) {
+async function buildCategory_(category, apiKey) {
   const formatFolders = new Map();
 
   for (const [key, id] of Object.entries(category.formats || {})) {
-    formatFolders.set(slugify_(key), { key: slugify_(key), label: FORMAT_LABELS[slugify_(key)] || key.toUpperCase(), folderId: id });
+    const fmtKey = canonicalFormatKey_(key);
+    formatFolders.set(fmtKey, { key: fmtKey, label: FORMAT_LABELS[fmtKey] || key.toUpperCase(), folderId: id });
   }
 
   // Future-friendly fallback: if the category folder itself contains folders named
   // image/psd/blend/etc., pick them up automatically.
   if (category.folderId) {
     try {
-      const entries = await scrapeDriveFolderEntries_(category.folderId);
+      const entries = await listDriveFolderEntries_(category.folderId, apiKey);
       for (const folder of entries.folders || []) {
-        const key = slugify_(folder.name);
+        const key = canonicalFormatKey_(folder.name);
         if (!key || formatFolders.has(key)) continue;
         formatFolders.set(key, { key, label: FORMAT_LABELS[key] || folder.name.toUpperCase(), folderId: folder.id });
       }
@@ -113,10 +119,10 @@ async function buildCategory_(category) {
 
   for (const format of formatFolders.values()) {
     if (!format.folderId) continue;
-    const entries = await scrapeDriveFolderEntries_(format.folderId).catch(() => ({ files: [] }));
+    const entries = await listDriveFolderEntries_(format.folderId, apiKey).catch(() => ({ files: [] }));
 
     for (const file of entries.files || []) {
-      const ext = getExtension_(file.name);
+      const ext = getExtension_(file.name) || extFromMime_(file.mimeType);
       const baseName = stripExtension_(file.name);
       const baseKey = normalizeBase_(baseName);
       if (!baseKey) continue;
@@ -132,30 +138,35 @@ async function buildCategory_(category) {
           thumbId: "",
           imageId: "",
           timelapseId: "",
+          thumbnailUrl: "",
         });
       }
 
       const item = byBase.get(baseKey);
+      const fileId = file.fileId || file.id;
       const fileInfo = {
         key: format.key,
         label: format.label,
-        fileId: file.fileId || file.id,
-        id: file.fileId || file.id,
+        fileId,
+        id: fileId,
         name: file.name,
         ext,
+        mimeType: file.mimeType || "",
         downloadName: baseName,
-        driveUrl: `https://drive.google.com/file/d/${file.fileId || file.id}/view`,
-        drivePreviewUrl: `https://drive.google.com/file/d/${file.fileId || file.id}/preview`,
+        thumbnailUrl: file.thumbnailUrl || file.thumbnailLink || "",
+        driveUrl: file.webViewLink || `https://drive.google.com/file/d/${fileId}/view`,
+        drivePreviewUrl: `https://drive.google.com/file/d/${fileId}/preview`,
       };
 
       item.files[format.key] = fileInfo;
       if (!item.formats.some((f) => f.key === format.key)) item.formats.push(fileInfo);
 
-      if (format.key === "image" || isImageFile_(file.name)) {
+      if (format.key === "image" || isImageFile_(file.name) || String(file.mimeType || "").startsWith("image/")) {
         item.thumbId = item.thumbId || fileInfo.fileId;
         item.imageId = item.imageId || fileInfo.fileId;
+        item.thumbnailUrl = item.thumbnailUrl || fileInfo.thumbnailUrl;
       }
-      if (format.key === "timelapse" || isVideoFile_(file.name)) {
+      if (format.key === "timelapse" || isVideoFile_(file.name) || String(file.mimeType || "").startsWith("video/")) {
         item.timelapseId = item.timelapseId || fileInfo.fileId;
       }
     }
@@ -167,6 +178,55 @@ async function buildCategory_(category) {
   }).sort((a, b) => a.name.localeCompare(b.name));
 
   return { items };
+}
+
+async function listDriveFolderEntries_(folderId, apiKey) {
+  if (apiKey) {
+    const viaApi = await listDriveFolderWithApi_(folderId, apiKey).catch(() => null);
+    if (viaApi && (viaApi.files.length || viaApi.folders.length)) return viaApi;
+  }
+  return await scrapeDriveFolderEntries_(folderId);
+}
+
+async function listDriveFolderWithApi_(folderId, apiKey) {
+  const out = { files: [], folders: [] };
+  let pageToken = "";
+
+  for (let page = 0; page < 10; page += 1) {
+    const url = new URL("https://www.googleapis.com/drive/v3/files");
+    url.searchParams.set("q", `'${String(folderId).replace(/'/g, "\\'")}' in parents and trashed = false`);
+    url.searchParams.set("fields", "nextPageToken,files(id,name,mimeType,thumbnailLink,webViewLink,webContentLink,modifiedTime,size)");
+    url.searchParams.set("pageSize", "1000");
+    url.searchParams.set("orderBy", "folder,name");
+    url.searchParams.set("supportsAllDrives", "true");
+    url.searchParams.set("includeItemsFromAllDrives", "true");
+    url.searchParams.set("key", apiKey);
+    if (pageToken) url.searchParams.set("pageToken", pageToken);
+
+    const res = await fetch(url.toString(), { cf: { cacheTtl: 300, cacheEverything: true } });
+    if (!res.ok) break;
+    const json = await res.json();
+    for (const f of json?.files || []) {
+      const entry = {
+        id: f.id,
+        fileId: f.id,
+        name: f.name,
+        mimeType: f.mimeType || "",
+        thumbnailUrl: f.thumbnailLink || "",
+        thumbnailLink: f.thumbnailLink || "",
+        webViewLink: f.webViewLink || "",
+        webContentLink: f.webContentLink || "",
+        modifiedTime: f.modifiedTime || "",
+        size: f.size || "",
+      };
+      if (f.mimeType === "application/vnd.google-apps.folder") out.folders.push(entry);
+      else out.files.push(entry);
+    }
+    pageToken = json?.nextPageToken || "";
+    if (!pageToken) break;
+  }
+
+  return out;
 }
 
 async function scrapeDriveFolderEntries_(folderId) {
@@ -193,18 +253,18 @@ async function scrapeDriveFolderEntries_(folderId) {
       const id = fileId || folderIdMatch;
       if (!id || !name || seen.has(id)) continue;
       seen.add(id);
-      if (folderIdMatch) out.folders.push({ id, name, label: name });
+      if (folderIdMatch) out.folders.push({ id, name, label: name, mimeType: "application/vnd.google-apps.folder" });
       else out.files.push({ id, name, fileId: id });
     }
 
-    for (const m of html.matchAll(/\["([a-zA-Z0-9_-]{20,})"(?:,[^\]]+?){1,4},"([^"]{2,160})"/g)) {
+    for (const m of html.matchAll(/\["([a-zA-Z0-9_-]{20,})"(?:,[^\]]+?){1,4},"([^"]{2,180})"/g)) {
       const id = m[1];
       const name = decodeHtml_(m[2]).trim();
       if (!id || !name || seen.has(id)) continue;
       if (/^(application\/|image\/|video\/|audio\/)/i.test(name)) continue;
       seen.add(id);
       if (looksLikeFile_(name)) out.files.push({ id, name, fileId: id });
-      else out.folders.push({ id, name, label: name });
+      else out.folders.push({ id, name, label: name, mimeType: "application/vnd.google-apps.folder" });
     }
 
     if (out.files.length || out.folders.length) break;
@@ -213,13 +273,33 @@ async function scrapeDriveFolderEntries_(folderId) {
   return out;
 }
 
-function looksLikeFile_(name) {
-  return /\.[a-z0-9]{2,8}$/i.test(String(name || ""));
+function canonicalCategoryKey_(s) {
+  const key = slugify_(s);
+  if (!key) return "";
+  if (key === "thumbnails") return "thumbnail";
+  return key.replace(/s$/, "");
 }
+function canonicalFormatKey_(s) {
+  const key = slugify_(s);
+  if (key === "images" || key === "jpg" || key === "jpeg" || key === "png") return "image";
+  if (key === "timelapses") return "timelapse";
+  return key;
+}
+function looksLikeFile_(name) { return /\.[a-z0-9]{2,8}$/i.test(String(name || "")); }
 function isImageFile_(name) { return /\.(png|jpe?g|webp|gif)$/i.test(String(name || "")); }
 function isVideoFile_(name) { return /\.(mp4|mov|webm|m4v)$/i.test(String(name || "")); }
 function stripExtension_(name) { return String(name || "").replace(/\.[a-z0-9]{2,8}$/i, ""); }
 function getExtension_(name) { const m = String(name || "").match(/\.([a-z0-9]{2,8})$/i); return m ? m[1].toLowerCase() : ""; }
+function extFromMime_(mime) {
+  const m = String(mime || "").toLowerCase();
+  if (m === "image/jpeg") return "jpg";
+  if (m === "image/png") return "png";
+  if (m === "image/webp") return "webp";
+  if (m === "video/mp4") return "mp4";
+  if (m === "video/quicktime") return "mov";
+  if (m === "application/vnd.adobe.photoshop") return "psd";
+  return "";
+}
 function normalizeBase_(s) { return slugify_(stripExtension_(s)); }
 function prettyName_(s) { return String(s || "").replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim(); }
 function titleCase_(s) { return String(s || "").toLowerCase().replace(/\b\w/g, (m) => m.toUpperCase()); }

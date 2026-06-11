@@ -11,6 +11,7 @@ import {
 } from "./ui.js";
 
 const els = {
+  typeChips: qs("#typeChips"),
   sortChips: qs("#sortChips"),
   search: qs("#searchInput"),
   count: qs("#countLabel"),
@@ -19,7 +20,6 @@ const els = {
   modalBackdrop: qs("#modalBackdrop"),
   modalClose: qs("#modalClose"),
   modalViewer: qs("#modalViewer"),
-  modalLoading: qs("#modalLoading"),
   modalName: qs("#modalName"),
   modalStats: qs("#modalStats"),
   modalPath: qs("#modalPath"),
@@ -28,6 +28,12 @@ const els = {
   modalCopy: qs("#modalCopy"),
 };
 
+const TYPES = [
+  { key: "videos", label: "VIDEOS", matches: ["video"] },
+  { key: "shorts", label: "SHORTS", matches: ["short"] },
+  { key: "live", label: "LIVESTREAMS", matches: ["live", "livestream"] },
+];
+
 const SORTS = [
   { key: "date", label: "NEWEST" },
   { key: "views", label: "MOST VIEWED" },
@@ -35,6 +41,7 @@ const SORTS = [
 ];
 
 const state = {
+  type: getUrlParam("type", "videos"),
   sort: getUrlParam("sort", "date"),
   q: getUrlParam("q", ""),
   previewId: getUrlParam("preview", ""),
@@ -45,14 +52,15 @@ const state = {
 };
 
 function clearNode(node) { while (node?.firstChild) node.removeChild(node.firstChild); }
-function slugify(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""); }
 function nfmt(n) { return n == null || Number.isNaN(Number(n)) ? "—" : new Intl.NumberFormat("en-US", { notation: Number(n) >= 100000 ? "compact" : "standard" }).format(Number(n)); }
 function dateValue(v) { const t = new Date(v || 0).getTime(); return Number.isFinite(t) ? t : 0; }
-function textDate(iso) {
-  if (!iso) return "";
-  try { return new Intl.DateTimeFormat("en-US", { year: "numeric", month: "short", day: "numeric" }).format(new Date(iso)); }
-  catch { return ""; }
+function shortDate(iso) {
+  if (!iso) return "—";
+  try { return new Intl.DateTimeFormat("en-US", { year: "numeric", month: "numeric", day: "numeric" }).format(new Date(iso)); }
+  catch { return "—"; }
 }
+function itemType(it) { return String(it.type || it.kind || "video").toLowerCase(); }
+function cardLine(it) { return `${nfmt(it.viewCount)} views, ${shortDate(it.publishedAt)}`; }
 
 function makeChip({ label, active, onClick }) {
   const b = document.createElement("button");
@@ -61,6 +69,23 @@ function makeChip({ label, active, onClick }) {
   b.textContent = label;
   b.addEventListener("click", onClick);
   return b;
+}
+
+function renderTypeChips() {
+  clearNode(els.typeChips);
+  for (const type of TYPES) {
+    els.typeChips.appendChild(makeChip({
+      label: type.label,
+      active: state.type === type.key,
+      onClick: () => {
+        if (state.type === type.key) return;
+        state.type = type.key;
+        setUrlParam("type", state.type);
+        renderTypeChips();
+        applyFiltersAndRenderGrid();
+      },
+    }));
+  }
 }
 
 function renderSortChips() {
@@ -89,27 +114,23 @@ function sortItems(items) {
 
 function applyFiltersAndRenderGrid() {
   const q = String(state.q || "").trim().toLowerCase();
-  let items = state.items.filter((it) => !q || (it.title || "").toLowerCase().includes(q));
+  const selectedType = TYPES.find((t) => t.key === state.type) || TYPES[0];
+  let items = state.items.filter((it) => selectedType.matches.includes(itemType(it)));
+  items = items.filter((it) => !q || (it.title || "").toLowerCase().includes(q));
   items = sortItems(items);
   state.filtered = items;
   els.count.textContent = `${items.length} shown`;
   renderGrid(items);
 }
 
-function stat(label, value) {
-  const s = document.createElement("span");
-  s.className = "card__stat";
-  s.textContent = `${label}: ${value}`;
-  return s;
-}
-
 function renderGrid(items) {
   els.grid.innerHTML = "";
 
   if (!items.length) {
+    const selected = TYPES.find((t) => t.key === state.type)?.label || "VIDEOS";
     const empty = document.createElement("div");
     empty.className = "empty-state";
-    empty.textContent = "NO VIDEOS FOUND. IF THIS STAYS EMPTY, THE YOUTUBE CHANNEL RSS/API MAY NEED A REDEPLOY OR API KEY.";
+    empty.textContent = `NO ${selected} FOUND.`;
     els.grid.appendChild(empty);
     return;
   }
@@ -129,25 +150,18 @@ function renderGrid(items) {
 
     const meta = document.createElement("div");
     meta.className = "card__meta";
-    const nameRow = document.createElement("div");
-    nameRow.className = "card__top";
     const name = document.createElement("h2");
     name.className = "card__name";
     name.textContent = it.title || "Untitled video";
-    nameRow.appendChild(name);
-
-    const badge = document.createElement("span");
-    badge.className = "badge";
-    badge.textContent = it.duration || "VIDEO";
-    nameRow.appendChild(badge);
 
     const stats = document.createElement("div");
     stats.className = "card__stats";
-    stats.appendChild(stat("views", nfmt(it.viewCount)));
-    if (it.likeCount != null) stats.appendChild(stat("likes", nfmt(it.likeCount)));
-    stats.appendChild(stat("date", it.publishedLabel || textDate(it.publishedAt) || "—"));
+    const line = document.createElement("span");
+    line.className = "card__stat";
+    line.textContent = cardLine(it);
+    stats.appendChild(line);
 
-    meta.appendChild(nameRow);
+    meta.appendChild(name);
     meta.appendChild(stats);
     card.appendChild(viewer);
     card.appendChild(meta);
@@ -168,9 +182,10 @@ function getPreviewlessHref() {
 
 function buildPreviewLink(it) {
   const url = new URL(`${window.location.origin}/editing/`);
-  url.searchParams.set("preview", it.id);
+  if (state.type && state.type !== "videos") url.searchParams.set("type", state.type);
   if (state.sort && state.sort !== "date") url.searchParams.set("sort", state.sort);
   if (state.q) url.searchParams.set("q", state.q);
+  url.searchParams.set("preview", it.id);
   return url.toString();
 }
 
@@ -180,7 +195,7 @@ function renderModalStats(it) {
     ["views", nfmt(it.viewCount)],
     ["likes", nfmt(it.likeCount)],
     ["comments", nfmt(it.commentCount)],
-    ["date", it.publishedLabel || textDate(it.publishedAt) || "—"],
+    ["date", shortDate(it.publishedAt)],
     ["length", it.duration || "—"],
   ];
   for (const [label, value] of stats) {
@@ -204,7 +219,7 @@ function openModal(it, opts = {}) {
   if (!opts.skipUrlUpdate) history.replaceState({}, "", previewLink);
 
   els.modalName.textContent = it.title || "Untitled video";
-  els.modalPath.textContent = it.statsReady ? "YOUTUBE VIDEO" : "YOUTUBE VIDEO • BASIC RSS DATA";
+  els.modalPath.textContent = cardLine(it);
   els.modalWatch.href = it.url || `https://www.youtube.com/watch?v=${it.id}`;
   renderModalStats(it);
 
@@ -250,6 +265,7 @@ function showLoading() {
 
 async function loadDataAndRender() {
   showLoading();
+  renderTypeChips();
   renderSortChips();
   const json = await fetchEditingVideos(state.sort).catch((err) => ({ items: [], error: err.message }));
   state.items = Array.isArray(json?.items) ? json.items : [];
@@ -268,6 +284,7 @@ els.search.addEventListener("input", debounce(() => {
 }, 120));
 
 window.addEventListener("popstate", async () => {
+  state.type = getUrlParam("type", "videos");
   state.sort = getUrlParam("sort", "date");
   state.q = getUrlParam("q", "");
   els.search.value = state.q;

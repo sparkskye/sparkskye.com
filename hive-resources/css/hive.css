@@ -118,7 +118,7 @@ a{ color:inherit; text-decoration:none; }
 }
 .topnav__burger:hover,
 .topnav__burger.is-open{
-  border: var(--ui-border-accent);
+  border-color: var(--accent);
 }
 .topnav__burger-icon{
   width: 18px;
@@ -158,7 +158,7 @@ a{ color:inherit; text-decoration:none; }
 }
 .topnav__dropitem + .topnav__dropitem{ margin-top: 8px; }
 .topnav__dropitem:hover{
-  border: var(--ui-border-accent);
+  border-color: var(--item-color, var(--accent));
 }
 
 @media (max-width: 680px){
@@ -174,11 +174,11 @@ a{ color:inherit; text-decoration:none; }
   border: var(--ui-border);
 }
 .topnav__btn:hover{
-  border: var(--ui-border-accent);
+  border-color: var(--item-color, var(--accent));
 }
 .topnav__btn.is-active{
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--item-color, var(--accent));
+  border-color: var(--item-color, var(--accent));
   color: #041018;
 }
 
@@ -453,7 +453,9 @@ a{ color:inherit; text-decoration:none; }
 }
 
 .card__name{
+  font-family: Minecraftia, sans-serif;
   font-size: 14px;
+  font-weight: 400;
   line-height: 1.2;
   margin:0;
 }
@@ -863,7 +865,7 @@ body.theme-art{ --accent:#fbbc42; --accent2:#ffd06c; }
   min-height: 150px;
   display:flex;
   flex-direction:column;
-  justify-content:space-between;
+  justify-content:flex-start;
   gap: 14px;
   padding: 18px;
   border-radius: var(--radius2);
@@ -878,6 +880,7 @@ body.theme-art{ --accent:#fbbc42; --accent2:#ffd06c; }
   font-family: MCTen, Minecraftia, sans-serif;
   font-size: clamp(28px, 4vw, 42px);
   line-height: 1;
+  color: var(--section-color, var(--accent));
 }
 .section-card__text{
   margin: 0;
@@ -1006,4 +1009,47 @@ body.theme-art{ --accent:#fbbc42; --accent2:#ffd06c; }
   .card--media .card__viewer{ height: 170px; }
   .modal__viewer--media{ height: 46vh; }
   .section-card__title{ font-size: 34px; }
+}
+
+/* Category page color + media-card polish */
+body.theme-animations .hero__title,
+body.theme-editing .hero__title,
+body.theme-design .hero__title,
+body.theme-art .hero__title{
+  color: var(--accent);
+}
+
+.topnav__dropitem{
+  --item-color: var(--accent);
+}
+
+.editing-page .card--media .card__viewer,
+.design-page .card--media .card__viewer{
+  padding: 12px;
+  background: rgba(0,0,0,.10);
+}
+
+.editing-page .card--media .card__viewer img,
+.design-page .card--media .card__viewer img{
+  border-radius: 14px;
+  overflow: hidden;
+  background: #101010;
+}
+
+.editing-page .card--media .card__viewer img{
+  object-fit: cover;
+}
+
+.design-page .card--media .card__viewer img{
+  object-fit: contain;
+}
+
+.editing-page .card__stats{
+  text-transform: none;
+  letter-spacing: .2px;
+}
+.topnav__dropitem.is-active{
+  background: var(--item-color, var(--accent));
+  border-color: var(--item-color, var(--accent));
+  color: #041018;
 }

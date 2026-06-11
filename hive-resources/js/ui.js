@@ -134,6 +134,9 @@ export function initMobileNav() {
         b.click();
       });
     }
+    const color = b.style?.getPropertyValue("--item-color") || b.getAttribute?.("data-color") || "";
+    if (color) a.style.setProperty("--item-color", color);
+    if (b.classList?.contains("is-active")) a.classList.add("is-active");
     a.textContent = (b.textContent || "").trim() || "Link";
     dropdown.appendChild(a);
   }

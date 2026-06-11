@@ -112,7 +112,7 @@ function renderGrid(items) {
       const img = document.createElement("img");
       img.loading = "lazy";
       img.alt = it.name || "Design preview";
-      img.src = fileViewUrl(it.thumbId || it.imageId);
+      img.src = it.thumbnailUrl || fileViewUrl(it.thumbId || it.imageId);
       viewer.appendChild(img);
     } else {
       const ph = document.createElement("div");
@@ -168,7 +168,7 @@ function showImagePreview(it) {
   if (it.imageId || it.thumbId) {
     const img = document.createElement("img");
     img.alt = it.name || "Design preview";
-    img.src = fileViewUrl(it.imageId || it.thumbId);
+    img.src = it.thumbnailUrl || fileViewUrl(it.imageId || it.thumbId);
     els.modalViewer.appendChild(img);
     return;
   }
