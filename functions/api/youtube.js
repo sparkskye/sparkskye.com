@@ -10,16 +10,21 @@ export async function onRequest(context) {
 
   const handle = normalizeHandle_(requestUrl.searchParams.get("handle") || DEFAULT_HANDLE);
   const apiKey = context.env?.GOOGLE_API_KEY || context.env?.YOUTUBE_API_KEY || "";
+  const debugMode = requestUrl.searchParams.has("debug") || requestUrl.searchParams.get("test") === "1";
+  const debug = {
+    apiKeySeen: !!apiKey,
+    channelIdSource: "default",
+    attempts: [],
+  };
 
   let channelId = handle.toLowerCase() === DEFAULT_HANDLE ? DEFAULT_CHANNEL_ID : "";
   let channelTitle = "Sparkskye";
 
   if (apiKey && !channelId) {
-    try {
-      const resolved = await resolveChannelWithApi_(handle, apiKey);
-      channelId = resolved.channelId || channelId;
-      channelTitle = resolved.title || channelTitle;
-    } catch {}
+    const resolved = await resolveChannelWithApi_(handle, apiKey, debug);
+    channelId = resolved.channelId || channelId;
+    channelTitle = resolved.title || channelTitle;
+    if (channelId) debug.channelIdSource = "youtube-api";
   }
 
   if (!channelId) {
@@ -27,7 +32,10 @@ export async function onRequest(context) {
       const resolved = await resolveChannelFromHandlePage_(handle);
       channelId = resolved.channelId || "";
       channelTitle = resolved.title || channelTitle;
-    } catch {}
+      if (channelId) debug.channelIdSource = "handle-page";
+    } catch (error) {
+      debug.attempts.push({ step: "resolve-handle-page", ok: false, error: String(error?.message || error) });
+    }
   }
 
   if (!channelId) {
@@ -38,38 +46,62 @@ export async function onRequest(context) {
       apiStatsEnabled: !!apiKey,
       items: [],
       error: "Could not resolve YouTube channel id from handle.",
-    }, 200, 60);
+      ...(debugMode ? { debug } : {}),
+    }, 200, debugMode ? 0 : 60);
   }
 
   let items = [];
+
+  // First try the full YouTube API path: channel -> uploads playlist -> video details.
   if (apiKey) {
     try {
-      items = await fetchChannelVideosWithApi_(channelId, apiKey);
-    } catch {
+      items = await fetchChannelVideosWithApi_(channelId, apiKey, debug);
+    } catch (error) {
+      debug.attempts.push({ step: "full-api", ok: false, error: String(error?.message || error) });
       items = [];
     }
   }
 
+  // Fallback: RSS already works for public uploads. If the API key works for videos.list,
+  // hydrate those RSS video IDs with views/likes/comments/duration.
   if (!items.length) {
-    const rssItems = await fetchRssItems_(channelId).catch(() => []);
-    items = rssItems.map((item) => ({
-      ...item,
-      type: looksLikeShortWithoutApi_(item) ? "short" : "video",
-      url: `https://www.youtube.com/watch?v=${item.id}`,
-      embedUrl: `https://www.youtube.com/embed/${item.id}`,
-      thumbnail: item.thumbnail || `https://i.ytimg.com/vi/${item.id}/hqdefault.jpg`,
-      publishedLabel: formatDate_(item.publishedAt),
-      statsReady: false,
-    }));
+    const rssItems = await fetchRssItems_(channelId, debug).catch((error) => {
+      debug.attempts.push({ step: "rss", ok: false, error: String(error?.message || error) });
+      return [];
+    });
+
+    if (apiKey && rssItems.length) {
+      const rssIds = rssItems.map((item) => item.id).filter(Boolean);
+      try {
+        const hydrated = await fetchVideoDetails_(rssIds, apiKey, debug, "rss-video-details");
+        if (hydrated.length) items = hydrated;
+      } catch (error) {
+        debug.attempts.push({ step: "rss-video-details", ok: false, error: String(error?.message || error) });
+      }
+    }
+
+    if (!items.length) {
+      items = rssItems.map((item) => ({
+        ...item,
+        type: looksLikeShortWithoutApi_(item) ? "short" : "video",
+        url: `https://www.youtube.com/watch?v=${item.id}`,
+        embedUrl: `https://www.youtube.com/embed/${item.id}`,
+        thumbnail: item.thumbnail || `https://i.ytimg.com/vi/${item.id}/hqdefault.jpg`,
+        publishedLabel: formatDate_(item.publishedAt),
+        statsReady: false,
+      }));
+    }
   }
 
+  const responseMaxAge = debugMode ? 0 : 300;
   return jsonResponse_({
     source: "youtube",
     handle,
     channel: { id: channelId, title: channelTitle, url: `https://www.youtube.com/${handle}` },
     apiStatsEnabled: !!apiKey,
     items,
-  }, 200, 300);
+    ...(debugMode ? { debug } : {}),
+  }, 200, responseMaxAge);
 }
 
 function normalizeHandle_(raw) {
@@ -85,29 +117,30 @@ function normalizeHandle_(raw) {
   return s.startsWith("@") ? s : `@${s}`;
 }
 
-async function resolveChannelWithApi_(handle, apiKey) {
+async function resolveChannelWithApi_(handle, apiKey, debug) {
   const url = new URL("https://www.googleapis.com/youtube/v3/channels");
   url.searchParams.set("part", "id,snippet");
   url.searchParams.set("forHandle", handle.replace(/^@/, ""));
   url.searchParams.set("key", apiKey);
-  const res = await fetch(url.toString(), { cf: { cacheTtl: 3600, cacheEverything: true } });
-  if (!res.ok) return { channelId: "", title: "" };
-  const json = await res.json();
-  const item = json?.items?.[0] || null;
+  const result = await fetchJson_(url, 3600, "resolve-channel-api", debug);
+  if (!result.ok) return { channelId: "", title: "" };
+  const item = result.json?.items?.[0] || null;
   return { channelId: item?.id || "", title: item?.snippet?.title || "" };
 }
 
-async function fetchChannelVideosWithApi_(channelId, apiKey) {
+async function fetchChannelVideosWithApi_(channelId, apiKey, debug) {
   const channelUrl = new URL("https://www.googleapis.com/youtube/v3/channels");
   channelUrl.searchParams.set("part", "snippet,contentDetails");
   channelUrl.searchParams.set("id", channelId);
   channelUrl.searchParams.set("key", apiKey);
 
-  const channelRes = await fetch(channelUrl.toString(), { cf: { cacheTtl: 3600, cacheEverything: true } });
-  if (!channelRes.ok) return [];
-  const channelJson = await channelRes.json();
-  const uploadsPlaylistId = channelJson?.items?.[0]?.contentDetails?.relatedPlaylists?.uploads || "";
-  if (!uploadsPlaylistId) return [];
+  const channelResult = await fetchJson_(channelUrl, 3600, "channel-content-details", debug);
+  if (!channelResult.ok) return [];
+  const uploadsPlaylistId = channelResult.json?.items?.[0]?.contentDetails?.relatedPlaylists?.uploads || "";
+  if (!uploadsPlaylistId) {
+    debug.attempts.push({ step: "channel-content-details", ok: true, note: "No uploads playlist returned." });
+    return [];
+  }
 
   const ids = [];
   let pageToken = "";
@@ -120,18 +153,18 @@ async function fetchChannelVideosWithApi_(channelId, apiKey) {
     playlistUrl.searchParams.set("key", apiKey);
     if (pageToken) playlistUrl.searchParams.set("pageToken", pageToken);
 
-    const playlistRes = await fetch(playlistUrl.toString(), { cf: { cacheTtl: 600, cacheEverything: true } });
-    if (!playlistRes.ok) break;
-    const playlistJson = await playlistRes.json();
-    for (const item of playlistJson?.items || []) {
+    const playlistResult = await fetchJson_(playlistUrl, 600, `playlist-items-page-${page + 1}`, debug);
+    if (!playlistResult.ok) break;
+    for (const item of playlistResult.json?.items || []) {
       const id = item?.contentDetails?.videoId || "";
       if (id) ids.push(id);
     }
-    pageToken = playlistJson?.nextPageToken || "";
+    pageToken = playlistResult.json?.nextPageToken || "";
     if (!pageToken) break;
   }
 
-  return await fetchVideoDetails_(ids, apiKey);
+  if (!ids.length) return [];
+  return await fetchVideoDetails_(ids, apiKey, debug, "playlist-video-details");
 }
 
 async function resolveChannelFromHandlePage_(handle) {
@@ -154,17 +187,18 @@ async function resolveChannelFromHandlePage_(handle) {
   return { channelId, title };
 }
 
-async function fetchRssItems_(channelId) {
+async function fetchRssItems_(channelId, debug) {
   const rss = new URL("https://www.youtube.com/feeds/videos.xml");
   rss.searchParams.set("channel_id", channelId);
   const res = await fetch(rss.toString(), {
     headers: { "User-Agent": "sparkskye-pages-proxy" },
     cf: { cacheTtl: 600, cacheEverything: true },
   });
+  debug.attempts.push({ step: "rss", ok: res.ok, status: res.status });
   if (!res.ok) return [];
   const xml = await res.text();
   const entries = xml.split(/<entry>/g).slice(1);
-  return entries.map((entry) => {
+  const items = entries.map((entry) => {
     const id = textTag_(entry, "yt:videoId");
     const title = decodeXml_(textTag_(entry, "title"));
     const publishedAt = textTag_(entry, "published");
@@ -172,9 +206,11 @@ async function fetchRssItems_(channelId) {
     const thumbnail = firstMatch_(entry, /<media:thumbnail[^>]+url="([^"]+)"/i) || "";
     return { id, title, publishedAt, updatedAt, thumbnail };
   }).filter((v) => v.id && v.title);
+  debug.attempts.push({ step: "rss-parse", ok: true, count: items.length });
+  return items;
 }
 
-async function fetchVideoDetails_(ids, apiKey) {
+async function fetchVideoDetails_(ids, apiKey, debug, stepPrefix = "video-details") {
   const out = [];
   for (let i = 0; i < ids.length; i += 50) {
     const chunk = ids.slice(i, i + 50);
@@ -183,10 +219,9 @@ async function fetchVideoDetails_(ids, apiKey) {
     url.searchParams.set("part", "snippet,statistics,contentDetails,liveStreamingDetails");
     url.searchParams.set("id", chunk.join(","));
     url.searchParams.set("key", apiKey);
-    const res = await fetch(url.toString(), { cf: { cacheTtl: 600, cacheEverything: true } });
-    if (!res.ok) continue;
-    const json = await res.json();
-    for (const item of json?.items || []) {
+    const result = await fetchJson_(url, 600, `${stepPrefix}-${Math.floor(i / 50) + 1}`, debug);
+    if (!result.ok) continue;
+    for (const item of result.json?.items || []) {
       const stats = item.statistics || {};
       const snip = item.snippet || {};
       const thumbs = snip.thumbnails || {};
@@ -213,7 +248,26 @@ async function fetchVideoDetails_(ids, apiKey) {
       });
     }
   }
+  debug.attempts.push({ step: `${stepPrefix}-complete`, ok: true, count: out.length });
   return out.sort((a, b) => new Date(b.publishedAt || 0).getTime() - new Date(a.publishedAt || 0).getTime());
+}
+
+async function fetchJson_(url, ttl, step, debug) {
+  const res = await fetch(url.toString(), { cf: { cacheTtl: ttl, cacheEverything: true } });
+  const text = await res.text();
+  let json = null;
+  try { json = JSON.parse(text); } catch {}
+  const entry = { step, ok: res.ok, status: res.status };
+  const error = json?.error || null;
+  if (error) {
+    entry.errorCode = error.code || res.status;
+    entry.errorStatus = error.status || "";
+    entry.errorMessage = String(error.message || "").slice(0, 240);
+    entry.errorReason = error.errors?.[0]?.reason || "";
+  }
+  if (res.ok && json?.items) entry.count = json.items.length;
+  debug.attempts.push(entry);
+  return { ok: res.ok, status: res.status, json };
 }
 
 function classifyVideo_(item, durationSeconds) {
@@ -287,6 +341,6 @@ function corsJsonHeaders_(maxAge = 60) {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
-    "Cache-Control": `public, max-age=${maxAge}`,
+    "Cache-Control": maxAge ? `public, max-age=${maxAge}` : "no-store, max-age=0",
   };
 }
