@@ -93,6 +93,23 @@ export async function onRequest(context) {
     }
   }
 
+  // The YouTube Data API does not provide a clean "Shorts vs Videos tab" flag.
+  // Use the public channel tabs as the source of truth for the gallery chips,
+  // then fall back to metadata heuristics only when a tab does not reveal an ID.
+  if (items.length) {
+    try {
+      const tabTypes = await fetchChannelTabTypes_(handle, debug);
+      if (tabTypes.map.size) {
+        items = items.map((item) => {
+          const tabType = tabTypes.map.get(item.id);
+          return tabType ? { ...item, type: tabType, youtubeTab: tabType } : item;
+        });
+      }
+    } catch (error) {
+      debug.attempts.push({ step: "tab-type-map", ok: false, error: String(error?.message || error) });
+    }
+  }
+
   const responseMaxAge = debugMode ? 0 : 300;
   return jsonResponse_({
     source: "youtube",
@@ -278,6 +295,74 @@ async function fetchJson_(url, ttl, step, debug) {
   return { ok: res.ok, status: res.status, json };
 }
 
+async function fetchChannelTabTypes_(handle, debug) {
+  const base = `https://www.youtube.com/${encodeURIComponent(handle)}`;
+  const tabs = [
+    { kind: "video", path: "/videos" },
+    { kind: "live", path: "/streams" },
+    { kind: "short", path: "/shorts" },
+  ];
+
+  const map = new Map();
+  const counts = { video: 0, short: 0, live: 0 };
+
+  // Intentional order: VIDEOS first, then LIVESTREAMS, then SHORTS.
+  // If YouTube repeats an ID in more than one page, the more specific tabs win.
+  for (const tab of tabs) {
+    const ids = await fetchChannelTabIds_(`${base}${tab.path}`, tab.kind, debug);
+    counts[tab.kind] = ids.size;
+    for (const id of ids) map.set(id, tab.kind);
+  }
+
+  debug.attempts.push({ step: "tab-type-map-complete", ok: true, ...counts });
+  return { map, counts };
+}
+
+async function fetchChannelTabIds_(url, kind, debug) {
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 sparkskye-pages-proxy",
+      "Accept-Language": "en-US,en;q=0.9",
+    },
+    cf: { cacheTtl: 300, cacheEverything: true },
+  });
+
+  debug.attempts.push({ step: `youtube-tab-${kind}`, ok: res.ok, status: res.status });
+  if (!res.ok) return new Set();
+
+  const html = await res.text();
+  const ids = extractIdsFromChannelTab_(html, kind);
+  debug.attempts.push({ step: `youtube-tab-${kind}-parse`, ok: true, count: ids.size });
+  return ids;
+}
+
+function extractIdsFromChannelTab_(html, kind) {
+  const text = String(html || "");
+  const ids = new Set();
+
+  // Shorts are safest to identify from /shorts/<id> URLs.
+  if (kind === "short") {
+    addMatches_(ids, text, /\/(?:shorts)\/([a-zA-Z0-9_-]{11})/g);
+    addMatches_(ids, text, /%2Fshorts%2F([a-zA-Z0-9_-]{11})/g);
+    if (ids.size) return ids;
+  }
+
+  // Videos and livestream archives usually appear as videoId fields and watch URLs.
+  addMatches_(ids, text, /"videoId"\s*:\s*"([a-zA-Z0-9_-]{11})"/g);
+  addMatches_(ids, text, /watch\?v=([a-zA-Z0-9_-]{11})/g);
+  addMatches_(ids, text, /watch%3Fv%3D([a-zA-Z0-9_-]{11})/g);
+  addMatches_(ids, text, /%2Fwatch%3Fv%3D([a-zA-Z0-9_-]{11})/g);
+  return ids;
+}
+
+function addMatches_(set, text, regex) {
+  let match;
+  regex.lastIndex = 0;
+  while ((match = regex.exec(text))) {
+    if (match[1]) set.add(match[1]);
+  }
+}
+
 function classifyVideo_(item, durationSeconds, thumb = null) {
   const liveDetails = item.liveStreamingDetails || null;
   const liveState = String(item.snippet?.liveBroadcastContent || "").toLowerCase();
@@ -291,11 +376,13 @@ function classifyVideo_(item, durationSeconds, thumb = null) {
   const text = `${item.snippet?.title || ""} ${item.snippet?.description || ""}`;
   if (/(^|\s)#?shorts?(\s|$)|youtube\s+shorts|\/shorts\//i.test(text)) return "short";
 
-  // YouTube Shorts can be longer than 60 seconds, so use 3 minutes as the practical
-  // cutoff for this gallery. This keeps vertical short-form posts out of VIDEOS.
-  if (durationSeconds > 0 && durationSeconds <= 180) return "short";
+  const portraitThumb = thumb?.width && thumb?.height && Number(thumb.height) > Number(thumb.width) * 1.15;
+  if (portraitThumb) return "short";
 
-  if (thumb?.width && thumb?.height && Number(thumb.height) > Number(thumb.width)) return "short";
+  // Do not classify by duration alone. Plenty of normal videos are under 3 minutes.
+  // The channel tab scraper above is the main Shorts/Videos/Livestream source of truth.
+  if (durationSeconds > 0 && durationSeconds <= 60 && portraitThumb) return "short";
+
   return "video";
 }
 

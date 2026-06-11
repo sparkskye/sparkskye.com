@@ -60,12 +60,17 @@ function shortDate(iso) {
   catch { return "—"; }
 }
 function itemType(it) {
-  const raw = String(it.type || it.kind || "video").toLowerCase();
-  if (raw.includes("live")) return "live";
+  const raw = String(it.youtubeTab || it.type || it.kind || "video").toLowerCase();
+  if (raw.includes("live") || raw.includes("stream")) return "live";
   if (raw.includes("short")) return "short";
+
+  const w = Number(it.thumbnailWidth || 0);
+  const h = Number(it.thumbnailHeight || 0);
   const seconds = Number(it.durationSeconds || 0);
-  // Fallback for older cached API responses: current Shorts can be up to 3 minutes.
-  if (seconds > 0 && seconds <= 180) return "short";
+  const portrait = w > 0 && h > 0 && h > w * 1.15;
+
+  // Emergency fallback only. Do not classify by duration alone.
+  if (portrait && seconds > 0 && seconds <= 180) return "short";
   return "video";
 }
 function cardLine(it) { return `${nfmt(it.viewCount)} views, ${shortDate(it.publishedAt)}`; }

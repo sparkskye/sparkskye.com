@@ -96,7 +96,7 @@ export function fileViewUrl(fileId) {
 }
 
 export async function fetchEditingVideos(sort = "date") {
-  const url = siteApiUrl(`/api/youtube?handle=${encodeURIComponent("@sparkskye")}&sort=${encodeURIComponent(sort || "date")}`);
+  const url = siteApiUrl(`/api/youtube?handle=${encodeURIComponent("@sparkskye")}&sort=${encodeURIComponent(sort || "date")}&typeMode=youtube-tabs-v1`);
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
   return await res.json();
