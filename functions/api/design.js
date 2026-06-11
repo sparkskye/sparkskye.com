@@ -2,16 +2,16 @@ const DESIGN_ROOT_FOLDER_ID = "1DUmxNnEdzNo55jmW32nxEQW4GtWFNyAk";
 
 const MANUAL_CATEGORIES = [
   {
-    key: "thumbnails",
+    key: "thumbnail",
     label: "THUMBNAILS",
     name: "Thumbnails",
     folderId: "1BdY45PsEiH_Ok7LOoz4gA9dh8oMKQAAe",
     formats: {
-      blend: "1us9v1i-3iPRnHNTrfmV5VZC-CviFHc8s",
       image: "11glK03RH_oCvtEPodbcYlG_Cj1wEIRTf",
-      nomad: "1O6TY6VK2k2hvY5MA16nid-4m4QyygW7U",
-      psd: "1SLVCnMkZyEK7IzaVcEiFmFqFkYqsjr8B",
       timelapse: "10ZCgk3dc4NGbHip00qcbQQ2YEwbrsncs",
+      psd: "1SLVCnMkZyEK7IzaVcEiFmFqFkYqsjr8B",
+      blend: "1us9v1i-3iPRnHNTrfmV5VZC-CviFHc8s",
+      nomad: "1O6TY6VK2k2hvY5MA16nid-4m4QyygW7U",
     },
   },
 ];
@@ -23,26 +23,37 @@ const FORMAT_LABELS = {
   jpg: "IMAGE",
   jpeg: "IMAGE",
   png: "IMAGE",
+  webp: "IMAGE",
   nomad: "NOMAD",
   psd: "PSD",
   timelapse: "TIMELAPSE",
   timelapses: "TIMELAPSE",
+  mp4: "TIMELAPSE",
+  mov: "TIMELAPSE",
+  webm: "TIMELAPSE",
 };
 
 export async function onRequest(context) {
   const requestUrl = new URL(context.request.url);
   const apiKey = context.env?.GOOGLE_API_KEY || context.env?.DRIVE_API_KEY || "";
+  const debugMode = requestUrl.searchParams.get("debug") === "1";
+  const debug = [];
 
   if (context.request.method === "OPTIONS") {
     return new Response(null, { headers: corsJsonHeaders_(60) });
   }
 
   if (requestUrl.searchParams.get("list") === "1") {
-    return jsonResponse_({ categories: await listCategories_(apiKey), driveApiEnabled: !!apiKey }, 200, 300);
+    const categories = await listCategories_(apiKey, debug);
+    return jsonResponse_({
+      categories,
+      driveApiEnabled: !!apiKey,
+      ...(debugMode ? { debug } : {}),
+    }, 200, debugMode ? 0 : 60);
   }
 
   const selected = canonicalCategoryKey_(requestUrl.searchParams.get("category") || "all");
-  const categories = await listCategories_(apiKey);
+  const categories = await listCategories_(apiKey, debug);
   const wanted = selected && selected !== "all"
     ? categories.filter((c) => canonicalCategoryKey_(c.key) === selected)
     : categories;
@@ -51,7 +62,10 @@ export async function onRequest(context) {
   const allItems = [];
 
   for (const category of wanted) {
-    const built = await buildCategory_(category, apiKey).catch(() => ({ items: [] }));
+    const built = await buildCategory_(category, apiKey, debug).catch((err) => {
+      debug.push({ step: "build-category-error", category: category.key, message: String(err?.message || err) });
+      return { items: [] };
+    });
     groups.push({ key: category.key, label: category.label, folderId: category.folderId, items: built.items });
     allItems.push(...built.items);
   }
@@ -64,65 +78,75 @@ export async function onRequest(context) {
     groups,
     items: allItems,
     driveApiEnabled: !!apiKey,
-  }, 200, 300);
+    ...(debugMode ? { debug } : {}),
+  }, 200, debugMode ? 0 : 60);
 }
 
-async function listCategories_(apiKey) {
+async function listCategories_(apiKey, debug) {
   const merged = new Map();
   const add = (c) => {
-    const key = slugify_(c?.key || c?.name || c?.label || "");
-    const canonical = canonicalCategoryKey_(key || c?.name || c?.label || "");
+    const rawKey = c?.key || c?.name || c?.label || "";
+    const canonical = canonicalCategoryKey_(rawKey);
     if (!canonical) return;
+    const key = canonical;
     const label = String(c?.label || c?.name || key || "").trim().toUpperCase();
     const current = merged.get(canonical) || {};
     merged.set(canonical, {
-      key: current.key || key || canonical,
+      key,
       label: current.label || label,
       name: current.name || c?.name || titleCase_(label),
       folderId: current.folderId || c?.folderId || c?.id || "",
-      formats: { ...(c?.formats || {}), ...(current.formats || {}) },
+      formats: { ...(current.formats || {}), ...(c?.formats || {}) },
     });
   };
 
   for (const c of MANUAL_CATEGORIES) add(c);
 
   try {
-    const root = await listDriveFolderEntries_(DESIGN_ROOT_FOLDER_ID, apiKey);
+    const root = await listDriveFolderEntries_(DESIGN_ROOT_FOLDER_ID, apiKey, debug, "design-root");
     for (const folder of root.folders || []) add({ name: folder.name, folderId: folder.id });
-  } catch {}
+  } catch (err) {
+    debug.push({ step: "root-category-list-error", message: String(err?.message || err) });
+  }
 
   return [...merged.values()].sort((a, b) => a.label.localeCompare(b.label));
 }
 
-async function buildCategory_(category, apiKey) {
+async function buildCategory_(category, apiKey, debug) {
   const formatFolders = new Map();
 
   for (const [key, id] of Object.entries(category.formats || {})) {
     const fmtKey = canonicalFormatKey_(key);
+    if (!fmtKey || !id) continue;
     formatFolders.set(fmtKey, { key: fmtKey, label: FORMAT_LABELS[fmtKey] || key.toUpperCase(), folderId: id });
   }
 
-  // Future-friendly fallback: if the category folder itself contains folders named
+  // Future-friendly fallback: if the category folder contains folders named
   // image/psd/blend/etc., pick them up automatically.
   if (category.folderId) {
     try {
-      const entries = await listDriveFolderEntries_(category.folderId, apiKey);
+      const entries = await listDriveFolderEntries_(category.folderId, apiKey, debug, `category:${category.key}`);
       for (const folder of entries.folders || []) {
         const key = canonicalFormatKey_(folder.name);
         if (!key || formatFolders.has(key)) continue;
         formatFolders.set(key, { key, label: FORMAT_LABELS[key] || folder.name.toUpperCase(), folderId: folder.id });
       }
-    } catch {}
+    } catch (err) {
+      debug.push({ step: "category-folder-list-error", category: category.key, message: String(err?.message || err) });
+    }
   }
 
   const byBase = new Map();
 
   for (const format of formatFolders.values()) {
     if (!format.folderId) continue;
-    const entries = await listDriveFolderEntries_(format.folderId, apiKey).catch(() => ({ files: [] }));
+    const entries = await listDriveFolderEntries_(format.folderId, apiKey, debug, `format:${category.key}/${format.key}`).catch((err) => {
+      debug.push({ step: "format-folder-list-error", category: category.key, format: format.key, folderId: format.folderId, message: String(err?.message || err) });
+      return { files: [], folders: [] };
+    });
 
     for (const file of entries.files || []) {
-      const ext = getExtension_(file.name) || extFromMime_(file.mimeType);
+      const ext = getExtension_(file.name) || extFromMime_(file.mimeType) || format.key;
       const baseName = stripExtension_(file.name);
       const baseKey = normalizeBase_(baseName);
       if (!baseKey) continue;
@@ -144,31 +168,34 @@ async function buildCategory_(category, apiKey) {
 
       const item = byBase.get(baseKey);
       const fileId = file.fileId || file.id;
+      const inferredImage = format.key === "image" || isImageFile_(file.name) || String(file.mimeType || "").startsWith("image/");
+      const inferredVideo = format.key === "timelapse" || isVideoFile_(file.name) || String(file.mimeType || "").startsWith("video/");
+      const label = inferredImage ? "IMAGE" : inferredVideo ? "TIMELAPSE" : (format.label || FORMAT_LABELS[format.key] || format.key.toUpperCase());
+      const canonicalKey = inferredImage ? "image" : inferredVideo ? "timelapse" : format.key;
+
       const fileInfo = {
-        key: format.key,
-        label: format.label,
+        key: canonicalKey,
+        label,
         fileId,
         id: fileId,
         name: file.name,
         ext,
         mimeType: file.mimeType || "",
         downloadName: baseName,
-        thumbnailUrl: file.thumbnailUrl || file.thumbnailLink || "",
+        thumbnailUrl: file.thumbnailUrl || file.thumbnailLink || (inferredImage ? driveThumbnailUrl_(fileId, 1000) : ""),
         driveUrl: file.webViewLink || `https://drive.google.com/file/d/${fileId}/view`,
         drivePreviewUrl: `https://drive.google.com/file/d/${fileId}/preview`,
       };
 
-      item.files[format.key] = fileInfo;
-      if (!item.formats.some((f) => f.key === format.key)) item.formats.push(fileInfo);
+      item.files[canonicalKey] = fileInfo;
+      if (!item.formats.some((f) => f.key === canonicalKey)) item.formats.push(fileInfo);
 
-      if (format.key === "image" || isImageFile_(file.name) || String(file.mimeType || "").startsWith("image/")) {
+      if (inferredImage) {
         item.thumbId = item.thumbId || fileInfo.fileId;
         item.imageId = item.imageId || fileInfo.fileId;
-        item.thumbnailUrl = item.thumbnailUrl || fileInfo.thumbnailUrl;
+        item.thumbnailUrl = item.thumbnailUrl || fileInfo.thumbnailUrl || driveThumbnailUrl_(fileInfo.fileId, 1000);
       }
-      if (format.key === "timelapse" || isVideoFile_(file.name) || String(file.mimeType || "").startsWith("video/")) {
-        item.timelapseId = item.timelapseId || fileInfo.fileId;
-      }
+      if (inferredVideo) item.timelapseId = item.timelapseId || fileInfo.fileId;
     }
   }
 
@@ -177,34 +204,44 @@ async function buildCategory_(category, apiKey) {
     return item;
   }).sort((a, b) => a.name.localeCompare(b.name));
 
+  debug.push({ step: "category-built", category: category.key, formatFolderCount: formatFolders.size, itemCount: items.length });
   return { items };
 }
 
-async function listDriveFolderEntries_(folderId, apiKey) {
+async function listDriveFolderEntries_(folderId, apiKey, debug, label = "folder") {
   if (apiKey) {
-    const viaApi = await listDriveFolderWithApi_(folderId, apiKey).catch(() => null);
-    if (viaApi && (viaApi.files.length || viaApi.folders.length)) return viaApi;
+    const viaApi = await listDriveFolderWithApi_(folderId, apiKey, debug, label).catch((err) => {
+      debug.push({ step: "drive-api-exception", label, folderId, message: String(err?.message || err) });
+      return null;
+    });
+    if (viaApi) return viaApi;
+  } else {
+    debug.push({ step: "drive-api-skipped", label, folderId, reason: "missing GOOGLE_API_KEY" });
   }
-  return await scrapeDriveFolderEntries_(folderId);
+  return await scrapeDriveFolderEntries_(folderId, debug, label);
 }
 
-async function listDriveFolderWithApi_(folderId, apiKey) {
+async function listDriveFolderWithApi_(folderId, apiKey, debug, label) {
   const out = { files: [], folders: [] };
   let pageToken = "";
 
   for (let page = 0; page < 10; page += 1) {
     const url = new URL("https://www.googleapis.com/drive/v3/files");
     url.searchParams.set("q", `'${String(folderId).replace(/'/g, "\\'")}' in parents and trashed = false`);
-    url.searchParams.set("fields", "nextPageToken,files(id,name,mimeType,thumbnailLink,webViewLink,webContentLink,modifiedTime,size)");
+    url.searchParams.set("fields", "nextPageToken,files(id,name,mimeType,thumbnailLink,webViewLink,webContentLink,modifiedTime,size,imageMediaMetadata(width,height),videoMediaMetadata(width,height,durationMillis))");
     url.searchParams.set("pageSize", "1000");
-    url.searchParams.set("orderBy", "folder,name");
+    url.searchParams.set("spaces", "drive");
     url.searchParams.set("supportsAllDrives", "true");
     url.searchParams.set("includeItemsFromAllDrives", "true");
     url.searchParams.set("key", apiKey);
     if (pageToken) url.searchParams.set("pageToken", pageToken);
 
-    const res = await fetch(url.toString(), { cf: { cacheTtl: 300, cacheEverything: true } });
-    if (!res.ok) break;
+    const res = await fetch(url.toString(), { cf: { cacheTtl: 0, cacheEverything: false } });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      debug.push({ step: "drive-api-error", label, folderId, status: res.status, body: safeSnippet_(body) });
+      return null;
+    }
     const json = await res.json();
     for (const f of json?.files || []) {
       const entry = {
@@ -212,12 +249,14 @@ async function listDriveFolderWithApi_(folderId, apiKey) {
         fileId: f.id,
         name: f.name,
         mimeType: f.mimeType || "",
-        thumbnailUrl: f.thumbnailLink || "",
+        thumbnailUrl: f.thumbnailLink || (String(f.mimeType || "").startsWith("image/") ? driveThumbnailUrl_(f.id, 1000) : ""),
         thumbnailLink: f.thumbnailLink || "",
         webViewLink: f.webViewLink || "",
         webContentLink: f.webContentLink || "",
         modifiedTime: f.modifiedTime || "",
         size: f.size || "",
+        imageMediaMetadata: f.imageMediaMetadata || null,
+        videoMediaMetadata: f.videoMediaMetadata || null,
       };
       if (f.mimeType === "application/vnd.google-apps.folder") out.folders.push(entry);
       else out.files.push(entry);
@@ -226,10 +265,11 @@ async function listDriveFolderWithApi_(folderId, apiKey) {
     if (!pageToken) break;
   }
 
+  debug.push({ step: "drive-api-list", label, folderId, fileCount: out.files.length, folderCount: out.folders.length, sampleFiles: out.files.slice(0, 5).map((f) => f.name), sampleFolders: out.folders.slice(0, 5).map((f) => f.name) });
   return out;
 }
 
-async function scrapeDriveFolderEntries_(folderId) {
+async function scrapeDriveFolderEntries_(folderId, debug, label) {
   const urls = [
     `https://drive.google.com/embeddedfolderview?id=${encodeURIComponent(folderId)}#list`,
     `https://drive.google.com/drive/folders/${encodeURIComponent(folderId)}`,
@@ -241,9 +281,12 @@ async function scrapeDriveFolderEntries_(folderId) {
   for (const url of urls) {
     const res = await fetch(url, {
       headers: { "User-Agent": "Mozilla/5.0 sparkskye-pages-proxy" },
-      cf: { cacheTtl: 300, cacheEverything: true },
+      cf: { cacheTtl: 0, cacheEverything: false },
     });
-    if (!res.ok) continue;
+    if (!res.ok) {
+      debug.push({ step: "drive-scrape-error", label, folderId, status: res.status });
+      continue;
+    }
     const html = await res.text();
 
     for (const m of html.matchAll(/href="https:\/\/drive\.google\.com\/(?:file\/d\/([a-zA-Z0-9_-]+)|drive\/folders\/([a-zA-Z0-9_-]+))[^\"]*"[^>]*>([\s\S]*?)<\/a>/g)) {
@@ -257,19 +300,20 @@ async function scrapeDriveFolderEntries_(folderId) {
       else out.files.push({ id, name, fileId: id });
     }
 
-    for (const m of html.matchAll(/\["([a-zA-Z0-9_-]{20,})"(?:,[^\]]+?){1,4},"([^"]{2,180})"/g)) {
+    for (const m of html.matchAll(/\["([a-zA-Z0-9_-]{20,})"(?:,[^\]]+?){1,6},"([^"]{2,220})"/g)) {
       const id = m[1];
       const name = decodeHtml_(m[2]).trim();
       if (!id || !name || seen.has(id)) continue;
       if (/^(application\/|image\/|video\/|audio\/)/i.test(name)) continue;
       seen.add(id);
-      if (looksLikeFile_(name)) out.files.push({ id, name, fileId: id });
+      if (looksLikeFile_(name)) out.files.push({ id, name, fileId: id, thumbnailUrl: isImageFile_(name) ? driveThumbnailUrl_(id, 1000) : "" });
       else out.folders.push({ id, name, label: name, mimeType: "application/vnd.google-apps.folder" });
     }
 
     if (out.files.length || out.folders.length) break;
   }
 
+  debug.push({ step: "drive-scrape-list", label, folderId, fileCount: out.files.length, folderCount: out.folders.length, sampleFiles: out.files.slice(0, 5).map((f) => f.name), sampleFolders: out.folders.slice(0, 5).map((f) => f.name) });
   return out;
 }
 
@@ -281,8 +325,8 @@ function canonicalCategoryKey_(s) {
 }
 function canonicalFormatKey_(s) {
   const key = slugify_(s);
-  if (key === "images" || key === "jpg" || key === "jpeg" || key === "png") return "image";
-  if (key === "timelapses") return "timelapse";
+  if (key === "images" || key === "jpg" || key === "jpeg" || key === "png" || key === "webp") return "image";
+  if (key === "timelapses" || key === "mp4" || key === "mov" || key === "webm") return "timelapse";
   return key;
 }
 function looksLikeFile_(name) { return /\.[a-z0-9]{2,8}$/i.test(String(name || "")); }
@@ -303,7 +347,7 @@ function extFromMime_(mime) {
 function normalizeBase_(s) { return slugify_(stripExtension_(s)); }
 function prettyName_(s) { return String(s || "").replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim(); }
 function titleCase_(s) { return String(s || "").toLowerCase().replace(/\b\w/g, (m) => m.toUpperCase()); }
-function formatOrder_(key) { return ["image", "timelapse", "psd", "blend", "nomad"].indexOf(key) < 0 ? 99 : ["image", "timelapse", "psd", "blend", "nomad"].indexOf(key); }
+function formatOrder_(key) { const order = ["image", "timelapse", "psd", "blend", "nomad"]; const i = order.indexOf(key); return i < 0 ? 99 : i; }
 function cleanLinkText_(html) { return decodeHtml_(String(html || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ")).trim(); }
 function slugify_(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""); }
 function decodeHtml_(s) {
@@ -316,6 +360,8 @@ function decodeHtml_(s) {
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'");
 }
+function driveThumbnailUrl_(fileId, size = 1000) { return `https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=w${Number(size) || 1000}`; }
+function safeSnippet_(body) { return String(body || "").slice(0, 1000).replace(/[A-Za-z0-9_-]{30,}/g, "[redacted]"); }
 function jsonResponse_(payload, status = 200, maxAge = 60) { return new Response(JSON.stringify(payload), { status, headers: corsJsonHeaders_(maxAge) }); }
 function corsJsonHeaders_(maxAge = 60) {
   return {
@@ -323,6 +369,6 @@ function corsJsonHeaders_(maxAge = 60) {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
-    "Cache-Control": `public, max-age=${maxAge}`,
+    "Cache-Control": maxAge > 0 ? `public, max-age=${maxAge}` : "no-store",
   };
 }

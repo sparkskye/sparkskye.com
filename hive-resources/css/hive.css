@@ -1083,3 +1083,31 @@ body.theme-art .hero__title{
 .editing-page .modal__path{
   display: none;
 }
+
+/* Consistent themed hover/focus outlines across creation pages */
+.topnav__btn:hover,
+.topnav__btn:focus-visible,
+.topnav__dropitem:hover,
+.topnav__dropitem:focus-visible{
+  border-color: var(--item-color, var(--accent));
+  outline: none;
+}
+.btn:hover,
+.btn:focus-visible,
+.chip:hover,
+.chip:focus-visible,
+.card:hover,
+.card:focus-visible,
+.card__reload:hover,
+.card__reload:focus-visible,
+.topnav__burger:hover,
+.topnav__burger:focus-visible,
+.topnav__burger.is-open{
+  border-color: var(--accent);
+  outline: none;
+}
+.section-card:hover,
+.section-card:focus-visible{
+  border-color: var(--section-color, var(--accent));
+  outline: none;
+}

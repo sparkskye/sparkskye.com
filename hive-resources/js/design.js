@@ -35,6 +35,9 @@ const state = {
   lastNonPreviewUrl: "",
 };
 
+let gridLoadingStop = null;
+
+
 function clearNode(node) { while (node?.firstChild) node.removeChild(node.firstChild); }
 function slugify(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""); }
 function formatList(it) { return (it.formats || []).map((f) => f.label || f.key).join(" • "); }
@@ -272,8 +275,26 @@ function maybeOpenPreviewFromUrl() {
   if (match) openModal(match, { skipUrlUpdate: true });
 }
 
+function startDotLoader(el, baseText = "LOADING") {
+  if (!el) return () => {};
+  let n = 0;
+  el.textContent = baseText;
+  const t = window.setInterval(() => {
+    n = (n + 1) % 4;
+    el.textContent = baseText + ".".repeat(n);
+  }, 350);
+  return () => window.clearInterval(t);
+}
+
 function showLoading() {
-  els.grid.innerHTML = '<div class="grid__loading">LOADING...</div>';
+  if (gridLoadingStop) gridLoadingStop();
+  els.grid.innerHTML = '<div class="grid__loading"></div>';
+  gridLoadingStop = startDotLoader(els.grid.querySelector(".grid__loading"), "LOADING");
+}
+
+function stopLoading() {
+  if (gridLoadingStop) gridLoadingStop();
+  gridLoadingStop = null;
 }
 
 async function loadCategories() {
@@ -293,6 +314,7 @@ async function loadDataAndRender() {
     for (const it of g.items || []) fromGroups.push(it);
   }
   state.items = direct.length ? direct : fromGroups;
+  stopLoading();
   applyFiltersAndRenderGrid();
   maybeOpenPreviewFromUrl();
 }

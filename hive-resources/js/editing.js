@@ -51,6 +51,9 @@ const state = {
   lastNonPreviewUrl: "",
 };
 
+let gridLoadingStop = null;
+
+
 function clearNode(node) { while (node?.firstChild) node.removeChild(node.firstChild); }
 function nfmt(n) { return n == null || Number.isNaN(Number(n)) ? "—" : new Intl.NumberFormat("en-US", { notation: Number(n) >= 100000 ? "compact" : "standard" }).format(Number(n)); }
 function dateValue(v) { const t = new Date(v || 0).getTime(); return Number.isFinite(t) ? t : 0; }
@@ -293,8 +296,26 @@ function maybeOpenPreviewFromUrl() {
   if (match) openModal(match, { skipUrlUpdate: true });
 }
 
+function startDotLoader(el, baseText = "LOADING") {
+  if (!el) return () => {};
+  let n = 0;
+  el.textContent = baseText;
+  const t = window.setInterval(() => {
+    n = (n + 1) % 4;
+    el.textContent = baseText + ".".repeat(n);
+  }, 350);
+  return () => window.clearInterval(t);
+}
+
 function showLoading() {
-  els.grid.innerHTML = '<div class="grid__loading">LOADING...</div>';
+  if (gridLoadingStop) gridLoadingStop();
+  els.grid.innerHTML = '<div class="grid__loading"></div>';
+  gridLoadingStop = startDotLoader(els.grid.querySelector(".grid__loading"), "LOADING");
+}
+
+function stopLoading() {
+  if (gridLoadingStop) gridLoadingStop();
+  gridLoadingStop = null;
 }
 
 async function loadDataAndRender() {
@@ -303,6 +324,7 @@ async function loadDataAndRender() {
   renderSortChips();
   const json = await fetchEditingVideos(state.sort).catch((err) => ({ items: [], error: err.message }));
   state.items = Array.isArray(json?.items) ? json.items : [];
+  stopLoading();
   applyFiltersAndRenderGrid();
   maybeOpenPreviewFromUrl();
 }
