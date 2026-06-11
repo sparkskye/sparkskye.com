@@ -1,4 +1,4 @@
-import { fetchDesignCategories, fetchDesignItems, fileViewUrl, trackedDownloadUrl, driveBrowserDownloadUrl } from "./api.js";
+import { fetchDesignCategories, fetchDesignItems, trackedDownloadUrl, driveBrowserDownloadUrl } from "./api.js";
 import {
   qs,
   debounce,
@@ -9,6 +9,7 @@ import {
   lockBodyScroll,
   unlockBodyScroll,
 } from "./ui.js";
+import { createPanZoomImageViewer } from "./pan-zoom-viewer.js";
 
 const els = {
   categoryChips: qs("#categoryChips"),
@@ -44,10 +45,18 @@ const state = {
 };
 
 let gridLoadingStop = null;
-let designView = null;
+let activePreview = "image";
+let panZoomViewer = null;
+let imagePreviewButton = null;
+let timelapsePreviewButton = null;
 
 function clearNode(node) { while (node?.firstChild) node.removeChild(node.firstChild); }
 function slugify(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""); }
+function extFor(file) { return String(file?.ext || file?.key || "file").replace(/^\./, "").toLowerCase(); }
+function filenameFor(it, file) { const ext = extFor(file); return `${slugify(it.name) || "design"}.${ext}`; }
+function dateValue(v) { const t = new Date(v || 0).getTime(); return Number.isFinite(t) ? t : 0; }
+function numberValue(v) { const n = Number(v); return Number.isFinite(n) ? n : 0; }
+
 function formatList(it) {
   const preferred = ["image", "psd", "timelapse", "blend", "nomad"];
   const files = it.files || {};
@@ -58,13 +67,10 @@ function formatList(it) {
     .map((key) => String(key).toLowerCase())
     .join(", ");
 }
-function extFor(file) { return String(file?.ext || file?.key || "file").replace(/^\./, "").toLowerCase(); }
-function filenameFor(it, file) { const ext = extFor(file); return `${slugify(it.name) || "design"}.${ext}`; }
-function dateValue(v) { const t = new Date(v || 0).getTime(); return Number.isFinite(t) ? t : 0; }
-function numberValue(v) { const n = Number(v); return Number.isFinite(n) ? n : 0; }
+
 function imageUrl(it) {
   const f = it.files?.image;
-  return it.imagePreviewUrl || f?.previewUrl || f?.thumbnailUrl || it.thumbnailUrl || fileViewUrl(it.imageId || it.thumbId);
+  return it.imagePreviewUrl || f?.previewUrl || f?.thumbnailUrl || it.thumbnailUrl || "";
 }
 
 function makeChip({ label, active, onClick }) {
@@ -129,9 +135,15 @@ function sortItems(items) {
     return out.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
   }
   if (state.sort === "psd-size") {
-    return out.sort((a, b) => numberValue(b.psdSize || b.files?.psd?.size) - numberValue(a.psdSize || a.files?.psd?.size) || (a.name || "").localeCompare(b.name || ""));
+    return out.sort((a, b) =>
+      numberValue(b.psdSize || b.files?.psd?.size) - numberValue(a.psdSize || a.files?.psd?.size) ||
+      (a.name || "").localeCompare(b.name || "")
+    );
   }
-  return out.sort((a, b) => dateValue(b.imageModifiedTime || b.files?.image?.modifiedTime) - dateValue(a.imageModifiedTime || a.files?.image?.modifiedTime) || (a.name || "").localeCompare(b.name || ""));
+  return out.sort((a, b) =>
+    dateValue(b.imageModifiedTime || b.files?.image?.modifiedTime) - dateValue(a.imageModifiedTime || a.files?.image?.modifiedTime) ||
+    (a.name || "").localeCompare(b.name || "")
+  );
 }
 
 function applyFiltersAndRenderGrid() {
@@ -182,20 +194,13 @@ function renderGrid(items) {
 
     const meta = document.createElement("div");
     meta.className = "card__meta";
-    const nameRow = document.createElement("div");
-    nameRow.className = "card__top";
     const name = document.createElement("h2");
     name.className = "card__name";
     name.textContent = it.name || "Untitled design";
-    nameRow.appendChild(name);
-    const badge = document.createElement("span");
-    badge.className = "badge";
-    badge.textContent = it.categoryLabel || "DESIGN";
-    nameRow.appendChild(badge);
     const path = document.createElement("div");
     path.className = "card__path";
     path.textContent = formatList(it) || "no downloads";
-    meta.appendChild(nameRow);
+    meta.appendChild(name);
     meta.appendChild(path);
     card.appendChild(viewer);
     card.appendChild(meta);
@@ -224,213 +229,103 @@ function buildPreviewLink(it) {
 }
 
 function cleanupDesignView() {
-  if (!designView) return;
-  try { designView.resizeObserver?.disconnect?.(); } catch {}
-  designView = null;
-}
-
-function applyDesignTransform() {
-  if (!designView?.img) return;
-  const scale = (designView.baseScale || 1) * (designView.zoom || 1);
-  designView.img.style.width = `${designView.naturalW || 1}px`;
-  designView.img.style.height = `${designView.naturalH || 1}px`;
-  designView.img.style.transform = `translate(-50%, -50%) translate(${designView.panX || 0}px, ${designView.panY || 0}px) scale(${scale})`;
-  if (designView.zoomLabel) designView.zoomLabel.textContent = `${Math.round((designView.zoom || 1) * 100)}%`;
-}
-
-function fitDesignToView() {
-  if (!designView?.viewport || !designView?.img) return;
-  const rect = designView.viewport.getBoundingClientRect();
-  const w = designView.naturalW || designView.img.naturalWidth || 1;
-  const h = designView.naturalH || designView.img.naturalHeight || 1;
-  designView.naturalW = w;
-  designView.naturalH = h;
-  designView.baseScale = Math.min(rect.width / w, rect.height / h) * 0.96;
-  if (!Number.isFinite(designView.baseScale) || designView.baseScale <= 0) designView.baseScale = 1;
-  designView.zoom = 1;
-  designView.panX = 0;
-  designView.panY = 0;
-  applyDesignTransform();
-}
-
-function zoomDesign(multiplier) {
-  if (!designView) return;
-  const next = Math.max(0.2, Math.min(8, (designView.zoom || 1) * multiplier));
-  designView.zoom = next;
-  applyDesignTransform();
-}
-
-function createNavButton(label, onClick) {
-  const b = document.createElement("button");
-  b.className = "btn btn--nav";
-  b.type = "button";
-  b.textContent = label;
-  b.addEventListener("click", onClick);
-  return b;
+  if (!panZoomViewer) return;
+  try { panZoomViewer.destroy?.(); } catch {}
+  panZoomViewer = null;
 }
 
 function showImagePreview(it) {
   cleanupDesignView();
-  els.modalViewer.innerHTML = "";
   if (!(it.imageId || it.thumbId)) {
     els.modalViewer.innerHTML = '<div class="viewer__loading">NO PREVIEW AVAILABLE</div>';
     return;
   }
 
-  const shell = document.createElement("div");
-  shell.className = "map-preview design-preview";
-
-  const viewport = document.createElement("div");
-  viewport.className = "map-preview__viewport";
-
-  const img = document.createElement("img");
-  img.className = "modal__thumb map-preview__img design-preview__img";
-  img.alt = it.name || "Design preview";
-  img.src = imageUrl(it);
-  img.draggable = false;
-
-  const resolution = document.createElement("div");
-  resolution.className = "map-preview__resolution";
-  resolution.textContent = it.imageWidth && it.imageHeight ? `${it.imageWidth} x ${it.imageHeight} PIXELS` : "LOADING PIXELS";
-
-  const controls = document.createElement("div");
-  controls.className = "map-preview__controls";
-  const zoomGroup = document.createElement("div");
-  zoomGroup.className = "map-preview__group";
-  const zoomLabel = document.createElement("span");
-  zoomLabel.className = "map-preview__zoom";
-  zoomLabel.textContent = "100%";
-  zoomLabel.setAttribute("aria-live", "polite");
-  zoomGroup.appendChild(createNavButton("+", () => zoomDesign(1.25)));
-  zoomGroup.appendChild(createNavButton("-", () => zoomDesign(0.8)));
-  zoomGroup.appendChild(zoomLabel);
-  zoomGroup.appendChild(createNavButton("HOME", () => fitDesignToView()));
-  controls.appendChild(zoomGroup);
-
-  viewport.appendChild(img);
-  shell.appendChild(viewport);
-  shell.appendChild(resolution);
-  shell.appendChild(controls);
-  els.modalViewer.appendChild(shell);
-
-  designView = {
-    viewport,
-    img,
-    zoomLabel,
-    naturalW: Number(it.imageWidth || 0),
-    naturalH: Number(it.imageHeight || 0),
-    baseScale: 1,
-    zoom: 1,
-    panX: 0,
-    panY: 0,
-    dragging: false,
-    startX: 0,
-    startY: 0,
-    startPanX: 0,
-    startPanY: 0,
-  };
-
-  img.addEventListener("load", () => {
-    designView.naturalW = Number(it.imageWidth || img.naturalWidth || 1);
-    designView.naturalH = Number(it.imageHeight || img.naturalHeight || 1);
-    resolution.textContent = `${designView.naturalW} x ${designView.naturalH} PIXELS`;
-    fitDesignToView();
-  }, { once: true });
-
-  viewport.addEventListener("wheel", (ev) => {
-    ev.preventDefault();
-    zoomDesign(ev.deltaY < 0 ? 1.12 : 0.89);
-  }, { passive: false });
-
-  viewport.addEventListener("pointerdown", (ev) => {
-    if (!designView) return;
-    designView.dragging = true;
-    designView.startX = ev.clientX;
-    designView.startY = ev.clientY;
-    designView.startPanX = designView.panX || 0;
-    designView.startPanY = designView.panY || 0;
-    viewport.classList.add("is-dragging");
-    try { viewport.setPointerCapture(ev.pointerId); } catch {}
+  panZoomViewer = createPanZoomImageViewer({
+    container: els.modalViewer,
+    src: imageUrl(it),
+    alt: it.name || "Design preview",
+    units: "pixels",
+    imageClass: "design-preview__img",
+    loadingText: "LOADING PIXELS",
   });
-  viewport.addEventListener("pointermove", (ev) => {
-    if (!designView?.dragging) return;
-    designView.panX = designView.startPanX + (ev.clientX - designView.startX);
-    designView.panY = designView.startPanY + (ev.clientY - designView.startY);
-    applyDesignTransform();
-  });
-  const endDrag = (ev) => {
-    if (!designView) return;
-    designView.dragging = false;
-    viewport.classList.remove("is-dragging");
-    try { viewport.releasePointerCapture(ev.pointerId); } catch {}
-  };
-  viewport.addEventListener("pointerup", endDrag);
-  viewport.addEventListener("pointercancel", endDrag);
-
-  designView.resizeObserver = new ResizeObserver(() => fitDesignToView());
-  designView.resizeObserver.observe(viewport);
-  window.setTimeout(() => fitDesignToView(), 80);
 }
 
 function showTimelapsePreview(it) {
   cleanupDesignView();
   els.modalViewer.innerHTML = "";
-  const iframe = document.createElement("iframe");
   const file = it.files?.timelapse || (it.formats || []).find((f) => f.key === "timelapse");
-  iframe.src = file?.drivePreviewUrl || `https://drive.google.com/file/d/${it.timelapseId}/preview`;
+  if (!file) {
+    els.modalViewer.innerHTML = '<div class="viewer__loading">NO TIMELAPSE PREVIEW</div>';
+    return;
+  }
+  const iframe = document.createElement("iframe");
+  iframe.src = file.drivePreviewUrl || `https://drive.google.com/file/d/${file.fileId || it.timelapseId}/preview`;
   iframe.allow = "autoplay; fullscreen";
   iframe.allowFullscreen = true;
   iframe.title = `${it.name || "Design"} timelapse`;
   els.modalViewer.appendChild(iframe);
 }
 
-function addDownloadButton(it, file, label, primary = false) {
-  const a = document.createElement("a");
-  a.className = `btn ${primary ? "btn--primary" : ""}`.trim();
-  a.href = trackedDownloadUrl(file.fileId, slugify(it.name) || "design", extFor(file), {
+function makeDownloadUrl(it, file) {
+  return trackedDownloadUrl(file.fileId, slugify(it.name) || "design", extFor(file), {
     kind: `design-${file.key}`,
     asset: it.name,
     path: it.categoryLabel || "design",
     label: file.label || file.key,
   });
-  a.download = filenameFor(it, file);
-  a.textContent = label || `DOWNLOAD .${extFor(file).toUpperCase()}`;
-  a.addEventListener("click", async (ev) => {
-    if (ev.currentTarget?.dataset?.downloadFallbackReady === "1") return;
-    ev.preventDefault();
-    ev.stopPropagation();
-    await downloadViaFetch(a.href, filenameFor(it, file), {
-      button: a,
-      fallbackUrl: driveBrowserDownloadUrl(file.fileId),
-    });
-  });
-  els.modalActions.appendChild(a);
-  return a;
 }
 
-function addTimelapseToggle(it) {
-  const file = it.files?.timelapse;
+async function downloadFile(it, file, button) {
   if (!file) return;
-  let previewing = false;
+  await downloadViaFetch(makeDownloadUrl(it, file), filenameFor(it, file), {
+    button,
+    fallbackUrl: driveBrowserDownloadUrl(file.fileId),
+  });
+}
+
+function updatePreviewButtons() {
+  if (imagePreviewButton) {
+    const selected = activePreview === "image";
+    imagePreviewButton.classList.toggle("is-selected", selected);
+    imagePreviewButton.textContent = selected ? "DOWNLOAD IMAGE" : "IMAGE";
+  }
+  if (timelapsePreviewButton) {
+    const selected = activePreview === "timelapse";
+    timelapsePreviewButton.classList.toggle("is-selected", selected);
+    timelapsePreviewButton.textContent = selected ? "DOWNLOAD TIMELAPSE" : "TIMELAPSE";
+  }
+}
+
+function addPreviewButton(it, key) {
+  const file = it.files?.[key];
+  if (!file) return null;
+  const b = document.createElement("button");
+  b.className = "btn btn--preview";
+  b.type = "button";
+  b.addEventListener("click", async () => {
+    if (activePreview === key) {
+      await downloadFile(it, file, b);
+      updatePreviewButtons();
+      return;
+    }
+    activePreview = key;
+    if (key === "image") showImagePreview(it);
+    if (key === "timelapse") showTimelapsePreview(it);
+    updatePreviewButtons();
+  });
+  els.modalActions.appendChild(b);
+  return b;
+}
+
+function addDownloadButton(it, file, label) {
   const b = document.createElement("button");
   b.className = "btn";
   b.type = "button";
-  b.textContent = "TIMELAPSE";
-  b.addEventListener("click", async () => {
-    if (!previewing) {
-      previewing = true;
-      showTimelapsePreview(it);
-      b.textContent = "DOWNLOAD TIMELAPSE";
-      return;
-    }
-    await downloadViaFetch(trackedDownloadUrl(file.fileId, slugify(it.name) || "design", extFor(file), {
-      kind: "design-timelapse",
-      asset: it.name,
-      path: it.categoryLabel || "design",
-      label: file.label || file.key,
-    }), filenameFor(it, file), { button: b, fallbackUrl: driveBrowserDownloadUrl(file.fileId) });
-  });
+  b.textContent = label || `DOWNLOAD .${extFor(file).toUpperCase()}`;
+  b.addEventListener("click", async () => downloadFile(it, file, b));
   els.modalActions.appendChild(b);
+  return b;
 }
 
 function openModal(it, opts = {}) {
@@ -448,12 +343,15 @@ function openModal(it, opts = {}) {
   els.modalName.textContent = it.name || "Untitled design";
   els.modalPath.textContent = formatList(it) || "no downloads";
   clearNode(els.modalActions);
-  showImagePreview(it);
 
-  if (it.files?.image) addDownloadButton(it, it.files.image, "DOWNLOAD IMAGE", true);
-  addTimelapseToggle(it);
+  activePreview = "image";
+  showImagePreview(it);
+  imagePreviewButton = addPreviewButton(it, "image");
+  timelapsePreviewButton = addPreviewButton(it, "timelapse");
+  updatePreviewButtons();
+
   for (const key of ["psd", "blend", "nomad"]) {
-    if (it.files?.[key]) addDownloadButton(it, it.files[key], `DOWNLOAD .${key.toUpperCase()}`, false);
+    if (it.files?.[key]) addDownloadButton(it, it.files[key], `DOWNLOAD .${key.toUpperCase()}`);
   }
 }
 
@@ -464,6 +362,8 @@ function closeModal(opts = {}) {
   els.modal.setAttribute("aria-hidden", "true");
   els.modalViewer.innerHTML = '<div class="viewer__loading">Loading...</div>';
   unlockBodyScroll();
+  imagePreviewButton = null;
+  timelapsePreviewButton = null;
   if (!opts.skipUrlRestore) history.replaceState({}, "", state.lastNonPreviewUrl || getPreviewlessHref());
 }
 
@@ -565,6 +465,7 @@ async function downloadViaFetch(url, filename, opts = {}) {
       if (originalBusy === null) button.removeAttribute("aria-busy");
       else button.setAttribute("aria-busy", originalBusy);
       if ("disabled" in button) button.disabled = false;
+      updatePreviewButtons();
     }, delay);
   };
 
@@ -590,10 +491,7 @@ async function downloadViaFetch(url, filename, opts = {}) {
       button.textContent = "OPEN DRIVE";
       button.setAttribute("aria-busy", "false");
       if ("disabled" in button) button.disabled = false;
-      if (button.dataset) button.dataset.downloadFallbackReady = "1";
-      button.href = fallbackUrl;
-      button.target = "_blank";
-      button.rel = "noopener";
+      button.addEventListener("click", () => window.open(fallbackUrl, "_blank", "noopener"), { once: true });
       return;
     }
     setButton("FAILED", false);

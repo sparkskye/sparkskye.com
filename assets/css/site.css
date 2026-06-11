@@ -1116,3 +1116,38 @@ body.theme-art .hero__title{
 .design-page .card__path{
   text-transform: lowercase;
 }
+
+/* Design parity fixes */
+.btn.is-selected,
+.btn--preview.is-selected{
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #041018;
+}
+.btn.is-selected:hover,
+.btn--preview.is-selected:hover{
+  border-color: var(--accent2, var(--accent));
+}
+.btn:focus-visible,
+.chip:focus-visible,
+.card:focus-visible,
+.topnav__btn:focus-visible,
+.topnav__dropitem:focus-visible{
+  outline: none;
+  border-color: var(--accent);
+}
+.design-page .card:hover,
+.design-page .card:focus-visible,
+.design-page .btn:hover,
+.design-page .chip:hover,
+.design-page .modal__close:hover{
+  border-color: var(--accent);
+}
+.design-page .card--media .card__viewer img.card__thumb,
+.design-page .modal__viewer--media img,
+.design-preview__img{
+  image-rendering: auto;
+}
+.design-page .modal__viewer--media iframe{
+  border: 0;
+}

@@ -150,10 +150,16 @@ async function buildCategory_(category, apiKey, debug) {
       const baseKey = normalizeBase_(baseName);
       if (!baseKey) continue;
 
-      const inferredImage = format.key === "image" || isImageFile_(file.name) || String(file.mimeType || "").startsWith("image/");
-      const inferredVideo = format.key === "timelapse" || isVideoFile_(file.name) || String(file.mimeType || "").startsWith("video/");
-      const canonicalKey = inferredImage ? "image" : inferredVideo ? "timelapse" : format.key;
-      const label = FORMAT_LABELS[canonicalKey] || (inferredVideo ? "TIMELAPSE" : inferredImage ? "IMAGE" : (format.label || canonicalKey.toUpperCase()));
+      // Trust the folder/format first. Some source files (especially .psd) can report
+      // image-like MIME types in Drive, but they should still attach as PSD downloads,
+      // not become separate gallery cards.
+      let canonicalKey = format.key;
+      if (!canonicalKey || canonicalKey === "unknown") {
+        const inferredImage = isImageFile_(file.name) || String(file.mimeType || "").startsWith("image/");
+        const inferredVideo = isVideoFile_(file.name) || String(file.mimeType || "").startsWith("video/");
+        canonicalKey = inferredImage ? "image" : inferredVideo ? "timelapse" : canonicalFormatKey_(rawExt || format.key);
+      }
+      const label = FORMAT_LABELS[canonicalKey] || (format.label || canonicalKey.toUpperCase());
       const fileId = file.fileId || file.id;
       if (!fileId) continue;
 
@@ -194,12 +200,30 @@ async function buildCategory_(category, apiKey, debug) {
     attachFormat_(byBase.get(entry.baseKey), entry.file);
   }
 
+  const unmatchedFormats = [];
   for (const entry of collected.filter((x) => x.formatKey !== "image")) {
-    const item = byBase.get(entry.baseKey);
-    if (!item) continue;
+    const item = byBase.get(entry.baseKey) || findLooseItemMatch_(byBase, entry.baseKey);
+    if (!item) {
+      unmatchedFormats.push(entry);
+      continue;
+    }
     attachFormat_(item, entry.file);
     if (entry.formatKey === "timelapse") item.timelapseId = item.timelapseId || entry.file.fileId;
     if (entry.formatKey === "psd") item.psdSize = numberOrNull_(entry.file.size);
+  }
+
+  // Friendly single-item fallback while building/testing folders:
+  // if there is exactly one image card, attach unmatched format files to it rather than
+  // dropping them. This keeps one test thumbnail from splitting/missing downloads when
+  // a .psd/.blend filename differs slightly.
+  if (byBase.size === 1 && unmatchedFormats.length) {
+    const onlyItem = [...byBase.values()][0];
+    for (const entry of unmatchedFormats) {
+      if (onlyItem.files?.[entry.formatKey]) continue;
+      attachFormat_(onlyItem, entry.file);
+      if (entry.formatKey === "timelapse") onlyItem.timelapseId = onlyItem.timelapseId || entry.file.fileId;
+      if (entry.formatKey === "psd") onlyItem.psdSize = numberOrNull_(entry.file.size);
+    }
   }
 
   const items = [...byBase.values()].map((item) => {
@@ -214,7 +238,10 @@ async function buildCategory_(category, apiKey, debug) {
     formatFolderCount: formatFolders.size,
     collectedFileCount: collected.length,
     imageCardCount: items.length,
+    unmatchedFormatCount: unmatchedFormats.length,
+    unmatchedFormatNames: unmatchedFormats.slice(0, 10).map((x) => `${x.formatKey}:${x.file?.name || x.baseName}`),
     itemNames: items.slice(0, 10).map((it) => it.name),
+    itemFormats: items.slice(0, 10).map((it) => ({ name: it.name, formats: Object.keys(it.files || {}) })),
   });
   return { items };
 }
@@ -359,6 +386,17 @@ async function scrapeDriveFolderEntries_(folderId, debug, label) {
   return out;
 }
 
+
+function findLooseItemMatch_(byBase, baseKey) {
+  if (!baseKey || !byBase?.size) return null;
+  if (byBase.has(baseKey)) return byBase.get(baseKey);
+  const compact = String(baseKey).replace(/-(thumbnail|thumbnails|image|images|design|source|file|final)$/i, "");
+  for (const [key, item] of byBase.entries()) {
+    const itemCompact = String(key).replace(/-(thumbnail|thumbnails|image|images|design|source|file|final)$/i, "");
+    if (compact && itemCompact && (compact === itemCompact || compact.includes(itemCompact) || itemCompact.includes(compact))) return item;
+  }
+  return null;
+}
 function inlineFileUrl_(fileId, name = "", ext = "") {
   const params = new URLSearchParams();
   params.set("id", fileId);
