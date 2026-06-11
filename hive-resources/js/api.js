@@ -94,3 +94,24 @@ export async function fetchDownloadCount(fileId, kind = "asset") {
 export function fileViewUrl(fileId) {
   return apiUrl(`/api/file?id=${encodeURIComponent(fileId)}`);
 }
+
+export async function fetchEditingVideos(sort = "date") {
+  const url = siteApiUrl(`/api/youtube?handle=${encodeURIComponent("@sparkskye")}&sort=${encodeURIComponent(sort || "date")}`);
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+  return await res.json();
+}
+
+export async function fetchDesignCategories() {
+  const url = siteApiUrl(`/api/design?list=1`);
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+  return await res.json();
+}
+
+export async function fetchDesignItems(category = "all") {
+  const url = siteApiUrl(`/api/design${category && category !== "all" ? `?category=${encodeURIComponent(category)}` : ""}`);
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+  return await res.json();
+}
