@@ -1252,3 +1252,282 @@ body.theme-art .search:focus{
 .design-page .empty-state--search{
   min-height: 140px;
 }
+
+/* =========================
+   Homepage + main-site footer polish
+========================= */
+.hero--home{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 28px;
+  padding-top: 34px;
+}
+.hero--home .hero__text{
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.hero__pfp{
+  width: clamp(120px, 18vw, 220px);
+  height: clamp(120px, 18vw, 220px);
+  border-radius: 999px;
+  object-fit: cover;
+  border: var(--ui-border);
+  background: var(--panel);
+  flex: 0 0 auto;
+}
+.hero__pfp:hover{
+  border-color: var(--accent);
+}
+.home-links{
+  margin-top: 24px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap: 12px;
+}
+.home-links__row{
+  display:flex;
+  justify-content:center;
+  gap: 12px;
+  flex-wrap:wrap;
+}
+.home-links__row--secondary{
+  margin-top: 2px;
+}
+.site-footer{
+  padding: 8px 18px 34px;
+  text-align:center;
+  font-family: MCFive, Minecraftia, sans-serif;
+  font-size: 10px;
+  line-height: 1.7;
+}
+.site-footer__copy{
+  color: var(--text);
+}
+.site-footer__ai{
+  color: #6f6f6f;
+}
+
+/* keep long feature-card titles from clipping on narrow layouts */
+.section-card__title{
+  font-size: clamp(23px, 3.15vw, 34px);
+  overflow-wrap: anywhere;
+}
+
+/* Top menu buttons keep their own category colors, not the current page color. */
+.topnav__btn:hover,
+.topnav__btn:focus-visible{
+  border-color: var(--item-color, var(--accent)) !important;
+}
+.topnav__btn.is-active{
+  background: var(--item-color, var(--accent)) !important;
+  border-color: var(--item-color, var(--accent)) !important;
+  color: #041018 !important;
+}
+.topnav__dropitem:hover,
+.topnav__dropitem:focus-visible{
+  border-color: var(--item-color, var(--accent)) !important;
+}
+.topnav__dropitem.is-active{
+  background: var(--item-color, var(--accent)) !important;
+  border-color: var(--item-color, var(--accent)) !important;
+  color: #041018 !important;
+}
+
+@media (max-width: 680px){
+  .hero--home{
+    align-items:flex-start;
+    gap: 18px;
+  }
+  .hero__pfp{
+    width: 96px;
+    height: 96px;
+  }
+  .section-card__title{
+    font-size: 30px;
+  }
+}
+
+@media (max-width: 440px){
+  .hero--home{
+    flex-direction:column-reverse;
+  }
+  .hero__pfp{
+    align-self:flex-end;
+  }
+}
+
+
+/* =========================
+   Main site cleanup pass — home layout, nav color parity, footer
+========================= */
+/* Top menu buttons always keep their own category color, even on themed pages. */
+body.theme-animation .topbar .topnav__btn:hover,
+body.theme-animations .topbar .topnav__btn:hover,
+body.theme-editing .topbar .topnav__btn:hover,
+body.theme-design .topbar .topnav__btn:hover,
+body.theme-art .topbar .topnav__btn:hover,
+body.theme-animation .topbar .topnav__btn:focus-visible,
+body.theme-animations .topbar .topnav__btn:focus-visible,
+body.theme-editing .topbar .topnav__btn:focus-visible,
+body.theme-design .topbar .topnav__btn:focus-visible,
+body.theme-art .topbar .topnav__btn:focus-visible,
+.topbar .topnav__btn:hover,
+.topbar .topnav__btn:focus-visible{
+  border-color: var(--item-color, var(--accent)) !important;
+}
+body.theme-animation .topbar .topnav__btn.is-active,
+body.theme-animations .topbar .topnav__btn.is-active,
+body.theme-editing .topbar .topnav__btn.is-active,
+body.theme-design .topbar .topnav__btn.is-active,
+body.theme-art .topbar .topnav__btn.is-active,
+.topbar .topnav__btn.is-active{
+  background: var(--item-color, var(--accent)) !important;
+  border-color: var(--item-color, var(--accent)) !important;
+  color: #041018 !important;
+}
+body.theme-animation .topbar .topnav__dropitem:hover,
+body.theme-animations .topbar .topnav__dropitem:hover,
+body.theme-editing .topbar .topnav__dropitem:hover,
+body.theme-design .topbar .topnav__dropitem:hover,
+body.theme-art .topbar .topnav__dropitem:hover,
+body.theme-animation .topbar .topnav__dropitem:focus-visible,
+body.theme-animations .topbar .topnav__dropitem:focus-visible,
+body.theme-editing .topbar .topnav__dropitem:focus-visible,
+body.theme-design .topbar .topnav__dropitem:focus-visible,
+body.theme-art .topbar .topnav__dropitem:focus-visible,
+.topbar .topnav__dropitem:hover,
+.topbar .topnav__dropitem:focus-visible{
+  border-color: var(--item-color, var(--accent)) !important;
+}
+body.theme-animation .topbar .topnav__dropitem.is-active,
+body.theme-animations .topbar .topnav__dropitem.is-active,
+body.theme-editing .topbar .topnav__dropitem.is-active,
+body.theme-design .topbar .topnav__dropitem.is-active,
+body.theme-art .topbar .topnav__dropitem.is-active,
+.topbar .topnav__dropitem.is-active{
+  background: var(--item-color, var(--accent)) !important;
+  border-color: var(--item-color, var(--accent)) !important;
+  color: #041018 !important;
+}
+
+.hero--home{
+  display:grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items:center;
+  column-gap: clamp(22px, 5vw, 72px);
+  row-gap: 22px;
+  padding: clamp(28px, 5vw, 64px) 6px 18px;
+}
+.hero--home .hero__text{ min-width:0; }
+.hero__pfp{
+  width: clamp(132px, 19vw, 240px);
+  height: clamp(132px, 19vw, 240px);
+  border-radius: 999px;
+  object-fit: cover;
+  border: 3px solid var(--stroke2);
+  background: var(--panel);
+  display:block;
+  justify-self:end;
+}
+.hero__pfp:hover{ border-color: var(--accent); }
+
+.section-grid{
+  align-items: stretch;
+}
+.section-card{
+  min-height: 170px;
+  gap: 12px;
+  overflow: hidden;
+}
+.section-card__title{
+  font-size: clamp(24px, 2.65vw, 34px) !important;
+  line-height: .95;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+  max-width: 100%;
+}
+.section-card__text{
+  overflow-wrap: break-word;
+}
+
+.home-links{
+  margin-top: 30px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap: 16px;
+  clear: both;
+}
+.home-links__row{
+  width:100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap: 14px;
+  flex-wrap:wrap;
+}
+.home-links__row--secondary{
+  margin-top: 0;
+  padding-top: 2px;
+}
+.home-links .btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height: 52px;
+  min-width: 138px;
+  line-height:1;
+  white-space: nowrap;
+}
+.home-links .btn--primary{
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #041018;
+}
+
+.site-footer{
+  max-width: 1200px;
+  margin: 44px auto 0;
+  padding: 24px 18px 36px;
+  text-align:center;
+  font-family: MCFive, Minecraftia, sans-serif;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.6;
+  letter-spacing: .2px;
+}
+.site-footer__copy{ color: var(--text); }
+.site-footer__ai{ color: #6f6f6f; margin-top: 2px; }
+.site-footer__symbol{
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  font-weight: 700;
+  letter-spacing:0;
+  margin-right: 1px;
+}
+
+@media (max-width: 1080px){
+  .section-card__title{ font-size: clamp(22px, 4.4vw, 31px) !important; }
+}
+@media (max-width: 680px){
+  .hero--home{
+    grid-template-columns: 1fr auto;
+    align-items:start;
+    gap: 18px;
+  }
+  .hero__pfp{
+    width: 96px;
+    height: 96px;
+  }
+  .home-links .btn{
+    min-width: 132px;
+    min-height: 48px;
+  }
+}
+@media (max-width: 520px){
+  .hero--home{ grid-template-columns: 1fr; }
+  .hero__pfp{ justify-self:start; }
+  .section-card__title{ font-size: 28px !important; }
+}

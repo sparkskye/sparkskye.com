@@ -226,6 +226,13 @@ function buildPreviewLink(it) {
   return url.toString();
 }
 
+function buildShareLink(it) {
+  const preview = new URL(buildPreviewLink(it));
+  const url = new URL(`${window.location.origin}/share/editing/${encodeURIComponent(it.id)}`);
+  url.searchParams.set("go", `${preview.pathname}${preview.search}`);
+  return url.toString();
+}
+
 function renderModalStats(it) {
   clearNode(els.modalStats);
   const stats = [
@@ -274,7 +281,7 @@ function openModal(it, opts = {}) {
   };
 
   els.modalCopy.onclick = async () => {
-    await copyToClipboard(previewLink);
+    await copyToClipboard(buildShareLink(it));
     els.modalCopy.textContent = "COPIED!";
     setTimeout(() => (els.modalCopy.textContent = "COPY LINK"), 900);
   };

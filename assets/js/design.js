@@ -233,6 +233,13 @@ function buildPreviewLink(it) {
   return url.toString();
 }
 
+function buildShareLink(it) {
+  const preview = new URL(buildPreviewLink(it));
+  const url = new URL(`${window.location.origin}/share/design/${encodeURIComponent(it.id)}`);
+  url.searchParams.set("go", `${preview.pathname}${preview.search}`);
+  return url.toString();
+}
+
 function cleanupDesignView() {
   if (!panZoomViewer) return;
   try { panZoomViewer.destroy?.(); } catch {}
@@ -358,6 +365,17 @@ function openModal(it, opts = {}) {
   for (const key of ["psd", "blend", "nomad"]) {
     if (it.files?.[key]) addDownloadButton(it, it.files[key], `DOWNLOAD .${key.toUpperCase()}`);
   }
+
+  const copyButton = document.createElement("button");
+  copyButton.className = "btn";
+  copyButton.type = "button";
+  copyButton.textContent = "COPY LINK";
+  copyButton.addEventListener("click", async () => {
+    await copyToClipboard(buildShareLink(it));
+    copyButton.textContent = "COPIED!";
+    setTimeout(() => (copyButton.textContent = "COPY LINK"), 900);
+  });
+  els.modalActions.appendChild(copyButton);
 }
 
 function closeModal(opts = {}) {
