@@ -16,6 +16,14 @@ export async function fetchModels(gameKey) {
   return await res.json();
 }
 
+// List available model gamemodes from the MODELS drive root when the API supports it.
+export async function fetchModelGames() {
+  const url = apiUrl(`/api/models?list=1`);
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+  return await res.json();
+}
+
 export async function fetchMaps(gameKey) {
   const url = apiUrl(`/api/maps${gameKey ? `?game=${encodeURIComponent(gameKey)}` : ""}`);
   const res = await fetch(url, { cache: "no-store" });
