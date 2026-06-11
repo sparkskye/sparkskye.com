@@ -59,8 +59,30 @@ function shortDate(iso) {
   try { return new Intl.DateTimeFormat("en-US", { year: "numeric", month: "numeric", day: "numeric" }).format(new Date(iso)); }
   catch { return "—"; }
 }
-function itemType(it) { return String(it.type || it.kind || "video").toLowerCase(); }
+function itemType(it) {
+  const raw = String(it.type || it.kind || "video").toLowerCase();
+  if (raw.includes("live")) return "live";
+  if (raw.includes("short")) return "short";
+  const seconds = Number(it.durationSeconds || 0);
+  // Fallback for older cached API responses: current Shorts can be up to 3 minutes.
+  if (seconds > 0 && seconds <= 180) return "short";
+  return "video";
+}
 function cardLine(it) { return `${nfmt(it.viewCount)} views, ${shortDate(it.publishedAt)}`; }
+function thumbRatio(it) {
+  const type = itemType(it);
+  const ratio = String(it.thumbnailAspectRatio || "").trim();
+  if (/^\d+(?:\.\d+)?\s*\/\s*\d+(?:\.\d+)?$/.test(ratio)) return ratio;
+  const w = Number(it.thumbnailWidth || 0);
+  const h = Number(it.thumbnailHeight || 0);
+  if (w > 0 && h > 0) return `${w} / ${h}`;
+  return type === "short" ? "9 / 16" : "16 / 9";
+}
+function thumbnailUrl(it) {
+  const type = itemType(it);
+  if (type === "short" && it.shortThumbnail) return it.shortThumbnail;
+  return it.thumbnail || `https://i.ytimg.com/vi/${it.id}/hqdefault.jpg`;
+}
 
 function makeChip({ label, active, onClick }) {
   const b = document.createElement("button");
@@ -137,15 +159,22 @@ function renderGrid(items) {
 
   for (const it of items) {
     const card = document.createElement("div");
-    card.className = "card card--media";
+    const type = itemType(it);
+    card.className = `card card--media card--${type}`;
     card.tabIndex = 0;
+    card.style.setProperty("--thumb-ratio", thumbRatio(it));
 
     const viewer = document.createElement("div");
     viewer.className = "card__viewer";
     const img = document.createElement("img");
+    img.className = "card__thumb";
     img.loading = "lazy";
     img.alt = it.title || "Video thumbnail";
-    img.src = it.thumbnail || `https://i.ytimg.com/vi/${it.id}/hqdefault.jpg`;
+    img.src = thumbnailUrl(it);
+    img.addEventListener("error", () => {
+      const fallback = it.thumbnail || `https://i.ytimg.com/vi/${it.id}/hqdefault.jpg`;
+      if (img.src !== fallback) img.src = fallback;
+    }, { once: true });
     viewer.appendChild(img);
 
     const meta = document.createElement("div");
@@ -219,7 +248,7 @@ function openModal(it, opts = {}) {
   if (!opts.skipUrlUpdate) history.replaceState({}, "", previewLink);
 
   els.modalName.textContent = it.title || "Untitled video";
-  els.modalPath.textContent = cardLine(it);
+  els.modalPath.textContent = "";
   els.modalWatch.href = it.url || `https://www.youtube.com/watch?v=${it.id}`;
   renderModalStats(it);
 

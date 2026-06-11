@@ -1053,3 +1053,33 @@ body.theme-art .hero__title{
   border-color: var(--item-color, var(--accent));
   color: #041018;
 }
+
+/* Editing gallery fixes: accurate thumbnail shape + less redundant preview meta */
+.editing-page .card--media .card__viewer{
+  height: auto;
+  min-height: 0;
+  padding: 14px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.editing-page .card--media .card__viewer img.card__thumb{
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: var(--thumb-ratio, 16 / 9);
+  object-fit: cover;
+  border-radius: 14px;
+  background: #101010;
+}
+
+.editing-page .card--media.card--short .card__viewer img.card__thumb{
+  width: min(72%, 210px);
+  aspect-ratio: 9 / 16;
+}
+
+.editing-page .modal__path{
+  display: none;
+}

@@ -227,14 +227,22 @@ async function fetchVideoDetails_(ids, apiKey, debug, stepPrefix = "video-detail
       const thumbs = snip.thumbnails || {};
       const durationRaw = item.contentDetails?.duration || "";
       const durationSeconds = durationSeconds_(durationRaw);
-      const type = classifyVideo_(item, durationSeconds);
+      const thumbList = thumbnailList_(thumbs);
+      const preliminaryType = classifyVideo_(item, durationSeconds, null);
+      const thumb = chooseThumbnail_(thumbList, preliminaryType, item.id);
+      const type = classifyVideo_(item, durationSeconds, thumb);
+      const finalThumb = chooseThumbnail_(thumbList, type, item.id);
       out.push({
         id: item.id,
         title: snip.title || "",
         description: snip.description || "",
         publishedAt: snip.publishedAt || "",
         publishedLabel: formatDate_(snip.publishedAt || ""),
-        thumbnail: thumbs.maxres?.url || thumbs.high?.url || thumbs.medium?.url || thumbs.default?.url || `https://i.ytimg.com/vi/${item.id}/hqdefault.jpg`,
+        thumbnail: finalThumb.url,
+        thumbnailWidth: finalThumb.width || null,
+        thumbnailHeight: finalThumb.height || null,
+        thumbnailAspectRatio: finalThumb.aspectRatio || (type === "short" ? "9 / 16" : "16 / 9"),
+        shortThumbnail: `https://i.ytimg.com/vi/${item.id}/oardefault.jpg`,
         duration: formatDuration_(durationRaw),
         durationRaw,
         durationSeconds,
@@ -270,15 +278,62 @@ async function fetchJson_(url, ttl, step, debug) {
   return { ok: res.ok, status: res.status, json };
 }
 
-function classifyVideo_(item, durationSeconds) {
-  const live = item.liveStreamingDetails || item.snippet?.liveBroadcastContent === "live" || item.snippet?.liveBroadcastContent === "upcoming";
-  if (live) return "live";
-  if (durationSeconds > 0 && durationSeconds <= 60) return "short";
+function classifyVideo_(item, durationSeconds, thumb = null) {
+  const liveDetails = item.liveStreamingDetails || null;
+  const liveState = String(item.snippet?.liveBroadcastContent || "").toLowerCase();
+  if (
+    liveState === "live" ||
+    liveState === "upcoming" ||
+    liveDetails?.actualStartTime ||
+    liveDetails?.scheduledStartTime
+  ) return "live";
+
+  const text = `${item.snippet?.title || ""} ${item.snippet?.description || ""}`;
+  if (/(^|\s)#?shorts?(\s|$)|youtube\s+shorts|\/shorts\//i.test(text)) return "short";
+
+  // YouTube Shorts can be longer than 60 seconds, so use 3 minutes as the practical
+  // cutoff for this gallery. This keeps vertical short-form posts out of VIDEOS.
+  if (durationSeconds > 0 && durationSeconds <= 180) return "short";
+
+  if (thumb?.width && thumb?.height && Number(thumb.height) > Number(thumb.width)) return "short";
   return "video";
 }
 
+function thumbnailList_(thumbs = {}) {
+  return ["maxres", "standard", "high", "medium", "default"]
+    .map((key) => ({
+      key,
+      url: thumbs?.[key]?.url || "",
+      width: numberOrNull_(thumbs?.[key]?.width),
+      height: numberOrNull_(thumbs?.[key]?.height),
+    }))
+    .filter((thumb) => thumb.url);
+}
+
+function chooseThumbnail_(thumbs, type, id) {
+  const fallback = {
+    url: `https://i.ytimg.com/vi/${id}/${type === "short" ? "oardefault" : "hqdefault"}.jpg`,
+    width: type === "short" ? 720 : 480,
+    height: type === "short" ? 1280 : 360,
+    aspectRatio: type === "short" ? "9 / 16" : "16 / 9",
+  };
+  if (!Array.isArray(thumbs) || !thumbs.length) return fallback;
+
+  const landscape = thumbs.find((thumb) => thumb.width && thumb.height && thumb.width >= thumb.height);
+  const portrait = thumbs.find((thumb) => thumb.width && thumb.height && thumb.height > thumb.width);
+  const chosen = type === "short" ? (portrait || thumbs[0]) : (landscape || thumbs[0]);
+  const width = chosen.width || fallback.width;
+  const height = chosen.height || fallback.height;
+  return {
+    url: chosen.url || fallback.url,
+    width,
+    height,
+    aspectRatio: width && height ? `${width} / ${height}` : fallback.aspectRatio,
+  };
+}
+
 function looksLikeShortWithoutApi_(item) {
-  return /(^|\s)#?shorts?(\s|$)/i.test(`${item?.title || ""}`);
+  return /(^|\s)#?shorts?(\s|$)|youtube\s+shorts|\/shorts\//i.test(`${item?.title || ""}`);
 }
 
 function firstMatch_(text, re) {
