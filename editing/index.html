@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>editing • sparkskye</title>
+  <link rel="icon" href="/public/img/favicon.png" />
+  <link rel="stylesheet" href="/hive-resources/css/hive.css" />
+</head>
+<body class="theme-editing">
+  <header class="topbar">
+    <a class="brand" href="/">
+      <img class="brand__logo" src="/public/img/favicon.png" alt="Sparkskye" />
+      <span class="brand__name">SPARKSKYE</span>
+    </a>
+    <nav class="topnav">
+      <div class="topnav__links">
+        <a class="topnav__btn" href="/animations/">ANIMATIONS</a>
+        <a class="topnav__btn is-active" href="/editing/">EDITING</a>
+        <a class="topnav__btn" href="/design/">DESIGN</a>
+        <a class="topnav__btn" href="/art/">ART</a>
+        <a class="topnav__btn" href="/hive-resources/">HIVE RESOURCES</a>
+      </div>
+    </nav>
+  </header>
+
+  <main class="page page--wide">
+    <section class="hero">
+      <p class="hero__eyebrow">VIDEO EDITING</p>
+      <h1 class="hero__title">EDITING</h1>
+      <p class="hero__sub">Videos, tutorials, edits, process breakdowns, and experiments from Sparkskye.</p>
+    </section>
+
+    <section class="panel" id="filtersPanel">
+      <div class="panel__row panel__row--center">
+        <div class="panel__label">SORT</div>
+        <div class="chips" id="sortChips"></div>
+      </div>
+      <div class="panel__row panel__row--search">
+        <input id="searchInput" class="search" placeholder="search videos..." autocomplete="off" />
+        <div class="count" id="countLabel">0 shown</div>
+      </div>
+    </section>
+
+    <section class="grid" id="grid"></section>
+  </main>
+
+  <div class="modal" id="modal" aria-hidden="true">
+    <div class="modal__backdrop" id="modalBackdrop"></div>
+    <div class="modal__card" role="dialog" aria-modal="true" aria-label="Video preview">
+      <button class="modal__close" id="modalClose" aria-label="Close">X</button>
+      <div class="modal__viewer modal__viewer--media" id="modalViewer">
+        <div class="viewer__loading" id="modalLoading">Loading...</div>
+      </div>
+      <div class="modal__meta">
+        <div class="modal__name" id="modalName">—</div>
+        <div class="modal__stats" id="modalStats"></div>
+        <div class="modal__path" id="modalPath">—</div>
+        <div class="modal__actions">
+          <a class="btn btn--primary" id="modalWatch" href="#" target="_blank" rel="noopener">WATCH ON YOUTUBE</a>
+          <button class="btn" id="modalFullscreen">FULL SCREEN</button>
+          <button class="btn" id="modalCopy">COPY LINK</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/hive-resources/js/editing.js"></script>
+</body>
+</html>
