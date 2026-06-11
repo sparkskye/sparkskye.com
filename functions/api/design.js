@@ -17,20 +17,20 @@ const MANUAL_CATEGORIES = [
 ];
 
 const FORMAT_LABELS = {
-  blend: "BLEND",
   image: "IMAGE",
   images: "IMAGE",
   jpg: "IMAGE",
   jpeg: "IMAGE",
   png: "IMAGE",
   webp: "IMAGE",
-  nomad: "NOMAD",
-  psd: "PSD",
   timelapse: "TIMELAPSE",
   timelapses: "TIMELAPSE",
   mp4: "TIMELAPSE",
   mov: "TIMELAPSE",
   webm: "TIMELAPSE",
+  psd: "PSD",
+  blend: "BLEND",
+  nomad: "NOMAD",
 };
 
 export async function onRequest(context) {
@@ -88,11 +88,10 @@ async function listCategories_(apiKey, debug) {
     const rawKey = c?.key || c?.name || c?.label || "";
     const canonical = canonicalCategoryKey_(rawKey);
     if (!canonical) return;
-    const key = canonical;
-    const label = String(c?.label || c?.name || key || "").trim().toUpperCase();
+    const label = String(c?.label || c?.name || canonical || "").trim().toUpperCase();
     const current = merged.get(canonical) || {};
     merged.set(canonical, {
-      key,
+      key: canonical,
       label: current.label || label,
       name: current.name || c?.name || titleCase_(label),
       folderId: current.folderId || c?.folderId || c?.id || "",
@@ -136,7 +135,7 @@ async function buildCategory_(category, apiKey, debug) {
     }
   }
 
-  const byBase = new Map();
+  const collected = [];
 
   for (const format of formatFolders.values()) {
     if (!format.folderId) continue;
@@ -146,66 +145,109 @@ async function buildCategory_(category, apiKey, debug) {
     });
 
     for (const file of entries.files || []) {
-      const ext = getExtension_(file.name) || extFromMime_(file.mimeType) || format.key;
+      const rawExt = getExtension_(file.name) || extFromMime_(file.mimeType) || format.key;
       const baseName = stripExtension_(file.name);
       const baseKey = normalizeBase_(baseName);
       if (!baseKey) continue;
 
-      if (!byBase.has(baseKey)) {
-        byBase.set(baseKey, {
-          id: baseKey,
-          name: prettyName_(baseName),
-          categoryKey: category.key,
-          categoryLabel: category.label,
-          files: {},
-          formats: [],
-          thumbId: "",
-          imageId: "",
-          timelapseId: "",
-          thumbnailUrl: "",
-        });
-      }
-
-      const item = byBase.get(baseKey);
-      const fileId = file.fileId || file.id;
       const inferredImage = format.key === "image" || isImageFile_(file.name) || String(file.mimeType || "").startsWith("image/");
       const inferredVideo = format.key === "timelapse" || isVideoFile_(file.name) || String(file.mimeType || "").startsWith("video/");
-      const label = inferredImage ? "IMAGE" : inferredVideo ? "TIMELAPSE" : (format.label || FORMAT_LABELS[format.key] || format.key.toUpperCase());
       const canonicalKey = inferredImage ? "image" : inferredVideo ? "timelapse" : format.key;
+      const label = FORMAT_LABELS[canonicalKey] || (inferredVideo ? "TIMELAPSE" : inferredImage ? "IMAGE" : (format.label || canonicalKey.toUpperCase()));
+      const fileId = file.fileId || file.id;
+      if (!fileId) continue;
 
-      const fileInfo = {
-        key: canonicalKey,
-        label,
-        fileId,
-        id: fileId,
-        name: file.name,
-        ext,
-        mimeType: file.mimeType || "",
-        downloadName: baseName,
-        thumbnailUrl: file.thumbnailUrl || file.thumbnailLink || (inferredImage ? driveThumbnailUrl_(fileId, 1000) : ""),
-        driveUrl: file.webViewLink || `https://drive.google.com/file/d/${fileId}/view`,
-        drivePreviewUrl: `https://drive.google.com/file/d/${fileId}/preview`,
-      };
-
-      item.files[canonicalKey] = fileInfo;
-      if (!item.formats.some((f) => f.key === canonicalKey)) item.formats.push(fileInfo);
-
-      if (inferredImage) {
-        item.thumbId = item.thumbId || fileInfo.fileId;
-        item.imageId = item.imageId || fileInfo.fileId;
-        item.thumbnailUrl = item.thumbnailUrl || fileInfo.thumbnailUrl || driveThumbnailUrl_(fileInfo.fileId, 1000);
-      }
-      if (inferredVideo) item.timelapseId = item.timelapseId || fileInfo.fileId;
+      collected.push({
+        baseKey,
+        baseName,
+        formatKey: canonicalKey,
+        file: buildFileInfo_({ file, fileId, label, canonicalKey, ext: rawExt, baseName }),
+      });
     }
+  }
+
+  const byBase = new Map();
+
+  // Important: only image-folder/image-format files create cards.
+  // Other formats attach to an existing image with the same base filename.
+  for (const entry of collected.filter((x) => x.formatKey === "image")) {
+    if (!byBase.has(entry.baseKey)) {
+      byBase.set(entry.baseKey, {
+        id: entry.baseKey,
+        name: prettyName_(entry.baseName),
+        categoryKey: category.key,
+        categoryLabel: category.label,
+        files: {},
+        formats: [],
+        thumbId: entry.file.fileId,
+        imageId: entry.file.fileId,
+        timelapseId: "",
+        thumbnailUrl: entry.file.previewUrl,
+        imagePreviewUrl: entry.file.previewUrl,
+        imageWidth: entry.file.width || null,
+        imageHeight: entry.file.height || null,
+        imageModifiedTime: entry.file.modifiedTime || "",
+        imageSize: entry.file.size || null,
+        psdSize: null,
+      });
+    }
+    attachFormat_(byBase.get(entry.baseKey), entry.file);
+  }
+
+  for (const entry of collected.filter((x) => x.formatKey !== "image")) {
+    const item = byBase.get(entry.baseKey);
+    if (!item) continue;
+    attachFormat_(item, entry.file);
+    if (entry.formatKey === "timelapse") item.timelapseId = item.timelapseId || entry.file.fileId;
+    if (entry.formatKey === "psd") item.psdSize = numberOrNull_(entry.file.size);
   }
 
   const items = [...byBase.values()].map((item) => {
     item.formats.sort((a, b) => formatOrder_(a.key) - formatOrder_(b.key) || a.label.localeCompare(b.label));
+    item.formatLabels = item.formats.map((f) => String(f.key || f.label).toLowerCase());
     return item;
   }).sort((a, b) => a.name.localeCompare(b.name));
 
-  debug.push({ step: "category-built", category: category.key, formatFolderCount: formatFolders.size, itemCount: items.length });
+  debug.push({
+    step: "category-built",
+    category: category.key,
+    formatFolderCount: formatFolders.size,
+    collectedFileCount: collected.length,
+    imageCardCount: items.length,
+    itemNames: items.slice(0, 10).map((it) => it.name),
+  });
   return { items };
+}
+
+function buildFileInfo_({ file, fileId, label, canonicalKey, ext, baseName }) {
+  const width = numberOrNull_(file?.imageMediaMetadata?.width || file?.videoMediaMetadata?.width || file?.width);
+  const height = numberOrNull_(file?.imageMediaMetadata?.height || file?.videoMediaMetadata?.height || file?.height);
+  const safeExt = String(ext || canonicalKey || "file").replace(/^\./, "").toLowerCase();
+  return {
+    key: canonicalKey,
+    label,
+    fileId,
+    id: fileId,
+    name: file.name,
+    ext: safeExt,
+    mimeType: file.mimeType || "",
+    downloadName: baseName,
+    size: numberOrNull_(file.size),
+    modifiedTime: file.modifiedTime || "",
+    width,
+    height,
+    thumbnailUrl: file.thumbnailUrl || file.thumbnailLink || (canonicalKey === "image" ? driveThumbnailUrl_(fileId, 1600) : ""),
+    previewUrl: canonicalKey === "image" ? inlineFileUrl_(fileId, file.name, safeExt) : (file.thumbnailUrl || file.thumbnailLink || ""),
+    driveUrl: file.webViewLink || `https://drive.google.com/file/d/${fileId}/view`,
+    drivePreviewUrl: `https://drive.google.com/file/d/${fileId}/preview`,
+  };
+}
+
+function attachFormat_(item, fileInfo) {
+  item.files[fileInfo.key] = fileInfo;
+  const existingIdx = item.formats.findIndex((f) => f.key === fileInfo.key);
+  if (existingIdx >= 0) item.formats[existingIdx] = fileInfo;
+  else item.formats.push(fileInfo);
 }
 
 async function listDriveFolderEntries_(folderId, apiKey, debug, label = "folder") {
@@ -249,7 +291,7 @@ async function listDriveFolderWithApi_(folderId, apiKey, debug, label) {
         fileId: f.id,
         name: f.name,
         mimeType: f.mimeType || "",
-        thumbnailUrl: f.thumbnailLink || (String(f.mimeType || "").startsWith("image/") ? driveThumbnailUrl_(f.id, 1000) : ""),
+        thumbnailUrl: f.thumbnailLink || (String(f.mimeType || "").startsWith("image/") ? driveThumbnailUrl_(f.id, 1600) : ""),
         thumbnailLink: f.thumbnailLink || "",
         webViewLink: f.webViewLink || "",
         webContentLink: f.webContentLink || "",
@@ -306,7 +348,7 @@ async function scrapeDriveFolderEntries_(folderId, debug, label) {
       if (!id || !name || seen.has(id)) continue;
       if (/^(application\/|image\/|video\/|audio\/)/i.test(name)) continue;
       seen.add(id);
-      if (looksLikeFile_(name)) out.files.push({ id, name, fileId: id, thumbnailUrl: isImageFile_(name) ? driveThumbnailUrl_(id, 1000) : "" });
+      if (looksLikeFile_(name)) out.files.push({ id, name, fileId: id, thumbnailUrl: isImageFile_(name) ? driveThumbnailUrl_(id, 1600) : "" });
       else out.folders.push({ id, name, label: name, mimeType: "application/vnd.google-apps.folder" });
     }
 
@@ -317,6 +359,14 @@ async function scrapeDriveFolderEntries_(folderId, debug, label) {
   return out;
 }
 
+function inlineFileUrl_(fileId, name = "", ext = "") {
+  const params = new URLSearchParams();
+  params.set("id", fileId);
+  params.set("inline", "1");
+  if (name) params.set("name", name);
+  if (ext) params.set("ext", ext);
+  return `/api/file?${params.toString()}`;
+}
 function canonicalCategoryKey_(s) {
   const key = slugify_(s);
   if (!key) return "";
@@ -360,7 +410,8 @@ function decodeHtml_(s) {
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'");
 }
-function driveThumbnailUrl_(fileId, size = 1000) { return `https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=w${Number(size) || 1000}`; }
+function numberOrNull_(v) { const n = Number(v); return Number.isFinite(n) ? n : null; }
+function driveThumbnailUrl_(fileId, size = 1600) { return `https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=w${Number(size) || 1600}`; }
 function safeSnippet_(body) { return String(body || "").slice(0, 1000).replace(/[A-Za-z0-9_-]{30,}/g, "[redacted]"); }
 function jsonResponse_(payload, status = 200, maxAge = 60) { return new Response(JSON.stringify(payload), { status, headers: corsJsonHeaders_(maxAge) }); }
 function corsJsonHeaders_(maxAge = 60) {

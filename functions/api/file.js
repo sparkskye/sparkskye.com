@@ -3,6 +3,7 @@ export async function onRequest(context) {
   const id = url.searchParams.get("id");
   const requestedName = url.searchParams.get("name") || url.searchParams.get("filename") || "";
   const ext = (url.searchParams.get("ext") || "").replace(/^\./, "");
+  const inline = url.searchParams.get("inline") === "1" || url.searchParams.get("disposition") === "inline";
 
   if (!id) {
     return new Response("Missing id", { status: 400 });
@@ -41,8 +42,10 @@ export async function onRequest(context) {
   headers.set("Access-Control-Allow-Headers", "Content-Type, Range");
   headers.set("Cache-Control", "public, max-age=86400");
 
-  // Force a consistent filename for downloads.
-  if (safeName) {
+  // Force a consistent filename for downloads, unless this is being used as an inline preview.
+  if (inline) {
+    headers.set("Content-Disposition", safeName ? `inline; filename=\"${safeName}\"` : "inline");
+  } else if (safeName) {
     // iOS/Safari is picky — include both filename and filename* to avoid odd ".bin" naming.
     const enc = encodeURIComponent(safeName);
     headers.set(
