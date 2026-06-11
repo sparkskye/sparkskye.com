@@ -1,4 +1,4 @@
-import { fetchModels, fileViewUrl, trackedDownloadUrl, driveBrowserDownloadUrl } from "./api.js";
+import { fetchModels, fetchModelGames, fileViewUrl, trackedDownloadUrl, driveBrowserDownloadUrl } from "./api.js";
 import {
   qs,
   debounce,
@@ -89,13 +89,66 @@ function makeChip({ label, active, onClick, extraClass = "" }) {
   return b;
 }
 
-async function loadGameListIfNeeded() {
-  const provided = window.__HIVE_GAMES;
-  if (Array.isArray(provided) && provided.length) {
-    state.games = provided.map((x) => ({ key: slugify(x), label: normalizeGameLabel(x) }));
-    return;
+function parseGameList(raw) {
+  const arr = Array.isArray(raw?.games) ? raw.games : Array.isArray(raw) ? raw : [];
+  return arr
+    .map((g) => {
+      if (typeof g === "string") {
+        const key = slugify(g);
+        return key ? { key, label: normalizeGameLabel(g) } : null;
+      }
+
+      if (g && typeof g === "object") {
+        const labelCandidate =
+          (typeof g.label === "string" ? g.label : "") ||
+          (typeof g.name === "string" ? g.name : "") ||
+          (typeof g.title === "string" ? g.title : "") ||
+          (typeof g.key === "string" ? g.key : "") ||
+          (typeof g.slug === "string" ? g.slug : "");
+
+        const key = slugify(String(g.key || g.slug || labelCandidate || ""));
+        const label = normalizeGameLabel(String(labelCandidate || key || ""));
+        return key ? { key, label } : null;
+      }
+
+      return null;
+    })
+    .filter(Boolean);
+}
+
+function mergeGameLists(...lists) {
+  const out = [];
+  const seen = new Set();
+
+  for (const list of lists) {
+    for (const g of list || []) {
+      const key = slugify(g?.key || g?.label || "");
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      out.push({ key, label: normalizeGameLabel(g.label || key) });
+    }
   }
-  state.games = [];
+
+  return out;
+}
+
+async function loadGameListIfNeeded() {
+  const fallback = parseGameList(window.__HIVE_GAMES);
+  const manual = [{ key: "replay-cinema", label: "REPLAY CINEMA" }];
+
+  try {
+    const res = await fetchModelGames();
+    const fromApi = parseGameList(res);
+
+    // If the API/Apps Script returns a real folder list, use it.
+    // If not, keep the current fallback list so the existing model tags do not disappear.
+    state.games = fromApi.length >= 4
+      ? mergeGameLists(fromApi, manual)
+      : mergeGameLists(fallback, fromApi, manual);
+    return;
+  } catch {
+    state.games = mergeGameLists(fallback, manual);
+  }
 }
 
 function renderGameChips() {
