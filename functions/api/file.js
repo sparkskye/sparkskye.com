@@ -99,6 +99,12 @@ function contentTypeFromName(name) {
   if (n.endsWith(".png")) return "image/png";
   if (n.endsWith(".jpg") || n.endsWith(".jpeg")) return "image/jpeg";
   if (n.endsWith(".webp")) return "image/webp";
+  if (n.endsWith(".gif")) return "image/gif";
+  if (n.endsWith(".mp4") || n.endsWith(".m4v")) return "video/mp4";
+  if (n.endsWith(".mov")) return "video/quicktime";
+  if (n.endsWith(".webm")) return "video/webm";
+  if (n.endsWith(".blend")) return "application/octet-stream";
+  if (n.endsWith(".psd")) return "image/vnd.adobe.photoshop";
   if (n.endsWith(".json")) return "application/json; charset=utf-8";
   return null;
 }
