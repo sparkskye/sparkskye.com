@@ -1151,3 +1151,104 @@ body.theme-art .hero__title{
 .design-page .modal__viewer--media iframe{
   border: 0;
 }
+
+
+/* Cross-page theme parity fixes */
+body.theme-animation,
+body.theme-animations{ --accent:#598ffe; --accent2:#78a5ff; }
+body.theme-editing{ --accent:#f0593a; --accent2:#ff7659; }
+body.theme-design{ --accent:#894bdd; --accent2:#a06bff; }
+body.theme-art{ --accent:#fbbc42; --accent2:#ffd06c; }
+
+body.theme-animation .btn:hover,
+body.theme-animations .btn:hover,
+body.theme-editing .btn:hover,
+body.theme-design .btn:hover,
+body.theme-art .btn:hover,
+body.theme-animation .chip:hover,
+body.theme-animations .chip:hover,
+body.theme-editing .chip:hover,
+body.theme-design .chip:hover,
+body.theme-art .chip:hover,
+body.theme-animation .card:hover,
+body.theme-animations .card:hover,
+body.theme-editing .card:hover,
+body.theme-design .card:hover,
+body.theme-art .card:hover,
+body.theme-animation .modal__close:hover,
+body.theme-animations .modal__close:hover,
+body.theme-editing .modal__close:hover,
+body.theme-design .modal__close:hover,
+body.theme-art .modal__close:hover{
+  border-color: var(--accent) !important;
+}
+
+body.theme-animation .topnav__btn:hover,
+body.theme-animations .topnav__btn:hover,
+body.theme-editing .topnav__btn:hover,
+body.theme-design .topnav__btn:hover,
+body.theme-art .topnav__btn:hover,
+body.theme-animation .topnav__btn.is-active,
+body.theme-animations .topnav__btn.is-active,
+body.theme-editing .topnav__btn.is-active,
+body.theme-design .topnav__btn.is-active,
+body.theme-art .topnav__btn.is-active,
+body.theme-animation .topnav__dropitem:hover,
+body.theme-animations .topnav__dropitem:hover,
+body.theme-editing .topnav__dropitem:hover,
+body.theme-design .topnav__dropitem:hover,
+body.theme-art .topnav__dropitem:hover,
+body.theme-animation .topnav__dropitem.is-active,
+body.theme-animations .topnav__dropitem.is-active,
+body.theme-editing .topnav__dropitem.is-active,
+body.theme-design .topnav__dropitem.is-active,
+body.theme-art .topnav__dropitem.is-active{
+  border-color: var(--accent) !important;
+}
+
+body.theme-animation .topnav__btn.is-active,
+body.theme-animations .topnav__btn.is-active,
+body.theme-editing .topnav__btn.is-active,
+body.theme-design .topnav__btn.is-active,
+body.theme-art .topnav__btn.is-active,
+body.theme-animation .topnav__dropitem.is-active,
+body.theme-animations .topnav__dropitem.is-active,
+body.theme-editing .topnav__dropitem.is-active,
+body.theme-design .topnav__dropitem.is-active,
+body.theme-art .topnav__dropitem.is-active{
+  background: var(--accent) !important;
+  color: #041018 !important;
+}
+
+body.theme-animation .search:focus,
+body.theme-animations .search:focus,
+body.theme-editing .search:focus,
+body.theme-design .search:focus,
+body.theme-art .search:focus{
+  border-color: var(--accent) !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* Shared pan/zoom viewer must use the source image's natural aspect ratio.
+   Later media rules set modal images to width/height:100%, so this override
+   keeps the minimap-style transform math from shrinking or stretching images. */
+.shared-panzoom-preview .map-preview__img,
+.modal__viewer--media .shared-panzoom-preview .map-preview__img,
+.design-page .modal__viewer--media .shared-panzoom-preview .map-preview__img{
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  width: auto !important;
+  height: auto !important;
+  max-width: none !important;
+  max-height: none !important;
+  object-fit: unset !important;
+  transform-origin: center center !important;
+  user-select: none !important;
+  pointer-events: none !important;
+}
+
+.design-page .empty-state--search{
+  min-height: 140px;
+}

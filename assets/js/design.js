@@ -163,9 +163,14 @@ function renderGrid(items) {
   els.grid.innerHTML = "";
 
   if (!items.length) {
+    const q = String(state.q || "").trim();
+    if (!q && state.items.length) return;
+
     const empty = document.createElement("div");
-    empty.className = "empty-state";
-    empty.textContent = "NO DESIGN FILES FOUND. MAKE SURE THE IMAGE FOLDER HAS PUBLIC IMAGE FILES, THEN REDEPLOY/REFRESH.";
+    empty.className = q ? "empty-state empty-state--search" : "empty-state";
+    empty.textContent = q
+      ? "THERE ARE NO RESULTS FOR THAT SEARCH."
+      : "NO DESIGN FILES FOUND. MAKE SURE THE IMAGE FOLDER HAS PUBLIC IMAGE FILES, THEN REDEPLOY/REFRESH.";
     els.grid.appendChild(empty);
     return;
   }
