@@ -888,6 +888,16 @@ function buildPreviewLink(it) {
   return url.toString();
 }
 
+function buildShareLink(it) {
+  const id = it.glbId || it.thumbId || "";
+  const preview = new URL(buildPreviewLink(it));
+  const url = new URL(`${window.location.origin}/share/maps/${encodeURIComponent(id)}`);
+  url.searchParams.set("go", `${preview.pathname}${preview.search}`);
+  if (it.gameKey || state.game) url.searchParams.set("game", it.gameKey || state.game);
+  if (it.modeKey && it.modeKey !== "all") url.searchParams.set("mode", it.modeKey);
+  return url.toString();
+}
+
 function handleMapModalKeydown(e) {
   if (!els.modal.classList.contains("is-open") || !mapView.img) return false;
   if (e.key === "+" || e.key === "=") {
@@ -1003,7 +1013,7 @@ function openModal(it, opts = {}) {
   els.modalDownloadPng.style.display = it.thumbId || it.thumbUrl ? "inline-flex" : "none";
 
   els.modalCopy.onclick = async () => {
-    await copyToClipboard(previewLink);
+    await copyToClipboard(buildShareLink(it));
     els.modalCopy.textContent = "COPIED!";
     setTimeout(() => (els.modalCopy.textContent = "COPY LINK"), 900);
   };

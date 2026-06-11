@@ -537,6 +537,15 @@ function buildPreviewLink(it) {
   return url.toString();
 }
 
+function buildShareLink(it) {
+  const preview = new URL(buildPreviewLink(it));
+  const url = new URL(`${window.location.origin}/share/models/${encodeURIComponent(it.modelId)}`);
+  url.searchParams.set("go", `${preview.pathname}${preview.search}`);
+  if (state.game) url.searchParams.set("game", state.game);
+  if (it.folderKey && it.folderKey !== "root" && it.folderKey !== "all") url.searchParams.set("folder", it.folderKey);
+  return url.toString();
+}
+
 function setModalDownloadStat(text, isOff = false) {
   if (!els.modalDownloads) return;
   els.modalDownloads.textContent = text;
@@ -618,7 +627,7 @@ async function openModal(it, opts = {}) {
   };
 
   els.modalCopy.onclick = async () => {
-    await copyToClipboard(previewLink);
+    await copyToClipboard(buildShareLink(it));
     els.modalCopy.textContent = "COPIED!";
     setTimeout(() => (els.modalCopy.textContent = "COPY LINK"), 900);
   };

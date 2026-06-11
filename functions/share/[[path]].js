@@ -1,12 +1,25 @@
 const ACCENT = "#00aaff";
 
+const KIND_ALIASES = {
+  editing: "editing",
+  video: "editing",
+  videos: "editing",
+  design: "design",
+  designs: "design",
+  map: "maps",
+  maps: "maps",
+  model: "models",
+  models: "models",
+};
+
 export async function onRequest(context) {
   const requestUrl = new URL(context.request.url);
   const parts = normalizeParts_(context.params?.path);
-  const kind = (parts[0] || "").toLowerCase();
+  const requestedKind = (parts[0] || "").toLowerCase();
+  const kind = KIND_ALIASES[requestedKind] || "";
   const id = decodeURIComponent(parts.slice(1).join("/") || "").trim();
 
-  if (!id || !["editing", "design"].includes(kind)) {
+  if (!id || !kind) {
     return htmlResponse_(renderShareHtml_({
       title: "sparkskye",
       description: "sparkskye creations",
@@ -17,21 +30,19 @@ export async function onRequest(context) {
 
   let meta = null;
   try {
-    meta = kind === "editing"
-      ? await getEditingMeta_(requestUrl, id)
-      : await getDesignMeta_(requestUrl, id);
-  } catch (err) {
+    if (kind === "editing") meta = await getEditingMeta_(requestUrl, id);
+    if (kind === "design") meta = await getDesignMeta_(requestUrl, id);
+    if (kind === "maps") meta = await getMapMeta_(requestUrl, id);
+    if (kind === "models") meta = await getModelMeta_(requestUrl, id);
+  } catch {
     meta = null;
   }
 
-  const fallbackDestination = kind === "editing"
-    ? `/editing/?preview=${encodeURIComponent(id)}`
-    : `/design/?preview=${encodeURIComponent(id)}`;
-
+  const fallbackDestination = fallbackDestination_(kind, id, requestUrl);
   const destination = safeGo_(requestUrl.searchParams.get("go")) || fallbackDestination;
-  const title = meta?.title || (kind === "editing" ? "sparkskye video" : "sparkskye design");
-  const description = meta?.description || (kind === "editing" ? "my youtube videos" : "thumbnails, profiles, banners, and other graphic design work");
-  const image = absoluteUrl_(meta?.image || "/public/img/favicon.png", requestUrl.origin);
+  const title = meta?.title || fallbackTitle_(kind);
+  const description = meta?.description || fallbackDescription_(kind);
+  const image = meta?.image === null ? null : absoluteUrl_(meta?.image || fallbackImage_(kind), requestUrl.origin);
 
   return htmlResponse_(renderShareHtml_({ title, description, image, destination, pageUrl: requestUrl.toString() }), 200);
 }
@@ -62,17 +73,56 @@ async function getDesignMeta_(requestUrl, id) {
   if (!item) throw new Error("design not found");
   return {
     title: item.name || "sparkskye design",
-    description: formatList_(item) || "design file",
+    description: formatDesignList_(item) || "design file",
     image: item.imagePreviewUrl || item.files?.image?.previewUrl || item.thumbnailUrl || "/public/img/favicon.png",
+  };
+}
+
+async function getMapMeta_(requestUrl, id) {
+  const go = parseGoUrl_(requestUrl);
+  const game = requestUrl.searchParams.get("game") || go.searchParams.get("game") || "all";
+  const api = new URL("/api/maps", requestUrl.origin);
+  if (game) api.searchParams.set("game", game);
+  const res = await fetch(api.toString(), { cf: { cacheTtl: 300, cacheEverything: true } });
+  if (!res.ok) throw new Error(`maps api ${res.status}`);
+  const json = await res.json();
+  const items = flattenMapItems_(json, game);
+  const item = items.find((x) => String(x.glbId || x.thumbId || "") === String(id));
+  if (!item) throw new Error("map not found");
+  const image = item.thumbUrl || (item.thumbId ? `/api/file?id=${encodeURIComponent(item.thumbId)}&inline=1` : "/public/img/favicon.png");
+  return {
+    title: item.name || "hive map",
+    description: buildPathText_(item.gameKey || game, item.relPath || item.modeLabel || ""),
+    image,
+  };
+}
+
+async function getModelMeta_(requestUrl, id) {
+  const go = parseGoUrl_(requestUrl);
+  const game = requestUrl.searchParams.get("game") || go.searchParams.get("game") || "all";
+  const api = new URL("/api/models", requestUrl.origin);
+  if (game) api.searchParams.set("game", game);
+  const res = await fetch(api.toString(), { cf: { cacheTtl: 300, cacheEverything: true } });
+  if (!res.ok) throw new Error(`models api ${res.status}`);
+  const json = await res.json();
+  const items = flattenModelItems_(json, game);
+  const item = items.find((x) => String(x.modelId || "") === String(id));
+  if (!item) throw new Error("model not found");
+  return {
+    title: item.name || "hive model",
+    description: buildPathText_(game, item.relPath || item.folderLabel || ""),
+    image: null,
   };
 }
 
 function renderShareHtml_({ title, description, image, destination, pageUrl = "" }) {
   const t = esc_(title);
   const d = esc_(description);
-  const img = esc_(image);
+  const img = image ? esc_(image) : "";
   const dest = esc_(destination);
   const url = esc_(pageUrl || destination);
+  const imageTags = img ? `\n<meta property="og:image" content="${img}">\n<meta property="og:image:alt" content="${t}">\n<meta name="twitter:card" content="summary_large_image">\n<meta name="twitter:image" content="${img}">` : `\n<meta name="twitter:card" content="summary">`;
+
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -81,14 +131,12 @@ function renderShareHtml_({ title, description, image, destination, pageUrl = ""
 <title>${t}</title>
 <meta name="theme-color" content="${ACCENT}">
 <meta property="og:type" content="website">
+<meta property="og:site_name" content="sparkskye">
 <meta property="og:title" content="${t}">
-<meta property="og:description" content="${d}">
-<meta property="og:image" content="${img}">
+<meta property="og:description" content="${d}">${imageTags}
 <meta property="og:url" content="${url}">
-<meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${t}">
 <meta name="twitter:description" content="${d}">
-<meta name="twitter:image" content="${img}">
 <meta http-equiv="refresh" content="0; url=${dest}">
 <style>body{margin:0;background:#141414;color:#f2f2f2;font-family:system-ui,sans-serif;display:grid;min-height:100vh;place-items:center}a{color:${ACCENT}}</style>
 </head>
@@ -109,6 +157,138 @@ function htmlResponse_(html, status = 200) {
   });
 }
 
+function flattenMapItems_(json, gameKey) {
+  const groups = json.groups || json.modes || json.folders || [];
+  const out = [];
+  const seen = new Set();
+
+  const addItem = (it, group = {}) => {
+    const glbId = pickMapGlbId_(it);
+    const thumb = pickMapThumb_(it);
+    const dedupeKey = glbId || thumb.id || `${it.name || it.title || ""}::${it.path || it.modeLabel || it.folderLabel || group.label || ""}`;
+    if (!dedupeKey || seen.has(dedupeKey)) return;
+    seen.add(dedupeKey);
+    out.push({
+      name: it.name || it.title || "hive map",
+      gameKey,
+      glbId,
+      thumbId: thumb.id,
+      thumbUrl: thumb.url,
+      relPath: it.path || it.modeLabel || it.folderLabel || group.label || "",
+      modeLabel: it.modeLabel || it.folderLabel || group.label || "",
+    });
+  };
+
+  for (const group of groups) {
+    const key = String(group.key || "").toLowerCase();
+    if (key === "all") continue;
+    for (const it of group.items || []) addItem(it, group);
+  }
+
+  const allGroup = groups.find((g) => String(g.key || "").toLowerCase() === "all");
+  for (const it of allGroup?.items || []) addItem(it, allGroup || {});
+
+  for (const it of json.items || json.maps || json.rootItems || []) addItem(it, {});
+  return out;
+}
+
+function flattenModelItems_(json, gameKey) {
+  const groups = json.groups || json.folders || json.modes || [];
+  const out = [];
+  const seen = new Set();
+
+  const addItem = (it, group = {}) => {
+    const modelId = it.modelId || it.id || it.fileId || it.assetId || "";
+    const dedupeKey = modelId || `${it.name || it.title || ""}::${it.path || it.folderLabel || group.label || ""}`;
+    if (!dedupeKey || seen.has(dedupeKey)) return;
+    seen.add(dedupeKey);
+    out.push({
+      name: it.name || it.title || "hive model",
+      modelId,
+      relPath: it.path || it.folderLabel || group.label || "",
+      folderLabel: it.folderLabel || group.label || "",
+      gameKey,
+    });
+  };
+
+  for (const group of groups) {
+    const key = String(group.key || "").toLowerCase();
+    if (key === "all") continue;
+    for (const it of group.items || []) addItem(it, group);
+  }
+
+  const allGroup = groups.find((g) => String(g.key || "").toLowerCase() === "all");
+  for (const it of allGroup?.items || []) addItem(it, allGroup || {});
+
+  for (const it of json.items || json.models || json.rootItems || []) addItem(it, {});
+  return out;
+}
+
+function pickMapGlbId_(it) {
+  return it.glbId || it.modelId || it.mapId || it.id || it.fileId || it.assetId || "";
+}
+
+function pickMapThumb_(it) {
+  return {
+    id: it.thumbId || it.pngId || it.imageId || it.minimapId || it.thumbnailId || it.previewId || "",
+    url: it.thumbUrl || it.pngUrl || it.thumbnailUrl || it.previewUrl || "",
+  };
+}
+
+function fallbackDestination_(kind, id, requestUrl) {
+  if (kind === "editing") return `/editing/?preview=${encodeURIComponent(id)}`;
+  if (kind === "design") return `/design/?preview=${encodeURIComponent(id)}`;
+  if (kind === "maps") {
+    const game = requestUrl.searchParams.get("game") || "all";
+    const mode = requestUrl.searchParams.get("mode") || "";
+    const qs = new URLSearchParams();
+    if (game) qs.set("game", game);
+    if (mode) qs.set("mode", mode);
+    qs.set("preview", id);
+    return `/hive-resources/maps/?${qs.toString()}`;
+  }
+  if (kind === "models") {
+    const game = requestUrl.searchParams.get("game") || "all";
+    const folder = requestUrl.searchParams.get("folder") || "";
+    const qs = new URLSearchParams();
+    if (game) qs.set("game", game);
+    if (folder) qs.set("folder", folder);
+    qs.set("preview", id);
+    return `/hive-resources/models/?${qs.toString()}`;
+  }
+  return "/";
+}
+
+function fallbackTitle_(kind) {
+  if (kind === "editing") return "sparkskye video";
+  if (kind === "design") return "sparkskye design";
+  if (kind === "maps") return "hive map";
+  if (kind === "models") return "hive model";
+  return "sparkskye";
+}
+
+function fallbackDescription_(kind) {
+  if (kind === "editing") return "my youtube videos";
+  if (kind === "design") return "thumbnails, profiles, banners, and other graphic design work";
+  if (kind === "maps") return "hive resources map";
+  if (kind === "models") return "hive resources model";
+  return "sparkskye creations";
+}
+
+function fallbackImage_(kind) {
+  if (kind === "models") return null;
+  return "/public/img/favicon.png";
+}
+
+function parseGoUrl_(requestUrl) {
+  try {
+    const raw = requestUrl.searchParams.get("go") || "/";
+    return new URL(raw, requestUrl.origin);
+  } catch {
+    return new URL("/", requestUrl.origin);
+  }
+}
+
 function normalizeParts_(path) {
   if (Array.isArray(path)) return path;
   return String(path || "").split("/").filter(Boolean);
@@ -122,6 +302,7 @@ function safeGo_(go) {
 }
 
 function absoluteUrl_(url, origin) {
+  if (url === null) return null;
   try { return new URL(url, origin).toString(); }
   catch { return `${origin}/public/img/favicon.png`; }
 }
@@ -142,7 +323,7 @@ function shortDate_(iso) {
   catch { return "—"; }
 }
 
-function formatList_(item) {
+function formatDesignList_(item) {
   const preferred = ["image", "psd", "timelapse", "blend", "nomad"];
   const files = item.files || {};
   return preferred
@@ -151,4 +332,13 @@ function formatList_(item) {
     .filter((key, idx, arr) => arr.indexOf(key) === idx)
     .map((key) => String(key).toLowerCase())
     .join(", ");
+}
+
+function buildPathText_(gameKey, path) {
+  const g = String(gameKey || "").toUpperCase();
+  const p = String(path || "")
+    .replace(/^\/+/, "")
+    .replace(/\//g, " \\ ")
+    .trim();
+  return p ? `${g} \\ ${p.toUpperCase()}` : g;
 }
