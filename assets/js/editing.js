@@ -219,9 +219,6 @@ function getPreviewlessHref() {
 
 function buildPreviewLink(it) {
   const url = new URL(`${window.location.origin}/editing/`);
-  if (state.type && state.type !== "videos") url.searchParams.set("type", state.type);
-  if (state.sort && state.sort !== "date") url.searchParams.set("sort", state.sort);
-  if (state.q) url.searchParams.set("q", state.q);
   url.searchParams.set("preview", it.id);
   return url.toString();
 }

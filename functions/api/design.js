@@ -146,8 +146,10 @@ async function buildCategory_(category, apiKey, debug) {
 
     for (const file of entries.files || []) {
       const rawExt = getExtension_(file.name) || extFromMime_(file.mimeType) || format.key;
-      const baseName = stripExtension_(file.name);
-      const baseKey = normalizeBase_(baseName);
+      const rawBaseName = stripExtension_(file.name);
+      const parsedName = parseDesignName_(rawBaseName);
+      const baseName = parsedName.baseName;
+      const baseKey = parsedName.baseKey;
       if (!baseKey) continue;
 
       // Trust the folder/format first. Some source files (especially .psd) can report
@@ -166,8 +168,19 @@ async function buildCategory_(category, apiKey, debug) {
       collected.push({
         baseKey,
         baseName,
+        variantLabel: parsedName.variantLabel,
+        variantKey: parsedName.variantKey,
         formatKey: canonicalKey,
-        file: buildFileInfo_({ file, fileId, label, canonicalKey, ext: rawExt, baseName }),
+        file: buildFileInfo_({
+          file,
+          fileId,
+          label,
+          canonicalKey,
+          ext: rawExt,
+          baseName: rawBaseName,
+          variantLabel: parsedName.variantLabel,
+          variantKey: parsedName.variantKey,
+        }),
       });
     }
   }
@@ -196,9 +209,12 @@ async function buildCategory_(category, apiKey, debug) {
         imageCreatedTime: entry.file.createdTime || "",
         imageSize: entry.file.size || null,
         psdSize: null,
+        variations: [],
       });
     }
-    attachFormat_(byBase.get(entry.baseKey), entry.file);
+    const item = byBase.get(entry.baseKey);
+    attachImageVariant_(item, entry.file);
+    if (!item.files.image) attachFormat_(item, entry.file);
   }
 
   const unmatchedFormats = [];
@@ -228,6 +244,25 @@ async function buildCategory_(category, apiKey, debug) {
   }
 
   const items = [...byBase.values()].map((item) => {
+    item.variations = (item.variations || []).sort((a, b) => {
+      const aDefault = a.variantKey === "default" ? -1 : 0;
+      const bDefault = b.variantKey === "default" ? -1 : 0;
+      return aDefault - bDefault || String(a.label || "").localeCompare(String(b.label || "")) || String(a.name || "").localeCompare(String(b.name || ""));
+    });
+    const firstImage = item.variations[0] || item.files.image;
+    if (firstImage) {
+      item.files.image = firstImage;
+      item.thumbId = firstImage.fileId;
+      item.imageId = firstImage.fileId;
+      item.thumbnailUrl = firstImage.previewUrl || firstImage.thumbnailUrl || item.thumbnailUrl;
+      item.imagePreviewUrl = firstImage.previewUrl || firstImage.thumbnailUrl || item.imagePreviewUrl;
+      item.imageWidth = firstImage.width || item.imageWidth || null;
+      item.imageHeight = firstImage.height || item.imageHeight || null;
+      item.imageModifiedTime = firstImage.modifiedTime || item.imageModifiedTime || "";
+      item.imageCreatedTime = firstImage.createdTime || item.imageCreatedTime || "";
+      item.imageSize = firstImage.size || item.imageSize || null;
+    }
+    item.variationLabels = item.variations.map((v) => v.label).filter(Boolean);
     item.formats.sort((a, b) => formatOrder_(a.key) - formatOrder_(b.key) || a.label.localeCompare(b.label));
     item.formatLabels = item.formats.map((f) => String(f.key || f.label).toLowerCase());
     return item;
@@ -247,7 +282,7 @@ async function buildCategory_(category, apiKey, debug) {
   return { items };
 }
 
-function buildFileInfo_({ file, fileId, label, canonicalKey, ext, baseName }) {
+function buildFileInfo_({ file, fileId, label, canonicalKey, ext, baseName, variantLabel = "", variantKey = "default" }) {
   const width = numberOrNull_(file?.imageMediaMetadata?.width || file?.videoMediaMetadata?.width || file?.width);
   const height = numberOrNull_(file?.imageMediaMetadata?.height || file?.videoMediaMetadata?.height || file?.height);
   const safeExt = String(ext || canonicalKey || "file").replace(/^\./, "").toLowerCase();
@@ -260,6 +295,8 @@ function buildFileInfo_({ file, fileId, label, canonicalKey, ext, baseName }) {
     ext: safeExt,
     mimeType: file.mimeType || "",
     downloadName: baseName,
+    variantLabel,
+    variantKey,
     size: numberOrNull_(file.size),
     modifiedTime: file.modifiedTime || "",
     createdTime: file.createdTime || "",
@@ -270,6 +307,21 @@ function buildFileInfo_({ file, fileId, label, canonicalKey, ext, baseName }) {
     driveUrl: file.webViewLink || `https://drive.google.com/file/d/${fileId}/view`,
     drivePreviewUrl: `https://drive.google.com/file/d/${fileId}/preview`,
   };
+}
+
+function attachImageVariant_(item, fileInfo) {
+  if (!item || !fileInfo) return;
+  if (!Array.isArray(item.variations)) item.variations = [];
+  const key = fileInfo.variantKey || "default";
+  const variation = {
+    ...fileInfo,
+    key: "image",
+    variantKey: key,
+    label: fileInfo.variantLabel || "",
+  };
+  const existingIdx = item.variations.findIndex((v) => (v.variantKey || "default") === key);
+  if (existingIdx >= 0) item.variations[existingIdx] = variation;
+  else item.variations.push(variation);
 }
 
 function attachFormat_(item, fileInfo) {
@@ -435,7 +487,19 @@ function extFromMime_(mime) {
   if (m === "application/vnd.adobe.photoshop") return "psd";
   return "";
 }
-function normalizeBase_(s) { return slugify_(stripExtension_(s)); }
+function parseDesignName_(s) {
+  const raw = String(s || "").trim();
+  const match = raw.match(/^(.*?)\s*\[([^\]]+)\]\s*$/);
+  const baseName = (match ? match[1] : raw).trim() || raw;
+  const variantLabel = match ? String(match[2] || "").trim() : "";
+  return {
+    baseName,
+    baseKey: slugify_(baseName),
+    variantLabel,
+    variantKey: variantLabel ? slugify_(variantLabel) : "default",
+  };
+}
+function normalizeBase_(s) { return parseDesignName_(stripExtension_(s)).baseKey; }
 function prettyName_(s) { return String(s || "").replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim(); }
 function titleCase_(s) { return String(s || "").toLowerCase().replace(/\b\w/g, (m) => m.toUpperCase()); }
 function formatOrder_(key) { const order = ["image", "timelapse", "psd", "blend", "nomad"]; const i = order.indexOf(key); return i < 0 ? 99 : i; }

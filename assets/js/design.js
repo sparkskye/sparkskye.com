@@ -49,13 +49,38 @@ let activePreview = "image";
 let panZoomViewer = null;
 let imagePreviewButton = null;
 let timelapsePreviewButton = null;
+let activeVariationIndex = 0;
+let variantLabelEl = null;
 
 function clearNode(node) { while (node?.firstChild) node.removeChild(node.firstChild); }
 function slugify(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""); }
 function extFor(file) { return String(file?.ext || file?.key || "file").replace(/^\./, "").toLowerCase(); }
-function filenameFor(it, file) { const ext = extFor(file); return `${slugify(it.name) || "design"}.${ext}`; }
+function filenameFor(it, file) {
+  const ext = extFor(file);
+  const base = slugify(file?.downloadName || [it.name, file?.variantLabel].filter(Boolean).join(" ") || "design");
+  return `${base || "design"}.${ext}`;
+}
 function dateValue(v) { const t = new Date(v || 0).getTime(); return Number.isFinite(t) ? t : 0; }
 function numberValue(v) { const n = Number(v); return Number.isFinite(n) ? n : 0; }
+
+function variationsFor(it) {
+  const list = Array.isArray(it?.variations) ? it.variations.filter((v) => v?.fileId || v?.id) : [];
+  if (list.length) return list;
+  return it?.files?.image ? [{ ...it.files.image, label: it.files.image.variantLabel || "", variantKey: it.files.image.variantKey || "default" }] : [];
+}
+
+function currentVariation(it) {
+  const list = variationsFor(it);
+  if (!list.length) return null;
+  const idx = Math.max(0, Math.min(activeVariationIndex, list.length - 1));
+  activeVariationIndex = idx;
+  return list[idx];
+}
+
+function firstVariation(it) {
+  const list = variationsFor(it);
+  return list[0] || null;
+}
 
 function formatList(it) {
   const preferred = ["image", "psd", "timelapse", "blend", "nomad"];
@@ -68,9 +93,9 @@ function formatList(it) {
     .join(", ");
 }
 
-function imageUrl(it) {
-  const f = it.files?.image;
-  return it.imagePreviewUrl || f?.previewUrl || f?.thumbnailUrl || it.thumbnailUrl || "";
+function imageUrl(it, opts = {}) {
+  const f = opts.current ? currentVariation(it) : firstVariation(it);
+  return f?.previewUrl || f?.thumbnailUrl || it.imagePreviewUrl || it.thumbnailUrl || "";
 }
 
 function makeChip({ label, active, onClick }) {
@@ -152,6 +177,8 @@ function applyFiltersAndRenderGrid() {
     !q ||
     (it.name || "").toLowerCase().includes(q) ||
     (it.categoryLabel || "").toLowerCase().includes(q) ||
+    (it.variationLabels || []).join(" ").toLowerCase().includes(q) ||
+    variationsFor(it).map((v) => v.label || v.variantLabel || v.name || "").join(" ").toLowerCase().includes(q) ||
     formatList(it).toLowerCase().includes(q)
   ));
   state.filtered = items;
@@ -226,9 +253,6 @@ function getPreviewlessHref() {
 
 function buildPreviewLink(it) {
   const url = new URL(`${window.location.origin}/design/`);
-  if (state.category && state.category !== "all") url.searchParams.set("category", state.category);
-  if (state.sort && state.sort !== "date") url.searchParams.set("sort", state.sort);
-  if (state.q) url.searchParams.set("q", state.q);
   url.searchParams.set("preview", it.id);
   return url.toString();
 }
@@ -247,19 +271,70 @@ function cleanupDesignView() {
 
 function showImagePreview(it) {
   cleanupDesignView();
-  if (!(it.imageId || it.thumbId)) {
+  const variation = currentVariation(it);
+  if (!variation && !(it.imageId || it.thumbId)) {
     els.modalViewer.innerHTML = '<div class="viewer__loading">NO PREVIEW AVAILABLE</div>';
+    updateVariantLabel(it);
     return;
   }
 
   panZoomViewer = createPanZoomImageViewer({
     container: els.modalViewer,
-    src: imageUrl(it),
-    alt: it.name || "Design preview",
+    src: imageUrl(it, { current: true }),
+    alt: [it.name || "Design preview", variation?.label || variation?.variantLabel || ""].filter(Boolean).join(" — "),
     units: "pixels",
     imageClass: "design-preview__img",
     loadingText: "LOADING PIXELS",
   });
+  addVariantArrows(it);
+  updateVariantLabel(it);
+}
+
+function updateVariantLabel(it) {
+  if (!variantLabelEl) return;
+  const list = variationsFor(it);
+  const variation = currentVariation(it);
+  const label = variation?.label || variation?.variantLabel || "";
+  variantLabelEl.textContent = label ? `[${label}]` : "";
+  variantLabelEl.hidden = !label;
+}
+
+function setVariationIndex(it, nextIndex) {
+  const list = variationsFor(it);
+  if (list.length <= 1) return;
+  activeVariationIndex = (nextIndex + list.length) % list.length;
+  if (activePreview !== "image") activePreview = "image";
+  showImagePreview(it);
+  updatePreviewButtons();
+}
+
+function addVariantArrows(it) {
+  const list = variationsFor(it);
+  if (list.length <= 1) return;
+  const prev = document.createElement("button");
+  prev.className = "design-variant-arrow design-variant-arrow--prev";
+  prev.type = "button";
+  prev.setAttribute("aria-label", "Previous variation");
+  prev.textContent = "‹";
+  prev.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    setVariationIndex(it, activeVariationIndex - 1);
+  });
+
+  const next = document.createElement("button");
+  next.className = "design-variant-arrow design-variant-arrow--next";
+  next.type = "button";
+  next.setAttribute("aria-label", "Next variation");
+  next.textContent = "›";
+  next.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    setVariationIndex(it, activeVariationIndex + 1);
+  });
+
+  els.modalViewer.appendChild(prev);
+  els.modalViewer.appendChild(next);
 }
 
 function inlineFileUrl(file) {
@@ -288,7 +363,7 @@ function showTimelapsePreview(it) {
   video.controls = true;
   video.playsInline = true;
   video.preload = "metadata";
-  video.poster = imageUrl(it);
+  video.poster = imageUrl(it, { current: true }) || imageUrl(it);
   video.src = inlineFileUrl(file);
   video.title = `${it.name || "Design"} timelapse`;
 
@@ -326,13 +401,19 @@ function updatePreviewButtons() {
   }
 }
 
+function previewFileFor(it, key) {
+  if (key === "image") return currentVariation(it) || it.files?.image;
+  return it.files?.[key];
+}
+
 function addPreviewButton(it, key) {
-  const file = it.files?.[key];
-  if (!file) return null;
+  const initialFile = previewFileFor(it, key);
+  if (!initialFile) return null;
   const b = document.createElement("button");
   b.className = "btn btn--preview";
   b.type = "button";
   b.addEventListener("click", async () => {
+    const file = previewFileFor(it, key);
     if (activePreview === key) {
       await downloadFile(it, file, b);
       updatePreviewButtons();
@@ -370,10 +451,18 @@ function openModal(it, opts = {}) {
   if (!opts.skipUrlUpdate) history.replaceState({}, "", previewLink);
 
   els.modalName.textContent = it.name || "Untitled design";
+  let existingVariant = els.modalName.parentElement?.querySelector(".modal__variant");
+  if (!existingVariant) {
+    existingVariant = document.createElement("div");
+    existingVariant.className = "modal__variant";
+    els.modalName.insertAdjacentElement("afterend", existingVariant);
+  }
+  variantLabelEl = existingVariant;
   els.modalPath.textContent = formatList(it) || "no downloads";
   clearNode(els.modalActions);
 
   activePreview = "image";
+  activeVariationIndex = 0;
   showImagePreview(it);
   imagePreviewButton = addPreviewButton(it, "image");
   timelapsePreviewButton = addPreviewButton(it, "timelapse");
@@ -404,6 +493,8 @@ function closeModal(opts = {}) {
   unlockBodyScroll();
   imagePreviewButton = null;
   timelapsePreviewButton = null;
+  variantLabelEl = null;
+  activeVariationIndex = 0;
   if (!opts.skipUrlRestore) history.replaceState({}, "", state.lastNonPreviewUrl || getPreviewlessHref());
 }
 
