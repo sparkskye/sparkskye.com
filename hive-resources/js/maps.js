@@ -889,13 +889,8 @@ function buildPreviewLink(it) {
 }
 
 function buildShareLink(it) {
-  const id = it.glbId || it.thumbId || "";
-  const preview = new URL(buildPreviewLink(it));
-  const url = new URL(`${window.location.origin}/share/maps/${encodeURIComponent(id)}`);
-  url.searchParams.set("go", `${preview.pathname}${preview.search}`);
-  if (it.gameKey || state.game) url.searchParams.set("game", it.gameKey || state.game);
-  if (it.modeKey && it.modeKey !== "all") url.searchParams.set("mode", it.modeKey);
-  return url.toString();
+  // Clean preview URL; the Pages Function serves embed metadata to social bots.
+  return buildPreviewLink(it);
 }
 
 function handleMapModalKeydown(e) {

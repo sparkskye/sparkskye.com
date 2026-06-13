@@ -193,6 +193,7 @@ async function buildCategory_(category, apiKey, debug) {
         imageWidth: entry.file.width || null,
         imageHeight: entry.file.height || null,
         imageModifiedTime: entry.file.modifiedTime || "",
+        imageCreatedTime: entry.file.createdTime || "",
         imageSize: entry.file.size || null,
         psdSize: null,
       });
@@ -261,6 +262,7 @@ function buildFileInfo_({ file, fileId, label, canonicalKey, ext, baseName }) {
     downloadName: baseName,
     size: numberOrNull_(file.size),
     modifiedTime: file.modifiedTime || "",
+    createdTime: file.createdTime || "",
     width,
     height,
     thumbnailUrl: file.thumbnailUrl || file.thumbnailLink || (canonicalKey === "image" ? driveThumbnailUrl_(fileId, 1600) : ""),
@@ -297,7 +299,7 @@ async function listDriveFolderWithApi_(folderId, apiKey, debug, label) {
   for (let page = 0; page < 10; page += 1) {
     const url = new URL("https://www.googleapis.com/drive/v3/files");
     url.searchParams.set("q", `'${String(folderId).replace(/'/g, "\\'")}' in parents and trashed = false`);
-    url.searchParams.set("fields", "nextPageToken,files(id,name,mimeType,thumbnailLink,webViewLink,webContentLink,modifiedTime,size,imageMediaMetadata(width,height),videoMediaMetadata(width,height,durationMillis))");
+    url.searchParams.set("fields", "nextPageToken,files(id,name,mimeType,thumbnailLink,webViewLink,webContentLink,createdTime,modifiedTime,size,imageMediaMetadata(width,height),videoMediaMetadata(width,height,durationMillis))");
     url.searchParams.set("pageSize", "1000");
     url.searchParams.set("spaces", "drive");
     url.searchParams.set("supportsAllDrives", "true");
@@ -322,6 +324,7 @@ async function listDriveFolderWithApi_(folderId, apiKey, debug, label) {
         thumbnailLink: f.thumbnailLink || "",
         webViewLink: f.webViewLink || "",
         webContentLink: f.webContentLink || "",
+        createdTime: f.createdTime || "",
         modifiedTime: f.modifiedTime || "",
         size: f.size || "",
         imageMediaMetadata: f.imageMediaMetadata || null,

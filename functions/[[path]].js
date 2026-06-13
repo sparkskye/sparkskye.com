@@ -14,20 +14,18 @@ const KIND_ALIASES = {
 
 export async function onRequest(context) {
   const requestUrl = new URL(context.request.url);
-  const parts = normalizeParts_(context.params?.path);
-  const requestedKind = (parts[0] || "").toLowerCase();
-  const kind = KIND_ALIASES[requestedKind] || "";
-  const id = decodeURIComponent(parts.slice(1).join("/") || "").trim();
+  const previewId = requestUrl.searchParams.get("preview");
 
-  if (!id || !kind) {
-    return htmlResponse_(renderShareHtml_({
-      title: "sparkskye",
-      description: "sparkskye creations",
-      image: `${requestUrl.origin}/public/img/favicon.png`,
-      destination: "/",
-    }), 404);
+  // Let normal visitors receive the real static page. Social/Discord bots get
+  // the metadata-only page for the same clean preview URL.
+  if (!previewId || !shouldServeEmbed_(context.request)) {
+    return context.next();
   }
 
+  const kind = kindFromPath_(requestUrl.pathname);
+  if (!kind) return context.next();
+
+  const id = decodeURIComponent(previewId).trim();
   let meta = null;
   try {
     if (kind === "editing") meta = await getEditingMeta_(requestUrl, id);
@@ -38,13 +36,43 @@ export async function onRequest(context) {
     meta = null;
   }
 
-  const fallbackDestination = fallbackDestination_(kind, id, requestUrl);
-  const destination = safeGo_(requestUrl.searchParams.get("go")) || fallbackDestination;
+  const destination = `${requestUrl.pathname}${requestUrl.search}`;
   const title = meta?.title || fallbackTitle_(kind);
   const description = meta?.description || fallbackDescription_(kind);
   const image = meta?.image === null ? null : absoluteUrl_(meta?.image || fallbackImage_(kind), requestUrl.origin);
+  const accent = themeColor_(kind);
 
-  return htmlResponse_(renderShareHtml_({ title, description, image, destination, pageUrl: requestUrl.toString(), accent: themeColor_(kind) }), 200);
+  return htmlResponse_(renderShareHtml_({
+    title,
+    description,
+    image,
+    destination,
+    pageUrl: requestUrl.toString(),
+    accent,
+  }), 200);
+}
+
+function shouldServeEmbed_(request) {
+  const url = new URL(request.url);
+  if (url.searchParams.get("embed") === "1") return true;
+  const ua = String(request.headers.get("user-agent") || "").toLowerCase();
+  return /discordbot|twitterbot|slackbot|facebookexternalhit|facebot|linkedinbot|whatsapp|telegrambot|skypeuripreview|pinterest|embedly|quora link preview|applebot|messages/i.test(ua);
+}
+
+function kindFromPath_(pathname) {
+  const p = String(pathname || "/").replace(/\/+$/, "").toLowerCase();
+  if (p === "/editing") return "editing";
+  if (p === "/design") return "design";
+  if (p === "/hive-resources/maps") return "maps";
+  if (p === "/hive-resources/models") return "models";
+  return "";
+}
+
+function themeColor_(kind) {
+  if (kind === "editing") return "#f0593a";
+  if (kind === "design") return "#894bdd";
+  if (kind === "maps" || kind === "models") return "#00aaff";
+  return "#00aaff";
 }
 
 async function getEditingMeta_(requestUrl, id) {
@@ -259,13 +287,6 @@ function fallbackDestination_(kind, id, requestUrl) {
     return `/hive-resources/models/?${qs.toString()}`;
   }
   return "/";
-}
-
-function themeColor_(kind) {
-  if (kind === "editing") return "#f0593a";
-  if (kind === "design") return "#894bdd";
-  if (kind === "maps" || kind === "models") return "#00aaff";
-  return "#00aaff";
 }
 
 function fallbackTitle_(kind) {

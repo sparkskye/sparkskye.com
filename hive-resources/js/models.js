@@ -538,12 +538,8 @@ function buildPreviewLink(it) {
 }
 
 function buildShareLink(it) {
-  const preview = new URL(buildPreviewLink(it));
-  const url = new URL(`${window.location.origin}/share/models/${encodeURIComponent(it.modelId)}`);
-  url.searchParams.set("go", `${preview.pathname}${preview.search}`);
-  if (state.game) url.searchParams.set("game", state.game);
-  if (it.folderKey && it.folderKey !== "root" && it.folderKey !== "all") url.searchParams.set("folder", it.folderKey);
-  return url.toString();
+  // Clean preview URL; the Pages Function serves embed metadata to social bots.
+  return buildPreviewLink(it);
 }
 
 function setModalDownloadStat(text, isOff = false) {

@@ -227,10 +227,8 @@ function buildPreviewLink(it) {
 }
 
 function buildShareLink(it) {
-  const preview = new URL(buildPreviewLink(it));
-  const url = new URL(`${window.location.origin}/share/editing/${encodeURIComponent(it.id)}`);
-  url.searchParams.set("go", `${preview.pathname}${preview.search}`);
-  return url.toString();
+  // Clean preview URL; the Pages Function serves embed metadata to social bots.
+  return buildPreviewLink(it);
 }
 
 function renderModalStats(it) {

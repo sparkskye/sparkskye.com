@@ -141,7 +141,7 @@ function sortItems(items) {
     );
   }
   return out.sort((a, b) =>
-    dateValue(b.imageModifiedTime || b.files?.image?.modifiedTime) - dateValue(a.imageModifiedTime || a.files?.image?.modifiedTime) ||
+    dateValue(b.imageCreatedTime || b.files?.image?.createdTime || b.imageModifiedTime || b.files?.image?.modifiedTime) - dateValue(a.imageCreatedTime || a.files?.image?.createdTime || a.imageModifiedTime || a.files?.image?.modifiedTime) ||
     (a.name || "").localeCompare(b.name || "")
   );
 }
@@ -234,10 +234,9 @@ function buildPreviewLink(it) {
 }
 
 function buildShareLink(it) {
-  const preview = new URL(buildPreviewLink(it));
-  const url = new URL(`${window.location.origin}/share/design/${encodeURIComponent(it.id)}`);
-  url.searchParams.set("go", `${preview.pathname}${preview.search}`);
-  return url.toString();
+  // Copy the clean preview URL. Cloudflare adds Open Graph metadata to this
+  // same URL for Discord/social bots, so the shared link stays readable.
+  return buildPreviewLink(it);
 }
 
 function cleanupDesignView() {
@@ -263,6 +262,15 @@ function showImagePreview(it) {
   });
 }
 
+function inlineFileUrl(file) {
+  const params = new URLSearchParams();
+  params.set("id", file.fileId || file.id || "");
+  params.set("inline", "1");
+  if (file.name) params.set("name", file.name);
+  if (file.ext) params.set("ext", extFor(file));
+  return `/api/file?${params.toString()}`;
+}
+
 function showTimelapsePreview(it) {
   cleanupDesignView();
   els.modalViewer.innerHTML = "";
@@ -271,12 +279,26 @@ function showTimelapsePreview(it) {
     els.modalViewer.innerHTML = '<div class="viewer__loading">NO TIMELAPSE PREVIEW</div>';
     return;
   }
-  const iframe = document.createElement("iframe");
-  iframe.src = file.drivePreviewUrl || `https://drive.google.com/file/d/${file.fileId || it.timelapseId}/preview`;
-  iframe.allow = "autoplay; fullscreen";
-  iframe.allowFullscreen = true;
-  iframe.title = `${it.name || "Design"} timelapse`;
-  els.modalViewer.appendChild(iframe);
+
+  const wrap = document.createElement("div");
+  wrap.className = "timelapse-preview";
+
+  const video = document.createElement("video");
+  video.className = "timelapse-preview__video";
+  video.controls = true;
+  video.playsInline = true;
+  video.preload = "metadata";
+  video.poster = imageUrl(it);
+  video.src = inlineFileUrl(file);
+  video.title = `${it.name || "Design"} timelapse`;
+
+  const hint = document.createElement("div");
+  hint.className = "timelapse-preview__hint";
+  hint.textContent = "TIMELAPSE PREVIEW";
+
+  wrap.appendChild(video);
+  wrap.appendChild(hint);
+  els.modalViewer.appendChild(wrap);
 }
 
 function makeDownloadUrl(it, file) {

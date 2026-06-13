@@ -1,4 +1,15 @@
 export async function onRequest(context) {
+  if (context.request.method === "OPTIONS") {
+    return new Response(null, {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Range",
+        "Access-Control-Max-Age": "86400",
+      },
+    });
+  }
+
   const url = new URL(context.request.url);
   const id = url.searchParams.get("id");
   const requestedName = url.searchParams.get("name") || url.searchParams.get("filename") || "";
@@ -19,7 +30,8 @@ export async function onRequest(context) {
     if (!safeName) safeName = `download${want}`;
   }
 
-  const driveRes = await fetchDriveFile(id);
+  const rangeHeader = context.request.headers.get("Range") || context.request.headers.get("range") || "";
+  const driveRes = await fetchDriveFile(id, rangeHeader);
 
   if (!driveRes || !driveRes.ok) {
     const status = driveRes?.status || 502;
@@ -41,6 +53,11 @@ export async function onRequest(context) {
   headers.set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
   headers.set("Access-Control-Allow-Headers", "Content-Type, Range");
   headers.set("Cache-Control", "public, max-age=86400");
+  headers.set("Accept-Ranges", driveRes.headers.get("Accept-Ranges") || "bytes");
+  for (const h of ["Content-Length", "Content-Range", "ETag", "Last-Modified"]) {
+    const v = driveRes.headers.get(h) || driveRes.headers.get(h.toLowerCase());
+    if (v) headers.set(h, v);
+  }
 
   // Force a consistent filename for downloads, unless this is being used as an inline preview.
   if (inline) {
@@ -78,7 +95,7 @@ export async function onRequest(context) {
     }
   }
 
-  return new Response(driveRes.body, { headers });
+  return new Response(driveRes.body, { status: driveRes.status || 200, headers });
 }
 
 function corsTextHeaders(status = 502) {
@@ -182,11 +199,12 @@ function extractDriveDownloadUrls(html, id) {
   return [...new Set(urls)];
 }
 
-async function fetchDriveUrl(url, cookie = "") {
+async function fetchDriveUrl(url, cookie = "", rangeHeader = "") {
   const headers = {
     "User-Agent": "sparkskye-pages-file-proxy",
   };
   if (cookie) headers.cookie = cookie;
+  if (rangeHeader) headers.Range = rangeHeader;
   return await fetch(url, { redirect: "follow", headers });
 }
 
@@ -194,7 +212,7 @@ function isHtmlResponse(res) {
   return (res.headers.get("Content-Type") || "").toLowerCase().includes("text/html");
 }
 
-async function fetchDriveFile(id) {
+async function fetchDriveFile(id, rangeHeader = "") {
   const base = `https://drive.google.com/uc?export=download&id=${encodeURIComponent(id)}`;
   const initialCandidates = [
     // This URL often skips Drive's large-file warning page entirely.
@@ -211,7 +229,7 @@ async function fetchDriveFile(id) {
     if (!url || seen.has(url)) return null;
     seen.add(url);
 
-    const res = await fetchDriveUrl(url, cookie);
+    const res = await fetchDriveUrl(url, cookie, rangeHeader);
     if (res.ok && !isHtmlResponse(res)) return res;
     if (!isHtmlResponse(res)) {
       lastErrorResponse = res;
