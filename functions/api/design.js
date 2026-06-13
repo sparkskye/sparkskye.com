@@ -3,8 +3,8 @@ const DESIGN_ROOT_FOLDER_ID = "1DUmxNnEdzNo55jmW32nxEQW4GtWFNyAk";
 const MANUAL_CATEGORIES = [
   {
     key: "thumbnail",
-    label: "THUMBNAILS",
-    name: "Thumbnails",
+    label: "THUMBNAIL",
+    name: "Thumbnail",
     folderId: "1BdY45PsEiH_Ok7LOoz4gA9dh8oMKQAAe",
     formats: {
       image: "11glK03RH_oCvtEPodbcYlG_Cj1wEIRTf",

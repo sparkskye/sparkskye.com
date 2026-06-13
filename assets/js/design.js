@@ -170,7 +170,7 @@ function renderGrid(items) {
     empty.className = q ? "empty-state empty-state--search" : "empty-state";
     empty.textContent = q
       ? "THERE ARE NO RESULTS FOR THAT SEARCH."
-      : "NO DESIGN FILES FOUND. MAKE SURE THE IMAGE FOLDER HAS PUBLIC IMAGE FILES, THEN REDEPLOY/REFRESH.";
+      : "NO DESIGN FILES FOUND.";
     els.grid.appendChild(empty);
     return;
   }
@@ -292,12 +292,7 @@ function showTimelapsePreview(it) {
   video.src = inlineFileUrl(file);
   video.title = `${it.name || "Design"} timelapse`;
 
-  const hint = document.createElement("div");
-  hint.className = "timelapse-preview__hint";
-  hint.textContent = "TIMELAPSE PREVIEW";
-
   wrap.appendChild(video);
-  wrap.appendChild(hint);
   els.modalViewer.appendChild(wrap);
 }
 
@@ -444,7 +439,7 @@ function stopLoading() {
 async function loadCategories() {
   const res = await fetchDesignCategories().catch(() => ({ categories: [] }));
   state.categories = Array.isArray(res?.categories) ? res.categories : [];
-  if (!state.categories.length) state.categories = [{ key: "thumbnail", label: "THUMBNAILS" }];
+  if (!state.categories.length) state.categories = [{ key: "thumbnail", label: "THUMBNAIL" }];
   renderCategoryChips();
 }
 

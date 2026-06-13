@@ -1116,3 +1116,9 @@ body.theme-art .hero__title{
 .design-page .card__path{
   text-transform: lowercase;
 }
+
+
+/* Public-testing cleanup: expanded previews close by backdrop/Escape, no floating X button. */
+.modal__close{
+  display: none !important;
+}

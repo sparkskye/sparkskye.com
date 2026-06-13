@@ -1600,3 +1600,14 @@ body.theme-art .topbar .topnav__dropitem.is-active,
     height: min(54vh, 520px);
   }
 }
+
+
+/* Public-testing cleanup: expanded previews close by backdrop/Escape, no floating X button. */
+.modal__close{
+  display: none !important;
+}
+
+/* Timelapse preview is cleaner without an extra label over the native video controls. */
+.timelapse-preview__hint{
+  display: none !important;
+}
