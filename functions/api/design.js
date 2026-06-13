@@ -180,6 +180,7 @@ async function buildCategory_(category, apiKey, debug) {
           baseName: rawBaseName,
           variantLabel: parsedName.variantLabel,
           variantKey: parsedName.variantKey,
+          variantOrder: parsedName.variantOrder,
         }),
       });
     }
@@ -245,9 +246,11 @@ async function buildCategory_(category, apiKey, debug) {
 
   const items = [...byBase.values()].map((item) => {
     item.variations = (item.variations || []).sort((a, b) => {
+      const ao = Number.isFinite(Number(a.variantOrder)) ? Number(a.variantOrder) : 9999;
+      const bo = Number.isFinite(Number(b.variantOrder)) ? Number(b.variantOrder) : 9999;
       const aDefault = a.variantKey === "default" ? -1 : 0;
       const bDefault = b.variantKey === "default" ? -1 : 0;
-      return aDefault - bDefault || String(a.label || "").localeCompare(String(b.label || "")) || String(a.name || "").localeCompare(String(b.name || ""));
+      return ao - bo || aDefault - bDefault || String(a.label || "").localeCompare(String(b.label || "")) || String(a.name || "").localeCompare(String(b.name || ""));
     });
     const firstImage = item.variations[0] || item.files.image;
     if (firstImage) {
@@ -282,7 +285,7 @@ async function buildCategory_(category, apiKey, debug) {
   return { items };
 }
 
-function buildFileInfo_({ file, fileId, label, canonicalKey, ext, baseName, variantLabel = "", variantKey = "default" }) {
+function buildFileInfo_({ file, fileId, label, canonicalKey, ext, baseName, variantLabel = "", variantKey = "default", variantOrder = 9999 }) {
   const width = numberOrNull_(file?.imageMediaMetadata?.width || file?.videoMediaMetadata?.width || file?.width);
   const height = numberOrNull_(file?.imageMediaMetadata?.height || file?.videoMediaMetadata?.height || file?.height);
   const safeExt = String(ext || canonicalKey || "file").replace(/^\./, "").toLowerCase();
@@ -297,6 +300,7 @@ function buildFileInfo_({ file, fileId, label, canonicalKey, ext, baseName, vari
     downloadName: baseName,
     variantLabel,
     variantKey,
+    variantOrder,
     size: numberOrNull_(file.size),
     modifiedTime: file.modifiedTime || "",
     createdTime: file.createdTime || "",
@@ -318,6 +322,7 @@ function attachImageVariant_(item, fileInfo) {
     key: "image",
     variantKey: key,
     label: fileInfo.variantLabel || "",
+    variantOrder: Number.isFinite(Number(fileInfo.variantOrder)) ? Number(fileInfo.variantOrder) : 9999,
   };
   const existingIdx = item.variations.findIndex((v) => (v.variantKey || "default") === key);
   if (existingIdx >= 0) item.variations[existingIdx] = variation;
@@ -489,14 +494,36 @@ function extFromMime_(mime) {
 }
 function parseDesignName_(s) {
   const raw = String(s || "").trim();
-  const match = raw.match(/^(.*?)\s*\[([^\]]+)\]\s*$/);
-  const baseName = (match ? match[1] : raw).trim() || raw;
-  const variantLabel = match ? String(match[2] || "").trim() : "";
+
+  // Preferred variation syntax:
+  //   design name[1]color
+  //   design name[2]black & white
+  // The number controls display order; the text after ] is what appears in the preview.
+  const ordered = raw.match(/^(.*?)\s*\[(\d+)\]\s*([^\[\]]+)\s*$/);
+  if (ordered) {
+    const baseName = String(ordered[1] || "").trim() || raw;
+    const variantOrder = Number(ordered[2]);
+    const variantLabel = String(ordered[3] || "").trim();
+    return {
+      baseName,
+      baseKey: slugify_(baseName),
+      variantLabel,
+      variantKey: variantLabel ? `${String(variantOrder).padStart(4, "0")}-${slugify_(variantLabel)}` : `order-${variantOrder}`,
+      variantOrder: Number.isFinite(variantOrder) ? variantOrder : 9999,
+    };
+  }
+
+  // Backward-compatible old syntax:
+  //   design name [color]
+  const old = raw.match(/^(.*?)\s*\[([^\]]+)\]\s*$/);
+  const baseName = (old ? old[1] : raw).trim() || raw;
+  const variantLabel = old ? String(old[2] || "").trim() : "";
   return {
     baseName,
     baseKey: slugify_(baseName),
     variantLabel,
     variantKey: variantLabel ? slugify_(variantLabel) : "default",
+    variantOrder: variantLabel ? 9999 : 0,
   };
 }
 function normalizeBase_(s) { return parseDesignName_(stripExtension_(s)).baseKey; }

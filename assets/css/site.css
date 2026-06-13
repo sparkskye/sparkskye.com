@@ -1634,8 +1634,9 @@ body.theme-art .topbar .topnav__dropitem.is-active,
   text-underline-offset: 4px;
 }
 .modal__variant{
-  margin-top: 4px;
-  min-height: 14px;
+  margin-top: 0;
+  margin-bottom: 4px;
+  min-height: 12px;
   color: var(--accent);
   font-family: MCFive, Minecraftia, sans-serif;
   font-size: 10px;
@@ -1649,35 +1650,34 @@ body.theme-art .topbar .topnav__dropitem.is-active,
   position:absolute;
   top:50%;
   z-index: 5;
-  width: 48px;
-  height: 72px;
+  width: 56px;
+  height: 96px;
   transform: translateY(-50%);
-  border-radius: 18px;
-  border: var(--ui-border);
-  background: rgba(20,20,20,.82);
-  color: var(--text);
+  border: 0;
+  background: transparent;
+  color: #fff;
   font-family: MCFive, Minecraftia, sans-serif;
-  font-size: 28px;
+  font-size: 34px;
   line-height: 1;
   cursor:pointer;
   display:flex;
   align-items:center;
   justify-content:center;
+  text-shadow: 0 3px 0 rgba(0,0,0,.55), 0 0 12px rgba(0,0,0,.85);
 }
 .design-variant-arrow:hover,
 .design-variant-arrow:focus-visible{
-  border-color: var(--accent);
+  color: var(--accent);
   outline: none;
 }
-.design-variant-arrow--prev{ left: 14px; }
-.design-variant-arrow--next{ right: 14px; }
+.design-variant-arrow--prev{ left: 8px; }
+.design-variant-arrow--next{ right: 8px; }
 @media (max-width: 720px){
   .design-variant-arrow{
-    width: 42px;
-    height: 58px;
-    font-size: 22px;
-    border-radius: 16px;
+    width: 46px;
+    height: 74px;
+    font-size: 26px;
   }
-  .design-variant-arrow--prev{ left: 10px; }
-  .design-variant-arrow--next{ right: 10px; }
+  .design-variant-arrow--prev{ left: 4px; }
+  .design-variant-arrow--next{ right: 4px; }
 }

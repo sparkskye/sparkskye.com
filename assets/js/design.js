@@ -292,10 +292,9 @@ function showImagePreview(it) {
 
 function updateVariantLabel(it) {
   if (!variantLabelEl) return;
-  const list = variationsFor(it);
   const variation = currentVariation(it);
   const label = variation?.label || variation?.variantLabel || "";
-  variantLabelEl.textContent = label ? `[${label}]` : "";
+  variantLabelEl.textContent = label || "";
   variantLabelEl.hidden = !label;
 }
 
