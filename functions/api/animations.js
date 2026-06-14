@@ -1,15 +1,17 @@
 const ANIMATION_ROOT_FOLDER_ID = "1dYQ5xLsWSdGxB63mbHS06u7ZlDMuJq3L";
 
-// Fallback so the first animation-video folder works even before Drive category
-// discovery succeeds. If a root folder named "blender animations" exists, the
-// API merge step combines this video folder with that category automatically.
+// Fallback so the first animation type works even before Drive category
+// discovery succeeds. The API also tries to resolve the parent folder of the
+// manual video folder, so matching sibling folders like blend/thumbnail can be
+// discovered automatically.
 const MANUAL_CATEGORIES = [
   {
-    key: "blender-animation",
-    label: "BLENDER ANIMATION",
-    name: "Blender Animation",
+    key: "blender",
+    label: "BLENDER",
+    name: "Blender",
     formats: {
       video: "1t2KxPLonWkLvdPehtr-RA63bvO_Ml1Ax",
+      thumbnail: "1hMfcWAjSPF6LA_5-DpzTvDhvOwZ7FmCh",
     },
   },
 ];
@@ -23,6 +25,9 @@ const FORMAT_LABELS = {
   mov: "VIDEO",
   webm: "VIDEO",
   m4v: "VIDEO",
+  thumbnail: "THUMBNAIL",
+  thumbnails: "THUMBNAIL",
+  preview: "THUMBNAIL",
   blend: "BLEND",
   blender: "BLEND",
   project: "PROJECT",
@@ -95,18 +100,44 @@ async function listCategories_(apiKey, debug) {
     });
   };
 
-  for (const c of MANUAL_CATEGORIES) add(c);
+  for (const c of MANUAL_CATEGORIES) {
+    add(c);
+
+    // If we only know the manual video/thumbnail folders, ask Drive for the
+    // parent type folder. That lets us discover sibling format folders such as
+    // blend without hard-coding every folder ID.
+    if (apiKey && !c.folderId && c.formats?.video) {
+      try {
+        const videoFolder = await getDriveFileMetadata_(c.formats.video, apiKey, debug, `manual-video-folder:${c.key}`);
+        const parentId = Array.isArray(videoFolder?.parents) ? videoFolder.parents[0] : "";
+        if (parentId) {
+          const parent = await getDriveFileMetadata_(parentId, apiKey, debug, `manual-parent-folder:${c.key}`);
+          add({
+            ...c,
+            // Keep the manual key stable, but use the real Drive folder name for
+            // the visible type chip. Example: folder "blender" -> BLENDER.
+            key: c.key,
+            name: parent?.name || c.name,
+            label: String(parent?.name || c.label || c.name || c.key).toUpperCase(),
+            folderId: parentId,
+          });
+        }
+      } catch (err) {
+        debug.push({ step: "manual-category-parent-error", category: c.key, message: String(err?.message || err) });
+      }
+    }
+  }
 
   try {
     const root = await listDriveFolderEntries_(ANIMATION_ROOT_FOLDER_ID, apiKey, debug, "animation-root");
     for (const folder of root.folders || []) {
       // If a format folder accidentally lives at root, attach it to the fallback
-      // Blender Animation category rather than creating a weird type chip.
+      // Blender category rather than creating a weird type chip.
       const fmt = canonicalFormatKey_(folder.name);
-      if (fmt === "video" || fmt === "blend") {
-        const existing = merged.get("blender-animation") || { key: "blender-animation", label: "BLENDER ANIMATION", name: "Blender Animation", formats: {} };
+      if (fmt === "video" || fmt === "blend" || fmt === "thumbnail") {
+        const existing = merged.get("blender") || { key: "blender", label: "BLENDER", name: "Blender", formats: {} };
         existing.formats = { ...(existing.formats || {}), [fmt]: folder.id };
-        merged.set("blender-animation", existing);
+        merged.set("blender", existing);
       } else {
         add({ name: folder.name, folderId: folder.id });
       }
@@ -139,6 +170,9 @@ async function buildCategory_(category, apiKey, debug) {
       // If the category folder itself contains videos, treat it like the video folder.
       if (!formatFolders.has("video") && (entries.files || []).some((f) => isVideoFile_(f.name) || String(f.mimeType || "").startsWith("video/"))) {
         formatFolders.set("video", { key: "video", label: "VIDEO", folderId: category.folderId, directFiles: entries.files });
+      }
+      if (!formatFolders.has("thumbnail") && (entries.files || []).some((f) => isImageFile_(f.name) || String(f.mimeType || "").startsWith("image/"))) {
+        formatFolders.set("thumbnail", { key: "thumbnail", label: "THUMBNAIL", folderId: category.folderId, directFiles: entries.files });
       }
     } catch (err) {
       debug.push({ step: "category-folder-list-error", category: category.key, message: String(err?.message || err) });
@@ -228,7 +262,10 @@ async function buildCategory_(category, apiKey, debug) {
 
   const items = [...byBase.values()].map((item) => {
     item.formats = (item.formats || []).sort((a, b) => formatOrder_(a.key) - formatOrder_(b.key) || String(a.label || a.key).localeCompare(String(b.label || b.key)));
-    item.thumbnailUrl = item.thumbnailUrl || item.files?.video?.thumbnailUrl || "/public/img/favicon.png";
+    const thumb = item.files?.thumbnail;
+    item.thumbnailUrl = thumb?.previewUrl || thumb?.thumbnailUrl || item.thumbnailUrl || item.files?.video?.thumbnailUrl || "/public/img/favicon.png";
+    item.thumbnailWidth = thumb?.width || item.thumbnailWidth || null;
+    item.thumbnailHeight = thumb?.height || item.thumbnailHeight || null;
     item.videoPreviewUrl = item.videoPreviewUrl || item.files?.video?.previewUrl || "";
     item.blendSize = item.blendSize ?? numberOrNull_(item.files?.blend?.size);
     return item;
@@ -272,6 +309,16 @@ function buildFileInfo_({ file, fileId, label, canonicalKey, ext, baseName }) {
 function attachFormat_(item, fileInfo) {
   if (!item.files) item.files = {};
   item.files[fileInfo.key] = fileInfo;
+
+  // Thumbnail files are used only for the prettier gallery/modal poster image.
+  // They should not show as downloadable formats.
+  if (fileInfo.key === "thumbnail") {
+    item.thumbnailUrl = fileInfo.previewUrl || fileInfo.thumbnailUrl || item.thumbnailUrl;
+    item.thumbnailWidth = fileInfo.width || item.thumbnailWidth || null;
+    item.thumbnailHeight = fileInfo.height || item.thumbnailHeight || null;
+    return;
+  }
+
   item.formats = item.formats || [];
   const idx = item.formats.findIndex((f) => f.key === fileInfo.key);
   const summary = { key: fileInfo.key, label: fileInfo.label, ext: fileInfo.ext, fileId: fileInfo.fileId, size: fileInfo.size, createdTime: fileInfo.createdTime, modifiedTime: fileInfo.modifiedTime };
@@ -291,6 +338,23 @@ async function listDriveFolderEntries_(folderId, apiKey, debug, label) {
     debug.push({ step: "drive-api-skipped", label, folderId, reason: "missing GOOGLE_API_KEY" });
   }
   return await scrapeDriveFolderEntries_(folderId, debug, label);
+}
+
+async function getDriveFileMetadata_(fileId, apiKey, debug, label) {
+  if (!fileId || !apiKey) return null;
+  const url = new URL(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`);
+  url.searchParams.set("fields", "id,name,mimeType,parents");
+  url.searchParams.set("supportsAllDrives", "true");
+  url.searchParams.set("key", apiKey);
+  const res = await fetch(url.toString(), { cf: { cacheTtl: 300, cacheEverything: true } });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    debug.push({ step: "drive-metadata-error", label, fileId, status: res.status, body: safeSnippet_(body) });
+    return null;
+  }
+  const json = await res.json();
+  debug.push({ step: "drive-metadata", label, fileId, name: json?.name || "", parentCount: Array.isArray(json?.parents) ? json.parents.length : 0 });
+  return json;
 }
 
 async function listDriveFolderWithApi_(folderId, apiKey, debug, label) {
@@ -408,18 +472,20 @@ function inlineFileUrl_(fileId, name = "", ext = "") {
 function canonicalCategoryKey_(s) {
   const key = slugify_(s);
   if (!key) return "";
-  if (key === "blender-animations") return "blender-animation";
+  if (key === "blender-animations" || key === "blender-animation") return "blender";
   return key.replace(/s$/, "");
 }
 function canonicalFormatKey_(s) {
   const key = slugify_(s);
   if (!key) return "";
   if (key.includes("video") || key === "mp4" || key === "mov" || key === "webm" || key === "m4v" || key === "animation") return "video";
+  if (key.includes("thumb") || key === "preview" || key === "poster") return "thumbnail";
   if (key === "blender" || key === "blend") return "blend";
   return key;
 }
 function looksLikeFile_(name) { return /\.[a-z0-9]{2,8}$/i.test(String(name || "")); }
 function isVideoFile_(name) { return /\.(mp4|mov|webm|m4v)$/i.test(String(name || "")); }
+function isImageFile_(name) { return /\.(png|jpe?g|webp|gif|avif)$/i.test(String(name || "")); }
 function stripExtension_(name) { return String(name || "").replace(/\.[a-z0-9]{2,8}$/i, ""); }
 function getExtension_(name) { const m = String(name || "").match(/\.([a-z0-9]{2,8})$/i); return m ? m[1].toLowerCase() : ""; }
 function extFromMime_(mime) {
@@ -427,6 +493,9 @@ function extFromMime_(mime) {
   if (m === "video/mp4") return "mp4";
   if (m === "video/quicktime") return "mov";
   if (m === "video/webm") return "webm";
+  if (m === "image/jpeg") return "jpg";
+  if (m === "image/png") return "png";
+  if (m === "image/webp") return "webp";
   if (m === "application/octet-stream") return "blend";
   return "";
 }

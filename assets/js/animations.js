@@ -70,18 +70,18 @@ function formatList(it) {
   const files = it.files || {};
   return preferred
     .filter((key) => files[key])
-    .concat((it.formats || []).map((f) => f.key).filter((key) => key && !preferred.includes(key)))
+    .concat((it.formats || []).map((f) => f.key).filter((key) => key && ![...preferred, "thumbnail"].includes(key)))
     .filter((key, idx, arr) => arr.indexOf(key) === idx)
     .map((key) => String(key).toLowerCase())
     .join(", ");
 }
 function thumbRatio(it) {
-  const w = Number(it.videoWidth || it.files?.video?.width || 0);
-  const h = Number(it.videoHeight || it.files?.video?.height || 0);
+  const w = Number(it.thumbnailWidth || it.files?.thumbnail?.width || it.videoWidth || it.files?.video?.width || 0);
+  const h = Number(it.thumbnailHeight || it.files?.thumbnail?.height || it.videoHeight || it.files?.video?.height || 0);
   return w > 0 && h > 0 ? `${w} / ${h}` : "16 / 9";
 }
 function thumbnailUrl(it) {
-  return it.thumbnailUrl || it.files?.video?.thumbnailUrl || "/public/img/favicon.png";
+  return it.files?.thumbnail?.previewUrl || it.files?.thumbnail?.thumbnailUrl || it.thumbnailUrl || it.files?.video?.thumbnailUrl || "/public/img/favicon.png";
 }
 
 function makeChip({ label, active, onClick }) {
@@ -384,7 +384,7 @@ function stopLoading() {
 async function loadCategories() {
   const res = await fetchAnimationCategories().catch(() => ({ categories: [] }));
   state.categories = Array.isArray(res?.categories) ? res.categories : [];
-  if (!state.categories.length) state.categories = [{ key: "blender-animation", label: "BLENDER ANIMATION" }];
+  if (!state.categories.length) state.categories = [{ key: "blender", label: "BLENDER" }];
   renderCategoryChips();
 }
 async function loadDataAndRender() {
