@@ -34,6 +34,14 @@ const FORMAT_LABELS = {
   source: "SOURCE",
 };
 
+function isRootFormatFolderName_(name) {
+  const key = slugify_(name);
+  // At the animation root, folders like "blender" are type/category folders,
+  // not format folders. Only exact format-folder names should be hijacked
+  // into the fallback category here.
+  return ["video", "videos", "thumbnail", "thumbnails", "thumb", "preview", "blend", "blends"].includes(key);
+}
+
 export async function onRequest(context) {
   const requestUrl = new URL(context.request.url);
   const apiKey = context.env?.GOOGLE_API_KEY || context.env?.DRIVE_API_KEY || "";
@@ -133,7 +141,7 @@ async function listCategories_(apiKey, debug) {
     for (const folder of root.folders || []) {
       // If a format folder accidentally lives at root, attach it to the fallback
       // Blender category rather than creating a weird type chip.
-      const fmt = canonicalFormatKey_(folder.name);
+      const fmt = isRootFormatFolderName_(folder.name) ? canonicalFormatKey_(folder.name) : "";
       if (fmt === "video" || fmt === "blend" || fmt === "thumbnail") {
         const existing = merged.get("blender") || { key: "blender", label: "BLENDER", name: "Blender", formats: {} };
         existing.formats = { ...(existing.formats || {}), [fmt]: folder.id };
@@ -598,7 +606,7 @@ function canonicalFormatKey_(s) {
   if (!key) return "";
   if (key.includes("video") || key === "mp4" || key === "mov" || key === "webm" || key === "m4v" || key === "animation") return "video";
   if (key.includes("thumb") || key === "preview" || key === "poster") return "thumbnail";
-  if (key === "blender" || key === "blend") return "blend";
+  if (key === "blend" || key === "blends") return "blend";
   return key;
 }
 function looksLikeFile_(name) { return /\.[a-z0-9]{2,8}$/i.test(String(name || "")); }
