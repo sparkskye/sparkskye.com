@@ -215,7 +215,8 @@ async function buildCategory_(category, apiKey, debug) {
 
   const byBase = new Map();
 
-  // Only files from video folders create animation cards.
+  // Only files from video folders create animation cards. Other folders attach
+  // to those cards as alternate downloadable formats.
   for (const entry of collected.filter((x) => x.formatKey === "video")) {
     if (!byBase.has(entry.baseKey)) {
       byBase.set(entry.baseKey, {
@@ -225,6 +226,7 @@ async function buildCategory_(category, apiKey, debug) {
         categoryLabel: category.label,
         files: {},
         formats: [],
+        matchAliases: buildMatchAliases_(entry.baseName, entry.baseKey),
         videoId: entry.file.fileId,
         videoPreviewUrl: entry.file.previewUrl,
         thumbnailUrl: entry.file.thumbnailUrl || driveThumbnailUrl_(entry.file.fileId, 1600),
@@ -241,22 +243,32 @@ async function buildCategory_(category, apiKey, debug) {
   }
 
   const unmatchedFormats = [];
+  const fuzzyMatches = [];
   for (const entry of collected.filter((x) => x.formatKey !== "video")) {
-    const item = byBase.get(entry.baseKey) || findLooseItemMatch_(byBase, entry.baseKey);
+    const match = byBase.get(entry.baseKey)
+      ? { item: byBase.get(entry.baseKey), score: 1, reason: "exact" }
+      : findLooseItemMatch_(byBase, entry.baseKey, entry.baseName);
+    const item = match?.item || null;
     if (!item) {
       unmatchedFormats.push(entry);
       continue;
     }
     attachFormat_(item, entry.file);
     if (entry.formatKey === "blend") item.blendSize = numberOrNull_(entry.file.size);
+    if (match?.reason && match.reason !== "exact") {
+      fuzzyMatches.push({ format: entry.formatKey, file: entry.file.name, attachedTo: item.name, score: match.score, reason: match.reason });
+    }
   }
 
+  // If there is only one animation card in a type, attach any remaining formats
+  // to it. This is handy while a new gallery has just one test asset.
   if (byBase.size === 1 && unmatchedFormats.length) {
     const onlyItem = [...byBase.values()][0];
-    for (const entry of unmatchedFormats) {
+    for (const entry of unmatchedFormats.splice(0)) {
       if (onlyItem.files?.[entry.formatKey]) continue;
       attachFormat_(onlyItem, entry.file);
       if (entry.formatKey === "blend") onlyItem.blendSize = numberOrNull_(entry.file.size);
+      fuzzyMatches.push({ format: entry.formatKey, file: entry.file.name, attachedTo: onlyItem.name, score: 0.5, reason: "single-item-fallback" });
     }
   }
 
@@ -275,8 +287,12 @@ async function buildCategory_(category, apiKey, debug) {
     step: "animation-category-built",
     category: category.key,
     formatFolders: [...formatFolders.values()].map((f) => ({ key: f.key, folderId: f.folderId })),
+    collectedCount: collected.length,
+    collectedSamples: collected.slice(0, 12).map((e) => ({ format: e.formatKey, baseKey: e.baseKey, name: e.file?.name })),
+    fuzzyMatches,
+    unmatchedFormats: unmatchedFormats.slice(0, 12).map((e) => ({ format: e.formatKey, baseKey: e.baseKey, name: e.file?.name })),
     itemCount: items.length,
-    sampleItems: items.slice(0, 5).map((i) => ({ name: i.name, formats: (i.formats || []).map((f) => f.key) })),
+    sampleItems: items.slice(0, 5).map((i) => ({ name: i.name, formats: (i.formats || []).map((f) => f.key), files: Object.keys(i.files || {}) })),
   });
 
   return { items };
@@ -451,15 +467,67 @@ async function scrapeDriveFolderEntries_(folderId, debug, label) {
   return out;
 }
 
-function findLooseItemMatch_(byBase, baseKey) {
+function findLooseItemMatch_(byBase, baseKey, baseName = "") {
   if (!baseKey || !byBase?.size) return null;
-  if (byBase.has(baseKey)) return byBase.get(baseKey);
-  const compact = String(baseKey).replace(/-(animation|video|render|final|source|file)$/i, "");
+  if (byBase.has(baseKey)) return { item: byBase.get(baseKey), score: 1, reason: "exact" };
+
+  const candidates = buildMatchAliases_(baseName, baseKey);
+  let best = null;
+
   for (const [key, item] of byBase.entries()) {
-    const itemCompact = String(key).replace(/-(animation|video|render|final|source|file)$/i, "");
-    if (compact && itemCompact && (compact === itemCompact || compact.includes(itemCompact) || itemCompact.includes(compact))) return item;
+    const itemAliases = Array.isArray(item.matchAliases) && item.matchAliases.length
+      ? item.matchAliases
+      : buildMatchAliases_(item.name, key);
+
+    for (const a of candidates) {
+      for (const b of itemAliases) {
+        if (!a || !b) continue;
+        if (a === b) {
+          const exactish = { item, score: 1, reason: "alias" };
+          return exactish;
+        }
+        if (a.length >= 8 && b.length >= 8 && (a.includes(b) || b.includes(a))) {
+          const score = Math.min(a.length, b.length) / Math.max(a.length, b.length);
+          if (!best || score > best.score) best = { item, score, reason: "contains" };
+        }
+      }
+    }
+
+    const score = tokenSimilarity_(candidates.join(" "), itemAliases.join(" "));
+    if (!best || score > best.score) best = { item, score, reason: "token-similarity" };
   }
-  return null;
+
+  return best && best.score >= 0.58 ? best : null;
+}
+
+function buildMatchAliases_(baseName = "", baseKey = "") {
+  const values = [baseName, baseKey, stripExtension_(baseName), stripFormatTail_(baseName), stripFormatTail_(baseKey)];
+  const out = new Set();
+  for (const value of values) {
+    const normalized = normalizeBase_(value);
+    if (!normalized) continue;
+    out.add(normalized);
+    out.add(stripFormatTail_(normalized));
+    out.add(normalized.replace(/-/g, ""));
+  }
+  return [...out].filter(Boolean);
+}
+
+function stripFormatTail_(s) {
+  return String(s || "")
+    .replace(/\s*\[[^\]]+\]\s*$/g, "")
+    .replace(/[\s_-]+(?:animation|animated|video|render|final|source|file|blend|blender|project|thumbnail|thumb|preview)$/i, "")
+    .trim();
+}
+
+function tokenSimilarity_(a, b) {
+  const stop = new Set(["animation", "animated", "video", "render", "final", "source", "file", "blend", "blender", "project", "thumbnail", "thumb", "preview", "mp4", "mov", "webm"]);
+  const ta = new Set(String(a || "").split(/[^a-z0-9]+/i).filter((x) => x && !stop.has(x)));
+  const tb = new Set(String(b || "").split(/[^a-z0-9]+/i).filter((x) => x && !stop.has(x)));
+  if (!ta.size || !tb.size) return 0;
+  let hit = 0;
+  for (const t of ta) if (tb.has(t)) hit += 1;
+  return hit / Math.max(ta.size, tb.size);
 }
 function inlineFileUrl_(fileId, name = "", ext = "") {
   const params = new URLSearchParams();
