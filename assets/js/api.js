@@ -115,3 +115,17 @@ export async function fetchDesignItems(category = "all") {
   if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
   return await res.json();
 }
+
+export async function fetchAnimationCategories() {
+  const url = siteApiUrl(`/api/animations?list=1`);
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+  return await res.json();
+}
+
+export async function fetchAnimationItems(category = "all") {
+  const url = siteApiUrl(`/api/animations${category && category !== "all" ? `?category=${encodeURIComponent(category)}` : ""}`);
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+  return await res.json();
+}

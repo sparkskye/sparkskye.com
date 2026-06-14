@@ -1681,3 +1681,73 @@ body.theme-art .topbar .topnav__dropitem.is-active,
   .design-variant-arrow--prev{ left: 4px; }
   .design-variant-arrow--next{ right: 4px; }
 }
+
+/* Animation gallery */
+.animation-page .card--animation{
+  min-height: 0;
+}
+.animation-page .card--animation .card__viewer{
+  padding: 12px;
+  background: rgba(0,0,0,.10);
+}
+.animation-page .card--animation .card__viewer img{
+  border-radius: 14px;
+  overflow: hidden;
+  background: #101010;
+  object-fit: cover;
+}
+.animation-page .card--animation .card__meta{
+  padding: 10px 12px 12px;
+  gap: 6px;
+}
+.animation-page .card--animation .card__name{
+  font-size: 13px;
+  line-height: 1.15;
+}
+.animation-page .card--animation .card__path{
+  font-size: 10px;
+  line-height: 1.35;
+}
+.animation-preview{
+  background:#050505;
+}
+.animation-preview__video{
+  object-fit: contain;
+}
+
+/* Top nav keeps per-button colors, even on themed section pages. */
+body.theme-animation .topnav__btn:hover,
+body.theme-animations .topnav__btn:hover,
+body.theme-editing .topnav__btn:hover,
+body.theme-design .topnav__btn:hover,
+body.theme-art .topnav__btn:hover,
+body.theme-animation .topnav__btn.is-active,
+body.theme-animations .topnav__btn.is-active,
+body.theme-editing .topnav__btn.is-active,
+body.theme-design .topnav__btn.is-active,
+body.theme-art .topnav__btn.is-active,
+body.theme-animation .topnav__dropitem:hover,
+body.theme-animations .topnav__dropitem:hover,
+body.theme-editing .topnav__dropitem:hover,
+body.theme-design .topnav__dropitem:hover,
+body.theme-art .topnav__dropitem:hover,
+body.theme-animation .topnav__dropitem.is-active,
+body.theme-animations .topnav__dropitem.is-active,
+body.theme-editing .topnav__dropitem.is-active,
+body.theme-design .topnav__dropitem.is-active,
+body.theme-art .topnav__dropitem.is-active{
+  border-color: var(--item-color, var(--accent)) !important;
+}
+body.theme-animation .topnav__btn.is-active,
+body.theme-animations .topnav__btn.is-active,
+body.theme-editing .topnav__btn.is-active,
+body.theme-design .topnav__btn.is-active,
+body.theme-art .topnav__btn.is-active,
+body.theme-animation .topnav__dropitem.is-active,
+body.theme-animations .topnav__dropitem.is-active,
+body.theme-editing .topnav__dropitem.is-active,
+body.theme-design .topnav__dropitem.is-active,
+body.theme-art .topnav__dropitem.is-active{
+  background: var(--item-color, var(--accent)) !important;
+  color: #041018 !important;
+}
