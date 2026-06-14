@@ -272,6 +272,47 @@ async function buildCategory_(category, apiKey, debug) {
     }
   }
 
+  // Last-resort but very useful for Drive galleries: if matching by filename
+  // failed, and a format folder has the same number of files as the video
+  // folder, attach them by sorted order. This mirrors how people usually keep
+  // parallel Drive folders organized and fixes cases where Drive/API filename
+  // metadata is slightly different from what the browser UI displays.
+  if (byBase.size > 1 && unmatchedFormats.length) {
+    const itemsByName = [...byBase.values()].sort(compareAnimationItemsForFallback_);
+    const remaining = [];
+    const byFormat = new Map();
+    for (const entry of unmatchedFormats) {
+      if (!byFormat.has(entry.formatKey)) byFormat.set(entry.formatKey, []);
+      byFormat.get(entry.formatKey).push(entry);
+    }
+
+    for (const [formatKey, entries] of byFormat.entries()) {
+      const openItems = itemsByName.filter((item) => !item.files?.[formatKey]);
+      const sortedEntries = [...entries].sort(compareCollectedEntriesForFallback_);
+      if (sortedEntries.length && sortedEntries.length <= openItems.length) {
+        sortedEntries.forEach((entry, index) => {
+          const item = openItems[index];
+          if (!item || item.files?.[entry.formatKey]) {
+            remaining.push(entry);
+            return;
+          }
+          attachFormat_(item, entry.file);
+          if (entry.formatKey === "blend") item.blendSize = numberOrNull_(entry.file.size);
+          fuzzyMatches.push({
+            format: entry.formatKey,
+            file: entry.file.name,
+            attachedTo: item.name,
+            score: 0.25,
+            reason: "parallel-folder-order-fallback",
+          });
+        });
+      } else {
+        remaining.push(...entries);
+      }
+    }
+    unmatchedFormats.splice(0, unmatchedFormats.length, ...remaining);
+  }
+
   const items = [...byBase.values()].map((item) => {
     item.formats = (item.formats || []).sort((a, b) => formatOrder_(a.key) - formatOrder_(b.key) || String(a.label || a.key).localeCompare(String(b.label || b.key)));
     const thumb = item.files?.thumbnail;
@@ -296,6 +337,15 @@ async function buildCategory_(category, apiKey, debug) {
   });
 
   return { items };
+}
+
+
+function compareAnimationItemsForFallback_(a, b) {
+  return String(a?.name || "").localeCompare(String(b?.name || ""), undefined, { numeric: true, sensitivity: "base" });
+}
+
+function compareCollectedEntriesForFallback_(a, b) {
+  return String(a?.baseName || a?.file?.name || "").localeCompare(String(b?.baseName || b?.file?.name || ""), undefined, { numeric: true, sensitivity: "base" });
 }
 
 function buildFileInfo_({ file, fileId, label, canonicalKey, ext, baseName }) {
