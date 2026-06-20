@@ -336,7 +336,16 @@ async function buildTexturePackCategory_(category, apiKey, debug) {
 
   // Also pick up format subfolders if texture packs later becomes structured.
   const formatFolders = collectManualAndChildFormatFolders_(category, entries, debug);
-  const textureDescriptions = await collectTextureDescriptions_(formatFolders.get("description"), apiKey, debug);
+  let textureDescriptions = await collectTextureDescriptions_(formatFolders.get("description"), apiKey, debug);
+  // Also support description .txt/.json files placed directly inside the texture packs folder.
+  const directDescriptionFiles = (entries.files || []).filter((f) => {
+    const ext = getExtension_(f.name).toLowerCase();
+    return /[jt]sx?on|txt|md|markdown/.test(ext || "txt");
+  });
+  if (directDescriptionFiles.length) {
+    const direct = await collectTextureDescriptions_({ folderId: category.folderId, rootFiles: directDescriptionFiles }, apiKey, debug);
+    textureDescriptions = [...textureDescriptions, ...direct];
+  }
   for (const format of formatFolders.values()) {
     if (format.key === "description") continue;
     if (!format.folderId) continue;
@@ -585,10 +594,12 @@ function attachFormat_(item, fileInfo) {
 
 async function collectTextureDescriptions_(descriptionFolder, apiKey, debug) {
   if (!descriptionFolder?.folderId) return [];
-  const entries = await listDriveFolderEntries_(descriptionFolder.folderId, apiKey, debug, "format:texture-packs/description").catch((err) => {
-    debug.push({ step: "texture-description-list-error", folderId: descriptionFolder.folderId, message: String(err?.message || err) });
-    return { files: [], folders: [] };
-  });
+  const entries = descriptionFolder.rootFiles
+    ? { files: descriptionFolder.rootFiles, folders: [] }
+    : await listDriveFolderEntries_(descriptionFolder.folderId, apiKey, debug, "format:texture-packs/description").catch((err) => {
+        debug.push({ step: "texture-description-list-error", folderId: descriptionFolder.folderId, message: String(err?.message || err) });
+        return { files: [], folders: [] };
+      });
   const out = [];
   for (const file of entries.files || []) {
     const ext = getExtension_(file.name).toLowerCase();

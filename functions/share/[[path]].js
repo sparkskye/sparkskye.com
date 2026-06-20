@@ -112,7 +112,7 @@ async function getArtMeta_(requestUrl, id) {
   return {
     title: item.name || "sparkskye art",
     description: formatArtList_(item) || "art file",
-    image: isModel ? "/public/img/favicon.png" : (isTexture ? (item.thumbnailUrl || item.trailer?.thumbnail || "/public/img/favicon.png") : (item.imagePreviewUrl || item.files?.image?.previewUrl || item.thumbnailUrl || "/public/img/favicon.png")),
+    image: isModel ? null : (isTexture ? (item.thumbnailUrl || item.trailer?.thumbnail || "/public/img/favicon.png") : (item.imagePreviewUrl || item.files?.image?.previewUrl || item.thumbnailUrl || "/public/img/favicon.png")),
   };
 }
 
@@ -149,7 +149,7 @@ async function getModelMeta_(requestUrl, id) {
   return {
     title: item.name || "hive model",
     description: buildPathText_(game, item.relPath || item.folderLabel || ""),
-    image: "/public/img/favicon.png",
+    image: null,
   };
 }
 
