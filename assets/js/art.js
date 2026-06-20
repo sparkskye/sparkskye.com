@@ -10,7 +10,6 @@ import {
   unlockBodyScroll,
 } from "./ui.js";
 import { createPanZoomImageViewer } from "./pan-zoom-viewer.js";
-import { CardPreview, ModalPreview } from "/hive-resources/js/preview3d.js";
 
 const els = {
   categoryChips: qs("#categoryChips"),
@@ -54,6 +53,17 @@ let variantLabelEl = null;
 
 const cardPreviews = new Map();
 let io = null;
+let preview3DPromise = null;
+
+function loadPreview3D() {
+  if (!preview3DPromise) {
+    preview3DPromise = import("/hive-resources/js/preview3d.js").catch((err) => {
+      console.warn("3D preview module failed to load", err);
+      return null;
+    });
+  }
+  return preview3DPromise;
+}
 
 function clearNode(node) { while (node?.firstChild) node.removeChild(node.firstChild); }
 function slugify(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""); }
@@ -215,7 +225,12 @@ function scheduleModelCardPreview(card, it) {
   const url = inlineFileUrl(file);
   const start = async () => {
     if (cardPreviews.has(card)) return;
-    const preview = new CardPreview(viewer);
+    const mod = await loadPreview3D();
+    if (!mod?.CardPreview) {
+      viewer.innerHTML = '<div class="card__placeholder">NO MODEL PREVIEW</div>';
+      return;
+    }
+    const preview = new mod.CardPreview(viewer);
     cardPreviews.set(card, preview);
     try { await preview.init(url); }
     catch { viewer.innerHTML = '<div class="card__placeholder">NO MODEL PREVIEW</div>'; }
@@ -327,13 +342,18 @@ function showVideoFilePreview(it, file) {
   els.modalViewer.appendChild(wrap);
 }
 
-function showModelPreview(it) {
+async function showModelPreview(it) {
   panZoomViewer?.destroy?.();
   panZoomViewer = null;
   els.modalViewer.innerHTML = '<div class="viewer__loading">LOADING...</div>';
   const file = modelFile(it);
   if (!file) { els.modalViewer.innerHTML = '<div class="viewer__loading">NO MODEL PREVIEW</div>'; return; }
-  modelPreview = new ModalPreview(els.modalViewer);
+  const mod = await loadPreview3D();
+  if (!mod?.ModalPreview) {
+    els.modalViewer.innerHTML = '<div class="viewer__loading">NO MODEL PREVIEW</div>';
+    return;
+  }
+  modelPreview = new mod.ModalPreview(els.modalViewer);
   modelPreview.open(inlineFileUrl(file)).catch(() => {
     els.modalViewer.innerHTML = '<div class="viewer__loading">NO MODEL PREVIEW</div>';
   });
@@ -548,12 +568,30 @@ async function loadDataAndRender() {
   renderSortChips();
   const res = await fetchArtItems(state.category).catch(() => ({ items: [], groups: [] }));
   const direct = Array.isArray(res?.items) ? res.items : [];
-  const fromGroups = [];
-  for (const g of res?.groups || []) {
-    if ((g.key || "").toLowerCase() === "all") continue;
-    for (const it of g.items || []) fromGroups.push(it);
+  const groups = Array.isArray(res?.groups) ? res.groups : [];
+  const activeCategory = String(state.category || "all").toLowerCase();
+
+  let fromGroups = [];
+  if (activeCategory === "all") {
+    const allGroup = groups.find((g) => String(g?.key || "").toLowerCase() === "all");
+    fromGroups = Array.isArray(allGroup?.items) && allGroup.items.length
+      ? allGroup.items
+      : groups.flatMap((g) => Array.isArray(g?.items) ? g.items : []);
+  } else {
+    const activeGroup = groups.find((g) => String(g?.key || "").toLowerCase() === activeCategory);
+    fromGroups = Array.isArray(activeGroup?.items) && activeGroup.items.length
+      ? activeGroup.items
+      : groups.flatMap((g) => Array.isArray(g?.items) ? g.items : [])
+          .filter((it) => String(it?.categoryKey || "").toLowerCase() === activeCategory);
   }
-  state.items = direct.length ? direct : fromGroups;
+
+  const seen = new Set();
+  state.items = (direct.length ? direct : fromGroups).filter((it) => {
+    const key = String(it?.id || it?.name || Math.random());
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
   stopLoading();
   applyFiltersAndRenderGrid();
   maybeOpenPreviewFromUrl();
@@ -604,4 +642,10 @@ window.addEventListener("popstate", async () => {
 });
 
 initMobileNav();
-loadCategories().then(loadDataAndRender);
+loadCategories()
+  .then(loadDataAndRender)
+  .catch((err) => {
+    console.error("Art gallery failed to initialize", err);
+    els.count.textContent = "0 shown";
+    els.grid.innerHTML = '<div class="empty-state">NO ART FILES FOUND.</div>';
+  });
