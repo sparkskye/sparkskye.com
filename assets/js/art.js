@@ -69,8 +69,15 @@ async function getPreview3dModule() {
 
 function modelPreviewUrl(file) {
   if (!file) return "";
+  if (file.previewUrl) return file.previewUrl;
   const id = file.fileId || file.id || "";
-  return id ? `/api/file?id=${encodeURIComponent(id)}&inline=1` : "";
+  if (!id) return "";
+  const params = new URLSearchParams();
+  params.set("id", id);
+  params.set("inline", "1");
+  if (file.name) params.set("name", file.name);
+  if (file.ext) params.set("ext", extFor(file));
+  return `/api/file?${params.toString()}`;
 }
 
 function clearNode(node) { while (node?.firstChild) node.removeChild(node.firstChild); }
@@ -220,65 +227,140 @@ function applyFiltersAndRenderGrid() {
   renderGrid(items);
 }
 
+const MAX_MODEL_CARD_LOAD_CONCURRENCY = 4;
+const queuedModelCards = new Set();
+const loadingModelCards = new Set();
+const modelPreviewQueue = [];
+
 function disposeCardPreviews() {
   for (const preview of cardPreviews.values()) {
     try { preview.destroy?.(true); } catch {}
     try { preview.dispose?.(); } catch {}
+    try { preview.close?.(); } catch {}
   }
   cardPreviews.clear();
+  queuedModelCards.clear();
+  loadingModelCards.clear();
+  modelPreviewQueue.length = 0;
   io?.disconnect?.();
   io = null;
 }
 
+function enqueueModelCardPreview(card, opts = {}) {
+  if (!card) return;
+  if (!opts.force && card.dataset.previewLoaded === "1") return;
+  if (loadingModelCards.has(card) || queuedModelCards.has(card)) return;
+
+  queuedModelCards.add(card);
+  if (opts.priority) modelPreviewQueue.unshift(card);
+  else modelPreviewQueue.push(card);
+
+  pumpModelPreviewQueue();
+}
+
+function pumpModelPreviewQueue() {
+  while (loadingModelCards.size < MAX_MODEL_CARD_LOAD_CONCURRENCY && modelPreviewQueue.length) {
+    const card = modelPreviewQueue.shift();
+    queuedModelCards.delete(card);
+    if (!card || card.dataset.previewLoaded === "1" || loadingModelCards.has(card)) continue;
+    loadModelCardPreview(card);
+  }
+}
+
+async function loadModelCardPreview(card) {
+  const viewer = card.querySelector(".card__viewer");
+  const ph = viewer?.querySelector(".card__placeholder");
+  const reload = viewer?.querySelector(".card__reload");
+  const modelUrl = viewer?.dataset.modelUrl;
+  if (!viewer || !modelUrl) return;
+
+  loadingModelCards.add(card);
+
+  const oldImg = viewer.querySelector("img.card__thumb--rendered");
+  if (oldImg) oldImg.remove();
+
+  if (reload) reload.style.display = "none";
+  if (ph) {
+    ph.style.display = "flex";
+    if (card._phStop) card._phStop();
+    card._phStop = startDotLoader(ph, "LOADING");
+  }
+
+  let preview = null;
+  try {
+    const { CardPreview } = await getPreview3dModule();
+    preview = new CardPreview(viewer);
+    cardPreviews.set(card, preview);
+
+    await preview.init(modelUrl);
+    const frozen = preview.freezeToImage();
+    cardPreviews.delete(card);
+    if (!frozen) throw new Error("Failed to freeze model preview");
+
+    card.dataset.failed = "";
+    card.dataset.previewLoaded = "1";
+    if (card._phStop) card._phStop();
+    card._phStop = null;
+    if (ph) {
+      ph.style.display = "none";
+      ph.textContent = "";
+    }
+    if (reload) reload.style.display = "none";
+    try { io?.unobserve(card); } catch {}
+  } catch (err) {
+    console.warn("Art model card preview failed", card?.dataset?.modelName || modelUrl, err);
+    const live = cardPreviews.get(card) || preview;
+    try { live?.destroy?.(true); } catch {}
+    try { live?.dispose?.(); } catch {}
+    cardPreviews.delete(card);
+    card.dataset.failed = "1";
+    card.dataset.previewLoaded = "";
+    if (card._phStop) card._phStop();
+    card._phStop = null;
+    if (ph) {
+      ph.style.display = "flex";
+      ph.textContent = "PREVIEW FAILED";
+    }
+    if (reload) reload.style.display = "inline-flex";
+  } finally {
+    loadingModelCards.delete(card);
+    pumpModelPreviewQueue();
+  }
+}
+
 function scheduleModelCardPreview(card, it) {
   const viewer = card.querySelector(".card__viewer");
-  const ph = viewer?.querySelector(".viewer__loading, .card__placeholder");
   const file = modelFile(it);
   const url = modelPreviewUrl(file);
   if (!viewer || !file || !url) return;
 
-  const start = async () => {
-    if (cardPreviews.has(card)) return;
-    if (ph) {
-      ph.style.display = "flex";
-      ph.textContent = "LOADING...";
-    }
+  viewer.dataset.modelUrl = url;
+  viewer.dataset.filename = filenameFor(it, file);
+  card.dataset.modelName = it?.name || file?.name || "model";
 
-    let preview = null;
-    try {
-      const { CardPreview } = await getPreview3dModule();
-      preview = new CardPreview(viewer);
-      cardPreviews.set(card, preview);
-      await preview.init(url);
-      const frozen = preview.freezeToImage();
-      cardPreviews.delete(card);
-      if (!frozen) throw new Error("Failed to freeze preview");
-      if (ph) {
-        ph.style.display = "none";
-        ph.textContent = "";
-      }
-      card.dataset.previewLoaded = "1";
-    } catch (err) {
-      console.warn("Art model card preview failed", it?.name || file?.name || file?.fileId, err);
-      try { preview.destroy?.(true); } catch {}
-      cardPreviews.delete(card);
-      viewer.innerHTML = '<div class="card__placeholder">NO MODEL PREVIEW</div>';
-    }
-  };
+  const reload = viewer.querySelector(".card__reload");
+  if (reload) {
+    reload.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      card.dataset.failed = "";
+      card.dataset.previewLoaded = "";
+      enqueueModelCardPreview(card, { priority: true, force: true });
+    });
+  }
 
   if ("IntersectionObserver" in window) {
-    if (!io) io = new IntersectionObserver((entries) => {
-      for (const entry of entries) {
-        if (!entry.isIntersecting) continue;
-        const target = entry.target;
-        try { io.unobserve(target); } catch {}
-        target.__loadPreview?.();
-      }
-    }, { root: null, threshold: 0.01, rootMargin: "480px 0px 480px 0px" });
-    card.__loadPreview = start;
+    if (!io) {
+      io = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          enqueueModelCardPreview(entry.target);
+        }
+      }, { root: null, threshold: 0.01, rootMargin: "480px 0px 480px 0px" });
+    }
     io.observe(card);
   } else {
-    start();
+    enqueueModelCardPreview(card);
   }
 }
 
@@ -304,7 +386,18 @@ function renderGrid(items) {
     viewer.className = "card__viewer";
 
     if (isModelItem(it)) {
-      viewer.innerHTML = '<div class="viewer__loading">LOADING...</div>';
+      const ph = document.createElement("div");
+      ph.className = "card__placeholder";
+      ph.textContent = "";
+
+      const reload = document.createElement("button");
+      reload.className = "card__reload";
+      reload.type = "button";
+      reload.textContent = "RELOAD";
+      reload.style.display = "none";
+
+      viewer.appendChild(ph);
+      viewer.appendChild(reload);
     } else {
       const img = document.createElement("img");
       img.className = "card__thumb";
