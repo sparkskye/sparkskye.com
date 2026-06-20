@@ -8,6 +8,8 @@ const KIND_ALIASES = {
   videos: "editing",
   design: "design",
   designs: "design",
+  art: "art",
+  arts: "art",
   map: "maps",
   maps: "maps",
   model: "models",
@@ -33,6 +35,7 @@ export async function onRequest(context) {
     if (kind === "animations") meta = await getAnimationMeta_(requestUrl, id);
     if (kind === "editing") meta = await getEditingMeta_(requestUrl, id);
     if (kind === "design") meta = await getDesignMeta_(requestUrl, id);
+    if (kind === "art") meta = await getArtMeta_(requestUrl, id);
     if (kind === "maps") meta = await getMapMeta_(requestUrl, id);
     if (kind === "models") meta = await getModelMeta_(requestUrl, id);
   } catch {
@@ -67,6 +70,7 @@ function kindFromPath_(pathname) {
   if (p === "/animations") return "animations";
   if (p === "/editing") return "editing";
   if (p === "/design") return "design";
+  if (p === "/art") return "art";
   if (p === "/hive-resources/maps") return "maps";
   if (p === "/hive-resources/models") return "models";
   return "";
@@ -76,6 +80,7 @@ function themeColor_(kind) {
   if (kind === "animations") return "#598ffe";
   if (kind === "editing") return "#f0593a";
   if (kind === "design") return "#894bdd";
+  if (kind === "art") return "#fbbc42";
   if (kind === "maps" || kind === "models") return "#00aaff";
   return "#00aaff";
 }
@@ -123,6 +128,23 @@ async function getDesignMeta_(requestUrl, id) {
     title: item.name || "sparkskye design",
     description: formatDesignList_(item) || "design file",
     image: item.imagePreviewUrl || item.files?.image?.previewUrl || item.thumbnailUrl || "/public/img/favicon.png",
+  };
+}
+
+async function getArtMeta_(requestUrl, id) {
+  const api = new URL("/api/art", requestUrl.origin);
+  api.searchParams.set("category", "all");
+  const res = await fetch(api.toString(), { cf: { cacheTtl: 300, cacheEverything: true } });
+  if (!res.ok) throw new Error(`art api ${res.status}`);
+  const json = await res.json();
+  const item = (json.items || []).find((x) => String(x.id) === String(id));
+  if (!item) throw new Error("art not found");
+  const isModel = String(item.kind || "").toLowerCase() === "model";
+  const isTexture = String(item.kind || "").toLowerCase() === "texture-pack";
+  return {
+    title: item.name || "sparkskye art",
+    description: formatArtList_(item) || "art file",
+    image: isModel ? null : (isTexture ? (item.thumbnailUrl || item.trailer?.thumbnail || "/public/img/favicon.png") : (item.imagePreviewUrl || item.files?.image?.previewUrl || item.thumbnailUrl || "/public/img/favicon.png")),
   };
 }
 
@@ -314,6 +336,7 @@ function fallbackTitle_(kind) {
   if (kind === "animations") return "sparkskye animation";
   if (kind === "editing") return "sparkskye video";
   if (kind === "design") return "sparkskye design";
+  if (kind === "art") return "sparkskye art";
   if (kind === "maps") return "hive map";
   if (kind === "models") return "hive model";
   return "sparkskye";
@@ -323,6 +346,7 @@ function fallbackDescription_(kind) {
   if (kind === "animations") return "2d and 3d animations i've made";
   if (kind === "editing") return "my youtube videos";
   if (kind === "design") return "thumbnails, profiles, banners, and other graphic design work";
+  if (kind === "art") return "pixel art, texture packs, and other arts";
   if (kind === "maps") return "hive resources map";
   if (kind === "models") return "hive resources model";
   return "sparkskye creations";
@@ -396,6 +420,22 @@ function formatDesignList_(item) {
     .filter((key, idx, arr) => arr.indexOf(key) === idx)
     .map((key) => String(key).toLowerCase())
     .join(", ");
+}
+
+function formatArtList_(item) {
+  const kind = String(item.kind || "").toLowerCase();
+  const preferred = kind === "model"
+    ? ["gltf", "glb", "bbmodel", "texture", "json", "zip", "blend"]
+    : kind === "texture-pack"
+      ? ["trailer", "mcpack", "zip", "mcaddon"]
+      : ["image", "timelapse", "psd", "blend", "nomad", "bbmodel", "zip"];
+  const files = item.files || {};
+  const labels = preferred
+    .filter((key) => key === "trailer" ? item.trailer : files[key])
+    .concat((item.formats || []).map((f) => f.key).filter((key) => key && !preferred.includes(key)))
+    .filter((key, idx, arr) => arr.indexOf(key) === idx)
+    .map((key) => String(key).toLowerCase());
+  return labels.join(", ");
 }
 
 function buildPathText_(gameKey, path) {

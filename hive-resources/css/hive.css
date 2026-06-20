@@ -1122,3 +1122,20 @@ body.theme-art .hero__title{
 .modal__close{
   display: none !important;
 }
+
+/* Public polish: tighter gallery cards across Hive Resources. */
+.card{
+  min-height: 0 !important;
+}
+.card__meta{
+  padding: 10px 12px 12px !important;
+  gap: 6px !important;
+}
+.card__name{
+  font-size: 13px !important;
+  line-height: 1.15 !important;
+}
+.card__path{
+  font-size: 10px !important;
+  line-height: 1.35 !important;
+}

@@ -1751,3 +1751,97 @@ body.theme-art .topnav__dropitem.is-active{
   background: var(--item-color, var(--accent)) !important;
   color: #041018 !important;
 }
+
+
+/* =========================
+   Public polish: compact gallery/home cards + Art gallery
+========================= */
+.section-card{
+  min-height: 132px !important;
+  padding: 16px !important;
+  gap: 10px !important;
+}
+.section-card__text{
+  line-height: 1.45 !important;
+}
+.btn--home-hive{
+  background: #00aaff !important;
+  border-color: #00aaff !important;
+  color: #041018 !important;
+}
+.btn--home-hive:hover{
+  border-color: #48c6ff !important;
+}
+.card{
+  min-height: 0 !important;
+}
+.card__meta{
+  padding: 10px 12px 12px !important;
+  gap: 6px !important;
+}
+.card__name{
+  font-size: 13px !important;
+  line-height: 1.15 !important;
+}
+.card__path,
+.card__stats{
+  font-size: 10px !important;
+  line-height: 1.35 !important;
+}
+.editing-page .card--media,
+.animation-page .card--animation,
+.design-page .card--design,
+.art-page .card--art{
+  min-height: 0 !important;
+}
+.editing-page .card--media .card__viewer,
+.animation-page .card--animation .card__viewer,
+.design-page .card--design .card__viewer,
+.art-page .card--art .card__viewer{
+  padding: 12px !important;
+}
+.art-page .card--media .card__viewer{
+  height: auto;
+  min-height: 0;
+  background: rgba(0,0,0,.10);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.art-page .card--media .card__viewer img.card__thumb{
+  display:block;
+  width:100%;
+  height:auto;
+  aspect-ratio: var(--thumb-ratio, 16 / 9);
+  object-fit: cover;
+  border-radius: 14px;
+  background: #101010;
+}
+.art-page .card--model .card__viewer{
+  height: 200px;
+  background: rgba(0,0,0,.16);
+  padding: 0 !important;
+}
+.art-page .card--model canvas{
+  width:100%;
+  height:100%;
+  display:block;
+}
+.art-page .modal__path,
+.art-page .card__path{
+  text-transform: lowercase;
+}
+.art-page .modal__viewer--model{
+  background: rgba(0,0,0,.16);
+}
+.art-page .modal__viewer--media iframe{
+  width: 100%;
+  height: 100%;
+  display:block;
+  border:0;
+  background:#111;
+}
+@media (max-width: 720px){
+  .section-card{ min-height: 118px !important; }
+  .art-page .card--model .card__viewer{ height: 170px; }
+}

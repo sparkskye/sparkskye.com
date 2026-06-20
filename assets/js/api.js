@@ -129,3 +129,17 @@ export async function fetchAnimationItems(category = "all") {
   if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
   return await res.json();
 }
+
+export async function fetchArtCategories() {
+  const url = siteApiUrl(`/api/art?list=1`);
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+  return await res.json();
+}
+
+export async function fetchArtItems(category = "all") {
+  const url = siteApiUrl(`/api/art${category && category !== "all" ? `?category=${encodeURIComponent(category)}` : ""}`);
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+  return await res.json();
+}

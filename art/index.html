@@ -7,29 +7,69 @@
   <link rel="icon" href="/public/img/favicon.png" />
   <link rel="stylesheet" href="/assets/css/site.css" />
 </head>
-<body class="theme-art">
+<body class="theme-art art-page">
   <header class="topbar">
     <a class="brand" href="/"><img class="brand__logo" src="/public/img/favicon.png" alt="Sparkskye" /><span class="brand__name">SPARKSKYE</span></a>
-    <nav class="topnav"><div class="topnav__links">
+    <nav class="topnav">
+      <div class="topnav__links">
         <a class="topnav__btn" style="--item-color:#598ffe" href="/animations/">ANIMATION</a>
         <a class="topnav__btn" style="--item-color:#f0593a" href="/editing/">EDITING</a>
         <a class="topnav__btn" style="--item-color:#894bdd" href="/design/">DESIGN</a>
         <a class="topnav__btn is-active" style="--item-color:#fbbc42" href="/art/">ART</a>
       </div>
+      <button class="topnav__burger" type="button" aria-label="Open menu" aria-expanded="false" data-mobile-nav-toggle><span class="topnav__burger-icon"><span></span><span></span><span></span></span></button>
+      <div class="topnav__dropdown" data-mobile-nav-menu>
+        <a class="topnav__dropitem" style="--item-color:#598ffe" href="/animations/">ANIMATION</a>
+        <a class="topnav__dropitem" style="--item-color:#f0593a" href="/editing/">EDITING</a>
+        <a class="topnav__dropitem" style="--item-color:#894bdd" href="/design/">DESIGN</a>
+        <a class="topnav__dropitem is-active" style="--item-color:#fbbc42" href="/art/">ART</a>
+      </div>
     </nav>
   </header>
+
   <main class="page page--wide">
     <section class="hero">
       <h1 class="hero__title">ART</h1>
       <p class="hero__sub">pixel art, texture packs, and other arts</p>
     </section>
-    <section class="empty-state">ART GALLERY COMING SOON.</section>
+
+    <section class="panel" aria-label="Art filters">
+      <div class="panel__row panel__row--center">
+        <div class="panel__label">TYPE</div>
+        <div class="chips" id="categoryChips"></div>
+      </div>
+      <div class="panel__divider"></div>
+      <div class="panel__row panel__row--center">
+        <div class="panel__label">SORT</div>
+        <div class="chips" id="sortChips"></div>
+      </div>
+      <div class="panel__row panel__row--search">
+        <input class="search" id="searchInput" type="search" placeholder="search art..." autocomplete="off" />
+        <div class="count" id="countLabel">0 shown</div>
+      </div>
+    </section>
+
+    <section class="grid" id="grid" aria-live="polite"></section>
   </main>
+
+  <div class="modal" id="modal" aria-hidden="true">
+    <div class="modal__backdrop" id="modalBackdrop"></div>
+    <section class="modal__card" role="dialog" aria-modal="true" aria-label="Art preview">
+      <button class="modal__close" id="modalClose" type="button" aria-label="Close">X</button>
+      <div class="modal__viewer modal__viewer--media" id="modalViewer"><div class="viewer__loading" id="modalLoading">Loading...</div></div>
+      <div class="modal__meta">
+        <div class="modal__name" id="modalName"></div>
+        <div class="modal__path" id="modalPath"></div>
+        <div class="modal__actions" id="modalActions"></div>
+      </div>
+    </section>
+  </div>
+
   <footer class="site-footer" aria-label="Site footer">
     <div class="site-footer__copy"><span class="site-footer__symbol">&copy;</span>2026 sparkskye</div>
     <div class="site-footer__ai">This website was made with the help of AI tools.</div>
   </footer>
 
-  <script type="module">import { initMobileNav } from "/assets/js/ui.js"; initMobileNav();</script>
+  <script type="module" src="/assets/js/art.js"></script>
 </body>
 </html>
