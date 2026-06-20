@@ -1779,20 +1779,27 @@ body.theme-art .topnav__dropitem.is-active{
   padding:0;
   background: rgba(0,0,0,.16);
 }
-.art-page .card--model .card__viewer canvas,
-.art-page .card--model .card__viewer model-viewer,
-.art-page .card--model .card__viewer .art-model-viewer{
-  width:100%;
-  height:100%;
+.art-page .card--model .card__viewer .viewer__loading,
+.art-page .card--model .card__viewer .card__placeholder{
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  color:#a9a9a9;
 }
-.art-model-viewer{
+.art-page .card--model .card__viewer canvas.previewCanvas,
+.art-page .card--model .card__viewer img.card__thumb--rendered{
   width:100%;
   height:100%;
   display:block;
+  object-fit: contain;
+  pointer-events:none;
   background: transparent;
 }
-.modal__viewer--model model-viewer,
-.modal__viewer--model .art-model-viewer{
+.modal__viewer--model canvas.previewCanvas,
+.modal__viewer--model canvas.previewCanvas--modal{
   width:100%;
   height:100%;
   display:block;

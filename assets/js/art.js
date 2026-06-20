@@ -10,6 +10,7 @@ import {
   unlockBodyScroll,
 } from "./ui.js";
 import { createPanZoomImageViewer } from "./pan-zoom-viewer.js";
+import { CardPreview, ModalPreview } from "/hive-resources/js/preview3d.js";
 
 const els = {
   categoryChips: qs("#categoryChips"),
@@ -44,7 +45,6 @@ const state = {
 
 let gridLoadingStop = null;
 let panZoomViewer = null;
-let modelPreview = null;
 let activePreview = "image";
 let imagePreviewButton = null;
 let timelapsePreviewButton = null;
@@ -53,59 +53,12 @@ let variantLabelEl = null;
 
 const cardPreviews = new Map();
 let io = null;
-let modelViewerScriptPromise = null;
-
-function ensureModelViewerScript() {
-  if (customElements.get("model-viewer")) return Promise.resolve();
-  if (modelViewerScriptPromise) return modelViewerScriptPromise;
-
-  modelViewerScriptPromise = new Promise((resolve, reject) => {
-    const existing = document.querySelector('script[data-model-viewer-loader="1"]');
-    if (existing) {
-      existing.addEventListener("load", () => resolve(), { once: true });
-      existing.addEventListener("error", () => reject(new Error("model-viewer failed to load")), { once: true });
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.type = "module";
-    script.src = "https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js";
-    script.dataset.modelViewerLoader = "1";
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("model-viewer failed to load"));
-    document.head.appendChild(script);
-  });
-
-  return modelViewerScriptPromise;
-}
+let activeModelModalPreview = null;
 
 function modelPreviewUrl(file) {
   if (!file) return "";
-  // This mirrors the working Hive Resources model viewer path: a simple inline
-  // file proxy URL by Drive file id. Keeping it simple avoids odd resource-path
-  // issues caused by filename/ext query parameters.
   const id = file.fileId || file.id || "";
   return id ? `/api/file?id=${encodeURIComponent(id)}&inline=1` : "";
-}
-
-function makeModelViewer(src, opts = {}) {
-  const mv = document.createElement("model-viewer");
-  mv.className = opts.className || "art-model-viewer";
-  mv.setAttribute("src", src);
-  mv.setAttribute("loading", "eager");
-  mv.setAttribute("reveal", "auto");
-  mv.setAttribute("interaction-prompt", "none");
-  mv.setAttribute("shadow-intensity", "0");
-  mv.setAttribute("environment-image", "neutral");
-  mv.setAttribute("exposure", "1.0");
-  mv.setAttribute("orientation", "0deg 180deg 0deg");
-  mv.setAttribute("touch-action", opts.interactive ? "none" : "pan-y");
-  if (opts.interactive) mv.setAttribute("camera-controls", "");
-  mv.style.background = "transparent";
-  mv.style.width = "100%";
-  mv.style.height = "100%";
-  mv.style.display = "block";
-  return mv;
 }
 
 function clearNode(node) { while (node?.firstChild) node.removeChild(node.firstChild); }
@@ -256,41 +209,45 @@ function applyFiltersAndRenderGrid() {
 }
 
 function disposeCardPreviews() {
-  for (const preview of cardPreviews.values()) { preview.dispose?.(); preview.destroy?.(); }
+  for (const preview of cardPreviews.values()) {
+    try { preview.destroy?.(true); } catch {}
+    try { preview.dispose?.(); } catch {}
+  }
   cardPreviews.clear();
   io?.disconnect?.();
   io = null;
 }
+
 function scheduleModelCardPreview(card, it) {
   const viewer = card.querySelector(".card__viewer");
+  const ph = viewer?.querySelector(".viewer__loading, .card__placeholder");
   const file = modelFile(it);
-  if (!viewer || !file) return;
   const url = modelPreviewUrl(file);
-  if (!url) return;
+  if (!viewer || !file || !url) return;
 
   const start = async () => {
     if (cardPreviews.has(card)) return;
+    const preview = new CardPreview(viewer);
+    cardPreviews.set(card, preview);
+    if (ph) {
+      ph.style.display = "flex";
+      ph.textContent = "LOADING...";
+    }
+
     try {
-      await ensureModelViewerScript();
-      if (!customElements.get("model-viewer")) throw new Error("model-viewer unavailable");
-
-      viewer.innerHTML = "";
-      const mv = makeModelViewer(url, { interactive: false, className: "art-model-viewer art-model-viewer--card" });
-      const cleanup = () => {
-        try { mv.remove(); } catch {}
-      };
-      cardPreviews.set(card, { destroy: cleanup, dispose: cleanup });
-
-      mv.addEventListener("error", () => {
-        console.warn("Art model card preview failed", it?.name || file?.name || file?.fileId);
-        cleanup();
-        cardPreviews.delete(card);
-        viewer.innerHTML = '<div class="card__placeholder">NO MODEL PREVIEW</div>';
-      }, { once: true });
-
-      viewer.appendChild(mv);
+      await preview.init(url);
+      const frozen = preview.freezeToImage();
+      cardPreviews.delete(card);
+      if (!frozen) throw new Error("Failed to freeze preview");
+      if (ph) {
+        ph.style.display = "none";
+        ph.textContent = "";
+      }
+      card.dataset.previewLoaded = "1";
     } catch (err) {
-      console.warn("Art model card preview setup failed", err);
+      console.warn("Art model card preview failed", it?.name || file?.name || file?.fileId, err);
+      try { preview.destroy?.(true); } catch {}
+      cardPreviews.delete(card);
       viewer.innerHTML = '<div class="card__placeholder">NO MODEL PREVIEW</div>';
     }
   };
@@ -300,13 +257,15 @@ function scheduleModelCardPreview(card, it) {
       for (const entry of entries) {
         if (!entry.isIntersecting) continue;
         const target = entry.target;
-        io.unobserve(target);
+        try { io.unobserve(target); } catch {}
         target.__loadPreview?.();
       }
-    }, { rootMargin: "220px" });
+    }, { root: null, threshold: 0.01, rootMargin: "480px 0px 480px 0px" });
     card.__loadPreview = start;
     io.observe(card);
-  } else start();
+  } else {
+    start();
+  }
 }
 
 function renderGrid(items) {
@@ -405,8 +364,8 @@ function showVideoFilePreview(it, file) {
 async function showModelPreview(it) {
   panZoomViewer?.destroy?.();
   panZoomViewer = null;
-  modelPreview?.close?.();
-  modelPreview = null;
+  try { activeModelModalPreview?.close?.(); } catch {}
+  activeModelModalPreview = null;
   els.modalViewer.innerHTML = '<div class="viewer__loading">LOADING...</div>';
 
   const file = modelFile(it);
@@ -417,20 +376,13 @@ async function showModelPreview(it) {
   }
 
   try {
-    await ensureModelViewerScript();
-    if (!customElements.get("model-viewer")) throw new Error("model-viewer unavailable");
-
     els.modalViewer.innerHTML = "";
-    const mv = makeModelViewer(url, { interactive: true, className: "art-model-viewer art-model-viewer--modal" });
-    mv.addEventListener("error", () => {
-      console.warn("Art model modal preview failed", it?.name || file?.name || file?.fileId);
-      els.modalViewer.innerHTML = '<div class="viewer__loading">NO MODEL PREVIEW</div>';
-      modelPreview = null;
-    }, { once: true });
-    els.modalViewer.appendChild(mv);
-    modelPreview = { close: () => { try { mv.remove(); } catch {} } };
+    activeModelModalPreview = new ModalPreview(els.modalViewer);
+    await activeModelModalPreview.open(url);
   } catch (err) {
-    console.warn("Art model modal preview setup failed", err);
+    console.warn("Art model modal preview failed", it?.name || file?.name || file?.fileId, err);
+    try { activeModelModalPreview?.close?.(); } catch {}
+    activeModelModalPreview = null;
     els.modalViewer.innerHTML = '<div class="viewer__loading">NO MODEL PREVIEW</div>';
   }
 }
@@ -604,8 +556,8 @@ function closeModal(opts = {}) {
   els.modal.setAttribute("aria-hidden", "true");
   panZoomViewer?.destroy?.();
   panZoomViewer = null;
-  modelPreview?.close?.();
-  modelPreview = null;
+  try { activeModelModalPreview?.close?.(); } catch {}
+  activeModelModalPreview = null;
   els.modalViewer.innerHTML = '<div class="viewer__loading" id="modalLoading">Loading...</div>';
   els.modalViewer.classList.remove("modal__viewer--model");
   variantLabelEl?.remove?.();
