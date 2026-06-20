@@ -1779,9 +1779,24 @@ body.theme-art .topnav__dropitem.is-active{
   padding:0;
   background: rgba(0,0,0,.16);
 }
-.art-page .card--model .card__viewer canvas{
+.art-page .card--model .card__viewer canvas,
+.art-page .card--model .card__viewer model-viewer,
+.art-page .card--model .card__viewer .art-model-viewer{
   width:100%;
   height:100%;
+}
+.art-model-viewer{
+  width:100%;
+  height:100%;
+  display:block;
+  background: transparent;
+}
+.modal__viewer--model model-viewer,
+.modal__viewer--model .art-model-viewer{
+  width:100%;
+  height:100%;
+  display:block;
+  background: transparent;
 }
 .art-page .card--texture-pack .card__viewer img.card__thumb{
   object-fit: cover;

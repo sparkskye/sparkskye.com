@@ -53,16 +53,59 @@ let variantLabelEl = null;
 
 const cardPreviews = new Map();
 let io = null;
-let preview3DPromise = null;
+let modelViewerScriptPromise = null;
 
-function loadPreview3D() {
-  if (!preview3DPromise) {
-    preview3DPromise = import("/hive-resources/js/preview3d.js").catch((err) => {
-      console.warn("3D preview module failed to load", err);
-      return null;
-    });
-  }
-  return preview3DPromise;
+function ensureModelViewerScript() {
+  if (customElements.get("model-viewer")) return Promise.resolve();
+  if (modelViewerScriptPromise) return modelViewerScriptPromise;
+
+  modelViewerScriptPromise = new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[data-model-viewer-loader="1"]');
+    if (existing) {
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener("error", () => reject(new Error("model-viewer failed to load")), { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.type = "module";
+    script.src = "https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js";
+    script.dataset.modelViewerLoader = "1";
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("model-viewer failed to load"));
+    document.head.appendChild(script);
+  });
+
+  return modelViewerScriptPromise;
+}
+
+function modelPreviewUrl(file) {
+  if (!file) return "";
+  // This mirrors the working Hive Resources model viewer path: a simple inline
+  // file proxy URL by Drive file id. Keeping it simple avoids odd resource-path
+  // issues caused by filename/ext query parameters.
+  const id = file.fileId || file.id || "";
+  return id ? `/api/file?id=${encodeURIComponent(id)}&inline=1` : "";
+}
+
+function makeModelViewer(src, opts = {}) {
+  const mv = document.createElement("model-viewer");
+  mv.className = opts.className || "art-model-viewer";
+  mv.setAttribute("src", src);
+  mv.setAttribute("loading", "eager");
+  mv.setAttribute("reveal", "auto");
+  mv.setAttribute("interaction-prompt", "none");
+  mv.setAttribute("shadow-intensity", "0");
+  mv.setAttribute("environment-image", "neutral");
+  mv.setAttribute("exposure", "1.0");
+  mv.setAttribute("orientation", "0deg 180deg 0deg");
+  mv.setAttribute("touch-action", opts.interactive ? "none" : "pan-y");
+  if (opts.interactive) mv.setAttribute("camera-controls", "");
+  mv.style.background = "transparent";
+  mv.style.width = "100%";
+  mv.style.height = "100%";
+  mv.style.display = "block";
+  return mv;
 }
 
 function clearNode(node) { while (node?.firstChild) node.removeChild(node.firstChild); }
@@ -222,24 +265,36 @@ function scheduleModelCardPreview(card, it) {
   const viewer = card.querySelector(".card__viewer");
   const file = modelFile(it);
   if (!viewer || !file) return;
-  const url = inlineFileUrl(file);
+  const url = modelPreviewUrl(file);
+  if (!url) return;
+
   const start = async () => {
     if (cardPreviews.has(card)) return;
-    const mod = await loadPreview3D();
-    if (!mod?.CardPreview) {
-      viewer.innerHTML = '<div class="card__placeholder">NO MODEL PREVIEW</div>';
-      return;
-    }
-    const preview = new mod.CardPreview(viewer);
-    cardPreviews.set(card, preview);
-    try { await preview.init(url); }
-    catch (err) {
-      console.warn("Art model card preview failed", err);
-      try { preview.destroy?.(); } catch {}
-      cardPreviews.delete(card);
+    try {
+      await ensureModelViewerScript();
+      if (!customElements.get("model-viewer")) throw new Error("model-viewer unavailable");
+
+      viewer.innerHTML = "";
+      const mv = makeModelViewer(url, { interactive: false, className: "art-model-viewer art-model-viewer--card" });
+      const cleanup = () => {
+        try { mv.remove(); } catch {}
+      };
+      cardPreviews.set(card, { destroy: cleanup, dispose: cleanup });
+
+      mv.addEventListener("error", () => {
+        console.warn("Art model card preview failed", it?.name || file?.name || file?.fileId);
+        cleanup();
+        cardPreviews.delete(card);
+        viewer.innerHTML = '<div class="card__placeholder">NO MODEL PREVIEW</div>';
+      }, { once: true });
+
+      viewer.appendChild(mv);
+    } catch (err) {
+      console.warn("Art model card preview setup failed", err);
       viewer.innerHTML = '<div class="card__placeholder">NO MODEL PREVIEW</div>';
     }
   };
+
   if ("IntersectionObserver" in window) {
     if (!io) io = new IntersectionObserver((entries) => {
       for (const entry of entries) {
@@ -248,7 +303,7 @@ function scheduleModelCardPreview(card, it) {
         io.unobserve(target);
         target.__loadPreview?.();
       }
-    }, { rootMargin: "180px" });
+    }, { rootMargin: "220px" });
     card.__loadPreview = start;
     io.observe(card);
   } else start();
@@ -350,20 +405,36 @@ function showVideoFilePreview(it, file) {
 async function showModelPreview(it) {
   panZoomViewer?.destroy?.();
   panZoomViewer = null;
+  modelPreview?.close?.();
+  modelPreview = null;
   els.modalViewer.innerHTML = '<div class="viewer__loading">LOADING...</div>';
+
   const file = modelFile(it);
-  if (!file) { els.modalViewer.innerHTML = '<div class="viewer__loading">NO MODEL PREVIEW</div>'; return; }
-  const mod = await loadPreview3D();
-  if (!mod?.ModalPreview) {
+  const url = modelPreviewUrl(file);
+  if (!file || !url) {
     els.modalViewer.innerHTML = '<div class="viewer__loading">NO MODEL PREVIEW</div>';
     return;
   }
-  modelPreview = new mod.ModalPreview(els.modalViewer);
-  modelPreview.open(inlineFileUrl(file)).catch((err) => {
-    console.warn("Art model modal preview failed", err);
+
+  try {
+    await ensureModelViewerScript();
+    if (!customElements.get("model-viewer")) throw new Error("model-viewer unavailable");
+
+    els.modalViewer.innerHTML = "";
+    const mv = makeModelViewer(url, { interactive: true, className: "art-model-viewer art-model-viewer--modal" });
+    mv.addEventListener("error", () => {
+      console.warn("Art model modal preview failed", it?.name || file?.name || file?.fileId);
+      els.modalViewer.innerHTML = '<div class="viewer__loading">NO MODEL PREVIEW</div>';
+      modelPreview = null;
+    }, { once: true });
+    els.modalViewer.appendChild(mv);
+    modelPreview = { close: () => { try { mv.remove(); } catch {} } };
+  } catch (err) {
+    console.warn("Art model modal preview setup failed", err);
     els.modalViewer.innerHTML = '<div class="viewer__loading">NO MODEL PREVIEW</div>';
-  });
+  }
 }
+
 function showTrailerPreview(it) {
   panZoomViewer?.destroy?.();
   panZoomViewer = null;
