@@ -94,11 +94,13 @@ function normalizeGameLabel(key) {
 }
 
 function buildPathText(gameKey, modePath) {
-  const g = (gameKey || "").toUpperCase();
+  const g = String(gameKey || "").trim().toLowerCase();
   const p = String(modePath || "")
     .replace(/^\/+/, "")
-    .replace(/\//g, " \\ ");
-  return p ? `${g} \\ ${p.toUpperCase()}` : `${g}`;
+    .replace(/\//g, " \\ ")
+    .trim()
+    .toLowerCase();
+  return p ? `${g} \\ ${p}` : `${g}`;
 }
 
 function clearNode(node) {

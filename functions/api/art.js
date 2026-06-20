@@ -34,6 +34,8 @@ const FORMAT_LABELS = {
   zip: "ZIP",
   mcaddon: "MCADDON",
   json: "JSON",
+  description: "DESCRIPTION",
+  descriptions: "DESCRIPTION",
   psd: "PSD",
   blend: "BLEND",
   nomad: "NOMAD",
@@ -334,7 +336,9 @@ async function buildTexturePackCategory_(category, apiKey, debug) {
 
   // Also pick up format subfolders if texture packs later becomes structured.
   const formatFolders = collectManualAndChildFormatFolders_(category, entries, debug);
+  const textureDescriptions = await collectTextureDescriptions_(formatFolders.get("description"), apiKey, debug);
   for (const format of formatFolders.values()) {
+    if (format.key === "description") continue;
     if (!format.folderId) continue;
     const fmtEntries = await listDriveFolderEntries_(format.folderId, apiKey, debug, `format:${category.key}/${format.key}`).catch(() => ({ files: [], folders: [] }));
     for (const file of fmtEntries.files || []) {
@@ -352,6 +356,17 @@ async function buildTexturePackCategory_(category, apiKey, debug) {
     debug.push({ step: "texture-playlist-error", message: String(err?.message || err) });
     return [];
   });
+
+  const knownTrailerIds = new Set(trailers.map((t) => t.id).filter(Boolean));
+  const extraTrailerIds = [...new Set(textureDescriptions.map((d) => d.trailerId).filter(Boolean))]
+    .filter((id) => !knownTrailerIds.has(id));
+  if (extraTrailerIds.length) {
+    const extra = await fetchVideoDetails_(extraTrailerIds, apiKey, debug, "art-description-video-details").catch((err) => {
+      debug.push({ step: "art-description-video-error", message: String(err?.message || err) });
+      return [];
+    });
+    trailers.push(...extra);
+  }
 
   const byBase = new Map();
   for (const pf of packFiles) {
@@ -371,7 +386,50 @@ async function buildTexturePackCategory_(category, apiKey, debug) {
     attachFormat_(byBase.get(pf.baseKey), pf.file);
   }
 
-  const unusedTrailers = [...trailers].sort((a, b) => dateNumber_(b.publishedAt) - dateNumber_(a.publishedAt));
+  const trailerById = new Map(trailers.map((t) => [t.id, t]));
+
+  for (const meta of textureDescriptions) {
+    const explicitPackKey = slugify_(stripExtension_(meta.pack || meta.packFile || meta.download || meta.file || ""));
+    const metaKey = slugify_(meta.slug || meta.id || meta.title || meta.baseName || "");
+    let item = null;
+    if (explicitPackKey) item = byBase.get(explicitPackKey) || findLooseItemMatch_(byBase, explicitPackKey);
+    if (!item && metaKey) item = byBase.get(metaKey) || findLooseItemMatch_(byBase, metaKey);
+    if (!item && byBase.size === 1) item = [...byBase.values()][0];
+    if (!item && metaKey) {
+      item = {
+        id: metaKey,
+        kind: "texture-pack",
+        name: prettyName_(meta.title || meta.baseName || metaKey),
+        categoryKey: category.key,
+        categoryLabel: category.label,
+        files: {},
+        formats: [],
+        packCreatedTime: meta.createdTime || "",
+        packModifiedTime: meta.modifiedTime || "",
+      };
+      byBase.set(metaKey, item);
+    }
+    if (!item) continue;
+    if (meta.title) item.name = meta.title;
+    if (meta.description) item.description = meta.description;
+    if (meta.trailerId) {
+      const trailer = trailerById.get(meta.trailerId) || {
+        id: meta.trailerId,
+        title: meta.title || item.name || "texture pack trailer",
+        description: meta.description || "",
+        publishedAt: "",
+        thumbnail: `https://i.ytimg.com/vi/${encodeURIComponent(meta.trailerId)}/hqdefault.jpg`,
+        url: `https://www.youtube.com/watch?v=${encodeURIComponent(meta.trailerId)}`,
+        embedUrl: `https://www.youtube.com/embed/${encodeURIComponent(meta.trailerId)}`,
+      };
+      item.trailer = trailer;
+      item.trailerId = trailer.id;
+      item.thumbnailUrl = trailer.thumbnail;
+      item.videoCreatedTime = trailer.publishedAt || item.videoCreatedTime || "";
+    }
+  }
+
+  const unusedTrailers = [...trailers].filter((t) => ![...byBase.values()].some((it) => it.trailerId === t.id)).sort((a, b) => dateNumber_(b.publishedAt) - dateNumber_(a.publishedAt));
   for (const trailer of trailers) {
     const tKey = slugify_(trailer.title || trailer.id || "");
     const item = findLooseItemMatch_(byBase, tKey) || findBestVideoMatch_(byBase, trailer);
@@ -423,7 +481,7 @@ async function buildTexturePackCategory_(category, apiKey, debug) {
     return item;
   }).sort((a, b) => a.name.localeCompare(b.name));
 
-  debug.push({ step: "art-texture-category-built", category: category.key, packFileCount: packFiles.length, trailerCount: trailers.length, itemCount: items.length, itemFormats: items.slice(0, 10).map((it) => ({ name: it.name, formats: Object.keys(it.files || {}), trailer: it.trailerId || "" })) });
+  debug.push({ step: "art-texture-category-built", category: category.key, packFileCount: packFiles.length, descriptionCount: textureDescriptions.length, trailerCount: trailers.length, itemCount: items.length, itemFormats: items.slice(0, 10).map((it) => ({ name: it.name, formats: Object.keys(it.files || {}), trailer: it.trailerId || "" })) });
   return { items };
 }
 
@@ -522,6 +580,104 @@ function attachFormat_(item, fileInfo) {
   const existingIdx = item.formats.findIndex((f) => f.key === fileInfo.key);
   if (existingIdx >= 0) item.formats[existingIdx] = fileInfo;
   else item.formats.push(fileInfo);
+}
+
+
+async function collectTextureDescriptions_(descriptionFolder, apiKey, debug) {
+  if (!descriptionFolder?.folderId) return [];
+  const entries = await listDriveFolderEntries_(descriptionFolder.folderId, apiKey, debug, "format:texture-packs/description").catch((err) => {
+    debug.push({ step: "texture-description-list-error", folderId: descriptionFolder.folderId, message: String(err?.message || err) });
+    return { files: [], folders: [] };
+  });
+  const out = [];
+  for (const file of entries.files || []) {
+    const ext = getExtension_(file.name).toLowerCase();
+    if (!/[jt]sx?on|txt|md|markdown/.test(ext || "txt")) continue;
+    const text = await fetchDriveTextFile_(file.fileId || file.id, apiKey, debug, file.name).catch((err) => {
+      debug.push({ step: "texture-description-read-error", name: file.name, message: String(err?.message || err) });
+      return "";
+    });
+    if (!text) continue;
+    const meta = parseTextureDescription_(text, stripExtension_(file.name));
+    meta.fileId = file.fileId || file.id;
+    meta.fileName = file.name;
+    meta.createdTime = file.createdTime || "";
+    meta.modifiedTime = file.modifiedTime || "";
+    out.push(meta);
+  }
+  debug.push({ step: "texture-descriptions-built", count: out.length, samples: out.slice(0, 5).map((d) => ({ file: d.fileName, title: d.title || "", trailerId: d.trailerId || "", pack: d.pack || "" })) });
+  return out;
+}
+
+async function fetchDriveTextFile_(fileId, apiKey, debug, label = "description") {
+  if (!fileId || !apiKey) return "";
+  const url = new URL(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`);
+  url.searchParams.set("alt", "media");
+  url.searchParams.set("key", apiKey);
+  const res = await fetch(url.toString(), { cf: { cacheTtl: 0, cacheEverything: false } });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    debug.push({ step: "drive-text-file-error", label, fileId, status: res.status, body: safeSnippet_(body) });
+    return "";
+  }
+  return await res.text();
+}
+
+function parseTextureDescription_(text, fallbackName = "") {
+  const raw = String(text || "").trim();
+  let data = {};
+  if (raw.startsWith("{") || raw.startsWith("[")) {
+    try { data = JSON.parse(raw); } catch { data = {}; }
+  }
+  if (!data || Array.isArray(data) || typeof data !== "object") data = {};
+
+  if (!Object.keys(data).length) {
+    const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const body = [];
+    for (const line of lines) {
+      const m = /^([a-zA-Z0-9_-]+)\s*[:=]\s*(.+)$/.exec(line);
+      if (m) data[m[1].toLowerCase()] = m[2].trim();
+      else if (/youtu\.?be|youtube\.com/i.test(line) && !data.trailer) data.trailer = line;
+      else body.push(line);
+    }
+    if (body.length && !data.description) data.description = body.join("\n");
+  }
+
+  const trailerUrl = data.trailer || data.trailerUrl || data.youtube || data.video || data.url || "";
+  const title = data.title || data.name || prettyName_(fallbackName);
+  const pack = data.pack || data.packFile || data.mcpack || data.download || data.file || "";
+  return {
+    id: data.id || data.slug || fallbackName,
+    slug: data.slug || data.id || "",
+    baseName: fallbackName,
+    title: String(title || "").trim(),
+    description: String(data.description || data.summary || "").trim(),
+    trailerUrl: String(trailerUrl || "").trim(),
+    trailerId: extractYouTubeId_(trailerUrl),
+    pack: String(pack || "").trim(),
+  };
+}
+
+function extractYouTubeId_(value) {
+  const s = String(value || "").trim();
+  if (!s) return "";
+  if (/^[a-zA-Z0-9_-]{11}$/.test(s)) return s;
+  const patterns = [
+    /youtu\.be\/([a-zA-Z0-9_-]{11})/i,
+    /youtube\.com\/watch\?[^\s#]*v=([a-zA-Z0-9_-]{11})/i,
+    /youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/i,
+    /youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/i,
+  ];
+  for (const re of patterns) {
+    const m = re.exec(s);
+    if (m?.[1]) return m[1];
+  }
+  try {
+    const u = new URL(s);
+    const v = u.searchParams.get("v");
+    if (/^[a-zA-Z0-9_-]{11}$/.test(v || "")) return v;
+  } catch {}
+  return "";
 }
 
 async function fetchPlaylistVideos_(playlistId, apiKey, debug) {
@@ -724,6 +880,7 @@ function canonicalFormatKey_(s) {
   if (["timelapses"].includes(key) || key.includes("timelapse")) return "timelapse";
   if (["videos", "mp4", "mov", "webm", "m4v"].includes(key) || key === "video") return "video";
   if (["trailers"].includes(key) || key.includes("trailer")) return "trailer";
+  if (key.includes("description") || key === "desc" || key === "metadata") return "description";
   if (key.includes("bbmodel")) return "bbmodel";
   if (key.includes("gltf") || key.includes("glb") || key === "model" || key === "models") return "gltf";
   if (key.includes("texture-pack") || key === "pack" || key === "packs") return "mcpack";

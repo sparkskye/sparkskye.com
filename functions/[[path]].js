@@ -144,7 +144,7 @@ async function getArtMeta_(requestUrl, id) {
   return {
     title: item.name || "sparkskye art",
     description: formatArtList_(item) || "art file",
-    image: isModel ? null : (isTexture ? (item.thumbnailUrl || item.trailer?.thumbnail || "/public/img/favicon.png") : (item.imagePreviewUrl || item.files?.image?.previewUrl || item.thumbnailUrl || "/public/img/favicon.png")),
+    image: isModel ? "/public/img/favicon.png" : (isTexture ? (item.thumbnailUrl || item.trailer?.thumbnail || "/public/img/favicon.png") : (item.imagePreviewUrl || item.files?.image?.previewUrl || item.thumbnailUrl || "/public/img/favicon.png")),
   };
 }
 
@@ -181,7 +181,7 @@ async function getModelMeta_(requestUrl, id) {
   return {
     title: item.name || "hive model",
     description: buildPathText_(game, item.relPath || item.folderLabel || ""),
-    image: null,
+    image: "/public/img/favicon.png",
   };
 }
 
@@ -439,10 +439,11 @@ function formatArtList_(item) {
 }
 
 function buildPathText_(gameKey, path) {
-  const g = String(gameKey || "").toUpperCase();
+  const g = String(gameKey || "").trim().toLowerCase();
   const p = String(path || "")
     .replace(/^\/+/, "")
     .replace(/\//g, " \\ ")
-    .trim();
-  return p ? `${g} \\ ${p.toUpperCase()}` : g;
+    .trim()
+    .toLowerCase();
+  return p ? `${g} \\ ${p}` : g;
 }

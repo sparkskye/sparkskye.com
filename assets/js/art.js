@@ -10,6 +10,7 @@ import {
   unlockBodyScroll,
 } from "./ui.js";
 import { createPanZoomImageViewer } from "./pan-zoom-viewer.js";
+import { CardPreview, ModalPreview } from "/hive-resources/js/preview3d.js";
 
 const els = {
   categoryChips: qs("#categoryChips"),
@@ -53,17 +54,6 @@ let variantLabelEl = null;
 
 const cardPreviews = new Map();
 let io = null;
-let preview3DPromise = null;
-
-function loadPreview3D() {
-  if (!preview3DPromise) {
-    preview3DPromise = import("/hive-resources/js/preview3d.js").catch((err) => {
-      console.warn("3D preview module failed to load", err);
-      return null;
-    });
-  }
-  return preview3DPromise;
-}
 
 function clearNode(node) { while (node?.firstChild) node.removeChild(node.firstChild); }
 function slugify(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""); }
@@ -225,12 +215,7 @@ function scheduleModelCardPreview(card, it) {
   const url = inlineFileUrl(file);
   const start = async () => {
     if (cardPreviews.has(card)) return;
-    const mod = await loadPreview3D();
-    if (!mod?.CardPreview) {
-      viewer.innerHTML = '<div class="card__placeholder">NO MODEL PREVIEW</div>';
-      return;
-    }
-    const preview = new mod.CardPreview(viewer);
+    const preview = new CardPreview(viewer);
     cardPreviews.set(card, preview);
     try { await preview.init(url); }
     catch { viewer.innerHTML = '<div class="card__placeholder">NO MODEL PREVIEW</div>'; }
@@ -348,12 +333,7 @@ async function showModelPreview(it) {
   els.modalViewer.innerHTML = '<div class="viewer__loading">LOADING...</div>';
   const file = modelFile(it);
   if (!file) { els.modalViewer.innerHTML = '<div class="viewer__loading">NO MODEL PREVIEW</div>'; return; }
-  const mod = await loadPreview3D();
-  if (!mod?.ModalPreview) {
-    els.modalViewer.innerHTML = '<div class="viewer__loading">NO MODEL PREVIEW</div>';
-    return;
-  }
-  modelPreview = new mod.ModalPreview(els.modalViewer);
+  modelPreview = new ModalPreview(els.modalViewer);
   modelPreview.open(inlineFileUrl(file)).catch(() => {
     els.modalViewer.innerHTML = '<div class="viewer__loading">NO MODEL PREVIEW</div>';
   });
