@@ -10,7 +10,6 @@ import {
   unlockBodyScroll,
 } from "./ui.js";
 import { createPanZoomImageViewer } from "./pan-zoom-viewer.js";
-import { CardPreview, ModalPreview } from "/hive-resources/js/preview3d.js";
 
 const els = {
   categoryChips: qs("#categoryChips"),
@@ -54,6 +53,19 @@ let variantLabelEl = null;
 const cardPreviews = new Map();
 let io = null;
 let activeModelModalPreview = null;
+
+let preview3dModulePromise = null;
+async function getPreview3dModule() {
+  if (!preview3dModulePromise) {
+    preview3dModulePromise = import("/hive-resources/js/preview3d.js")
+      .catch((err) => {
+        preview3dModulePromise = null;
+        throw err;
+      });
+  }
+  return preview3dModulePromise;
+}
+
 
 function modelPreviewUrl(file) {
   if (!file) return "";
@@ -227,14 +239,16 @@ function scheduleModelCardPreview(card, it) {
 
   const start = async () => {
     if (cardPreviews.has(card)) return;
-    const preview = new CardPreview(viewer);
-    cardPreviews.set(card, preview);
     if (ph) {
       ph.style.display = "flex";
       ph.textContent = "LOADING...";
     }
 
+    let preview = null;
     try {
+      const { CardPreview } = await getPreview3dModule();
+      preview = new CardPreview(viewer);
+      cardPreviews.set(card, preview);
       await preview.init(url);
       const frozen = preview.freezeToImage();
       cardPreviews.delete(card);
@@ -377,6 +391,7 @@ async function showModelPreview(it) {
 
   try {
     els.modalViewer.innerHTML = "";
+    const { ModalPreview } = await getPreview3dModule();
     activeModelModalPreview = new ModalPreview(els.modalViewer);
     await activeModelModalPreview.open(url);
   } catch (err) {
