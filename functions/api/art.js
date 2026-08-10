@@ -929,7 +929,7 @@ function isoDurationLabel_(iso) {
   return h ? `${h}:${String(min).padStart(2, "0")}:${String(sec).padStart(2, "0")}` : `${min}:${String(sec).padStart(2, "0")}`;
 }
 function dateNumber_(v) { const n = new Date(v || 0).getTime(); return Number.isFinite(n) ? n : 0; }
-function prettyName_(s) { return String(s || "").replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim(); }
+function prettyName_(s) { return String(s || "").replace(/^\s*!+\s*/, "").replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim(); }
 function titleCase_(s) { return String(s || "").toLowerCase().replace(/\b\w/g, (m) => m.toUpperCase()); }
 function formatOrder_(key) { const order = ["image", "video", "trailer", "timelapse", "gltf", "glb", "bbmodel", "mcpack", "zip", "mcaddon", "psd", "blend", "nomad"]; const i = order.indexOf(key); return i < 0 ? 99 : i; }
 function cleanLinkText_(html) { return decodeHtml_(String(html || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ")).trim(); }

@@ -527,7 +527,7 @@ function parseDesignName_(s) {
   };
 }
 function normalizeBase_(s) { return parseDesignName_(stripExtension_(s)).baseKey; }
-function prettyName_(s) { return String(s || "").replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim(); }
+function prettyName_(s) { return String(s || "").replace(/^\s*!+\s*/, "").replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim(); }
 function titleCase_(s) { return String(s || "").toLowerCase().replace(/\b\w/g, (m) => m.toUpperCase()); }
 function formatOrder_(key) { const order = ["image", "timelapse", "psd", "blend", "nomad"]; const i = order.indexOf(key); return i < 0 ? 99 : i; }
 function cleanLinkText_(html) { return decodeHtml_(String(html || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ")).trim(); }

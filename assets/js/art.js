@@ -5,6 +5,7 @@ import {
   setUrlParam,
   getUrlParam,
   copyToClipboard,
+  confirmRestrictedAssetDownload,
   initMobileNav,
   lockBodyScroll,
   unlockBodyScroll,
@@ -545,6 +546,7 @@ function makeDownloadUrl(it, file) {
 }
 async function downloadFile(it, file, button) {
   if (!file) return;
+  if (!confirmRestrictedAssetDownload(it)) return;
   await downloadViaFetch(makeDownloadUrl(it, file), filenameFor(it, file), { button, fallbackUrl: driveBrowserDownloadUrl(file.fileId) });
 }
 function makeActionButton(label, onClick, primary = false) {

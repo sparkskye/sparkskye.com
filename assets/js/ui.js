@@ -74,6 +74,20 @@ export function titleCase(str) {
     .replace(/\b\w/g, (m) => m.toUpperCase());
 }
 
+const RESTRICTED_ASSET_ACKNOWLEDGEMENT = "i acknowledge that these assets are for viewing and educational purposes only and i will not repurpose, extract, or plagiarize the assets in any way.";
+
+export function confirmRestrictedAssetDownload(item) {
+  const files = [
+    ...Object.values(item?.files || {}),
+    ...(Array.isArray(item?.formats) ? item.formats : []),
+    ...(Array.isArray(item?.variations) ? item.variations : []),
+  ];
+  const restricted = files.some((file) =>
+    String(file?.name || file?.downloadName || "").trimStart().startsWith("!")
+  );
+  return !restricted || window.confirm(RESTRICTED_ASSET_ACKNOWLEDGEMENT);
+}
+
 let scrollLockY = 0;
 
 export function lockBodyScroll() {
