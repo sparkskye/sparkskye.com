@@ -74,7 +74,7 @@ export function titleCase(str) {
     .replace(/\b\w/g, (m) => m.toUpperCase());
 }
 
-const RESTRICTED_ASSET_ACKNOWLEDGEMENT = "i acknowledge that these assets are for viewing and educational purposes only and i will not repurpose, extract, or plagiarize the assets in any way.";
+const RESTRICTED_ASSET_ACKNOWLEDGEMENT = "I acknowledge that these assets are for viewing and educational purposes only, and I will not repurpose, extract, or plagiarize the assets in any way.";
 
 export function confirmRestrictedAssetDownload(item) {
   const files = [
