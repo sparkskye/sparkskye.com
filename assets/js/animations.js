@@ -306,6 +306,24 @@ function addDownloadButton(it, file, label) {
 }
 
 let currentGalleryItem = null, galleryNavigationBusy = false, modalCloseTimer = 0;
+let itemMotion = null;
+function stopItemMotion() { itemMotion?.cancel(); itemMotion = null; }
+function exitTheater() { els.modal.classList.remove('lp-theater'); }
+(function addTheaterControl(){
+  const card = els.modal.querySelector('.modal__card');
+  const enter = document.createElement('button');
+  enter.className = 'lp-theater-enter'; enter.type = 'button'; enter.textContent = 'THEATER MODE';
+  enter.addEventListener('click', () => els.modal.classList.add('lp-theater'));
+  const exit = document.createElement('button');
+  exit.className = 'lp-theater-exit'; exit.type = 'button'; exit.textContent = 'EXIT THEATER';
+  exit.addEventListener('click', exitTheater);
+  card.append(enter, exit);
+})();
+window.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && els.modal.classList.contains('lp-theater')) {
+    e.preventDefault(); e.stopImmediatePropagation(); exitTheater();
+  }
+}, true);
 function openModal(it, opts = {}) {
   clearTimeout(modalCloseTimer);
   els.modal.classList.remove('is-closing');
@@ -351,10 +369,11 @@ function openModal(it, opts = {}) {
 }
 
 function closeModal(opts = {}) {
+  if (els.modal.classList.contains('lp-theater')) { exitTheater(); return; }
   if (!opts.afterAnimation && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
     if (els.modal.classList.contains('is-closing')) return;
     els.modal.classList.add('is-closing');
-    modalCloseTimer=setTimeout(()=>closeModal({...opts,afterAnimation:true}),240);
+    modalCloseTimer=setTimeout(()=>closeModal({...opts,afterAnimation:true}),360);
     return;
   }
   els.modal.classList.remove('is-closing');
@@ -475,21 +494,21 @@ loadCategories().then(loadDataAndRender);
 
 // Navigate the currently filtered gallery; variations remain on their own buttons.
 function navigateGalleryItem(direction) {
-  if(galleryNavigationBusy || !els.modal.classList.contains('is-open') || els.modal.classList.contains('is-closing')) return;
-  const index=state.filtered.findIndex(it=>it.id===currentGalleryItem?.id);
-  const next=state.filtered[index+direction];
-  if(index<0 || !next) return;
-  const card=els.modal.querySelector('.modal__card');
-  if(matchMedia('(prefers-reduced-motion: reduce)').matches) {openModal(next);return;}
-  galleryNavigationBusy=true;
-  const outgoing=card.animate([{translate:'0px',opacity:1},{translate:(-direction*45)+'px',opacity:0}],{duration:130,easing:'ease-in',fill:'forwards'});
-  outgoing.finished.then(()=>{
-    if(!els.modal.classList.contains('is-open') || els.modal.classList.contains('is-closing')) return;
-    openModal(next);
-    outgoing.cancel();
-    return card.animate([{translate:(direction*45)+'px',opacity:0},{translate:'0px',opacity:1}],{duration:210,easing:'ease-out'}).finished;
-  }).catch(()=>{}).finally(()=>{outgoing.cancel();galleryNavigationBusy=false;});
+  if (!els.modal.classList.contains('is-open') || els.modal.classList.contains('is-closing')) return;
+  const index = state.filtered.findIndex(it => it.id === currentGalleryItem?.id);
+  const next = state.filtered[index + direction];
+  if (index < 0 || !next) return;
+  const rapid = !!itemMotion;
+  stopItemMotion();
+  openModal(next);
+  if (rapid || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const card = els.modal.querySelector('.modal__card');
+  const anim = card.animate([{translate: (direction * 25) + 'px 0', opacity:.87},{translate:'0 0',opacity:1}],{
+    duration:180,easing:'cubic-bezier(.16,1,.3,1)'});
+  itemMotion=anim;
+  anim.onfinish=()=>{if(itemMotion===anim){anim.cancel();itemMotion=null;}};
 }
+
 window.addEventListener('keydown',e=>{
   if(e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.target.closest?.('input,textarea,select,[contenteditable=true]')) return;
   if(els.modal.classList.contains('is-open') && ['ArrowLeft','ArrowRight'].includes(e.key)) {
@@ -498,12 +517,12 @@ window.addEventListener('keydown',e=>{
 });
 let gallerySwipe=null;
 els.modal.addEventListener('pointerdown',e=>{
-  // Keep image panning, model rotation, and video controls available: swipe the details panel.
-  if(e.pointerType==='touch' && e.target.closest('.modal__meta') && !e.target.closest('button,a,input')) gallerySwipe={x:e.clientX,y:e.clientY,id:e.pointerId};
-});
+  if(e.pointerType!=='touch' || e.target.closest('button,a,input,video,iframe')) return;
+  gallerySwipe={x:e.clientX,y:e.clientY,id:e.pointerId};
+},true);
 els.modal.addEventListener('pointerup',e=>{
-  if(!gallerySwipe || gallerySwipe.id!==e.pointerId) return;
-  const dx=e.clientX-gallerySwipe.x,dy=e.clientY-gallerySwipe.y; gallerySwipe=null;
-  if(Math.abs(dx)>55 && Math.abs(dx)>Math.abs(dy)*1.5) navigateGalleryItem(dx<0?1:-1);
-});
-els.modal.addEventListener('pointercancel',()=>gallerySwipe=null);
+  if (!gallerySwipe || gallerySwipe.id!==e.pointerId) return;
+  const dx=e.clientX-gallerySwipe.x, dy=e.clientY-gallerySwipe.y; gallerySwipe=null;
+  if(Math.abs(dx)>56 && Math.abs(dx)>Math.abs(dy)*1.35) navigateGalleryItem(dx<0?1:-1);
+},true);
+els.modal.addEventListener('pointercancel',()=>gallerySwipe=null,true);

@@ -82,6 +82,13 @@ export function createPanZoomImageViewer({
     return (state.baseScale || 1) * (state.zoom || 1);
   }
 
+  let feedbackTimer = 0;
+  function showFeedback() {
+    if (!container.closest('.liquid-subpage')) return;
+    state.shell?.classList.add('lp-zoom-feedback');
+    clearTimeout(feedbackTimer);
+    feedbackTimer = setTimeout(() => state.shell?.classList.remove('lp-zoom-feedback'), 1100);
+  }
   function applyTransform() {
     if (!state.img) return;
     clamp();
@@ -89,6 +96,7 @@ export function createPanZoomImageViewer({
     state.img.style.transform = `translate(-50%, -50%) translate(${state.x}px, ${state.y}px) scale(${s})`;
     if (state.helper) state.helper.textContent = `${Math.round((state.zoom || 1) * 100)}%`;
     if (state.zoomLabel) state.zoomLabel.textContent = `${Math.round((state.zoom || 1) * 100)}%`;
+    if (state.shell?.classList.contains('lp-zoom-initialized')) showFeedback();
   }
 
   function applyFitScale(fitScale) {
@@ -161,6 +169,7 @@ export function createPanZoomImageViewer({
   }
 
   function destroy() {
+    clearTimeout(feedbackTimer);
     if (state.viewport && state.wheelHandler) state.viewport.removeEventListener("wheel", state.wheelHandler);
     if (state.viewport && state.pointerDownHandler) state.viewport.removeEventListener("pointerdown", state.pointerDownHandler);
     if (window && state.pointerMoveHandler) window.removeEventListener("pointermove", state.pointerMoveHandler);
@@ -194,8 +203,10 @@ export function createPanZoomImageViewer({
 
   const zoomGroup = document.createElement("div");
   zoomGroup.className = "map-preview__group";
-  zoomGroup.appendChild(createControl("+", () => zoomBy(1.25)));
-  zoomGroup.appendChild(createControl("-", () => zoomBy(0.8)));
+  if (!container.closest('.liquid-subpage')) {
+    zoomGroup.appendChild(createControl("+", () => zoomBy(1.25)));
+    zoomGroup.appendChild(createControl("-", () => zoomBy(0.8)));
+  }
 
   const zoomLabel = document.createElement("button");
   zoomLabel.type = "button";
@@ -340,6 +351,9 @@ export function createPanZoomImageViewer({
     const h = img.naturalHeight || 0;
     resolution.textContent = w && h ? `${w} x ${h} ${units}` : "";
     scheduleFit();
+    state.shell.classList.add('lp-zoom-initialized');
+    state.shell.classList.remove('lp-zoom-feedback');
+    clearTimeout(feedbackTimer);
     if (typeof onLoad === "function") onLoad({ width: w, height: h, state });
   });
 
