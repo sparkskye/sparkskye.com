@@ -401,7 +401,6 @@
     if (e.pointerType !== 'touch') return;
     // First tap always opens the island, even if a link occupies the same coordinates.
     suppressOpeningTap = !open;
-    if (suppressOpeningTap) suppressTouchClickUntil = performance.now() + 750;
     if (heldTouchLink) clearHeldTouchLink();
     activeTouchId = e.pointerId;
     touchDownAt = performance.now();
