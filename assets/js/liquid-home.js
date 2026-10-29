@@ -20,6 +20,11 @@
   const hint = document.querySelector('.island-hint');
   const detail = document.querySelector('.island-detail');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  if (!subpage) {
+    const revealCopy = () => { if (window.scrollY > 24) document.body.classList.add('lp-scrolled'); };
+    window.addEventListener('scroll', revealCopy, { passive: true });
+    revealCopy();
+  }
   document.documentElement.classList.add('liquid-enhanced');
   const CELL = 4; // The one and only spatial resolution for every liquid effect.
   const BASE_COLOR = stage.dataset.baseColor || '#00aaff';
@@ -157,11 +162,19 @@
   let touchTimeout = 0, activeTouchId = null, touchDragged = false;
   let touchDownAt = -Infinity, touchDownPosition = null, touchedLink = null;
   let suppressTouchClickUntil = 0;
+  let suppressOpeningTap = false;
+  let heldTouchLink = null;
   const TOUCH_OPEN_MS = 10000;
   function stopTouchTimer() { clearTimeout(touchTimeout); touchTimeout = 0; }
   function armTouchTimer() {
     stopTouchTimer();
-    if (open) touchTimeout = setTimeout(() => setOpen(false), TOUCH_OPEN_MS);
+    if (open) touchTimeout = setTimeout(() => { clearHeldTouchLink(); setOpen(false); }, TOUCH_OPEN_MS);
+  }
+  function clearHeldTouchLink() {
+    if (heldTouchLink) animateLetters(heldTouchLink, false);
+    heldTouchLink = null;
+    touchedLink = null;
+    showDescription(null);
   }
   let pointer = null; // Retain cursor position briefly beyond the island edge.
   const waves = [], droplets = [];
@@ -316,7 +329,7 @@
   stage.dataset.heading = 'hidden';
   function setOpen(value) {
     clearTimeout(collapseTimer);
-    if (!value) stopTouchTimer();
+    if (!value) { stopTouchTimer(); clearHeldTouchLink(); }
     if (open === value) return;
     clearTimeout(revealTimer);
     clearTimeout(entryTimer);
@@ -386,6 +399,10 @@
   // Short taps are still ordinary links; drags never navigate accidentally.
   hit.addEventListener('pointerdown', e => {
     if (e.pointerType !== 'touch') return;
+    // First tap always opens the island, even if a link occupies the same coordinates.
+    suppressOpeningTap = !open;
+    if (suppressOpeningTap) suppressTouchClickUntil = performance.now() + 750;
+    if (heldTouchLink) clearHeldTouchLink();
     activeTouchId = e.pointerId;
     touchDownAt = performance.now();
     touchDownPosition = { x: e.clientX, y: e.clientY };
@@ -409,21 +426,26 @@
   // Suppress only clicks created by dragging across the island. Taps on
   // actual links remain fully functional on phones.
   hit.addEventListener('click', e => {
-    if (performance.now() < suppressTouchClickUntil && e.detail !== 0) {
-      e.preventDefault(); e.stopPropagation();
+    if (suppressOpeningTap || (performance.now() < suppressTouchClickUntil && e.detail !== 0)) {
+      e.preventDefault(); e.stopImmediatePropagation();
+      suppressOpeningTap = false;
     }
   }, true);
   window.addEventListener('pointerup', e => {
     if (e.pointerId !== activeTouchId) return;
     if (touchDragged) suppressTouchClickUntil = performance.now() + 380;
     activeTouchId = null; lastPointer = null; pointer = null;
-    if (touchedLink) { animateLetters(touchedLink, false); showDescription(null); touchedLink = null; }
+    if (touchedLink && touchDragged) {
+      heldTouchLink = touchedLink;
+      showDescription(heldTouchLink);
+    } else if (touchedLink) { clearHeldTouchLink(); }
+    touchedLink = null;
     armTouchTimer();
   });
   window.addEventListener('pointercancel', e => {
     if (e.pointerId !== activeTouchId) return;
     activeTouchId = null; lastPointer = null; pointer = null;
-    if (touchedLink) { animateLetters(touchedLink, false); showDescription(null); touchedLink = null; }
+    clearHeldTouchLink();
     armTouchTimer();
   });
   hit.addEventListener('keydown', e => {

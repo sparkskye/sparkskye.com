@@ -492,3 +492,19 @@ html, body { overflow-x: clip; }
 @media(prefers-reduced-motion:reduce){.liquid-subpage .modal.is-closing .modal__card,.liquid-subpage .modal.is-closing .modal__backdrop{animation:none;}}
 
 .liquid-subpage .modal__meta {touch-action:pan-y;}
+
+
+/* v12: leave homepage copy hidden until the reader scrolls past the island. */
+.liquid-home:not(.lp-scrolled) .island-hint,
+.liquid-home:not(.lp-scrolled) .island-detail,
+.liquid-home:not(.lp-scrolled) .intro,
+.liquid-home:not(.lp-scrolled) .liquid-footer { visibility: hidden; opacity: 0 !important; pointer-events: none; animation: none !important; }
+@media (prefers-reduced-motion: no-preference) {
+ .liquid-home.lp-scrolled .island-hint { animation: lp-copy-appear .52s both; }
+ .liquid-home.lp-scrolled .intro { animation: lp-copy-appear .6s .12s both; }
+ .liquid-home.lp-scrolled .liquid-footer { animation: lp-copy-appear .6s .22s both; }
+}
+@media (max-width:600px) {
+ .liquid-subpage .island-toggle { font-size: clamp(35px, 9vw, 45px); }
+ .liquid-home .island-toggle { font-size: clamp(37px, 9vw, 47px); }
+}
