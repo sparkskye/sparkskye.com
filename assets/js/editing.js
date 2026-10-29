@@ -245,14 +245,18 @@ function renderModalStats(it) {
   }
 }
 
+let currentGalleryItem = null, galleryNavigationBusy = false, modalCloseTimer = 0;
 function openModal(it, opts = {}) {
+  clearTimeout(modalCloseTimer);
+  els.modal.classList.remove('is-closing');
+  currentGalleryItem=it;
   const wasOpen = els.modal.classList.contains("is-open");
   if (!wasOpen) state.lastNonPreviewUrl = getPreviewlessHref();
   const previewLink = buildPreviewLink(it);
 
   els.modal.classList.add("is-open");
   els.modal.setAttribute("aria-hidden", "false");
-  state.lastFocus = document.activeElement;
+  if (!wasOpen) state.lastFocus = document.activeElement;
   try { els.modalClose?.focus?.(); } catch {}
   lockBodyScroll();
   if (!opts.skipUrlUpdate) history.replaceState({}, "", previewLink);
@@ -283,6 +287,13 @@ function openModal(it, opts = {}) {
 }
 
 function closeModal(opts = {}) {
+  if (!opts.afterAnimation && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    if (els.modal.classList.contains('is-closing')) return;
+    els.modal.classList.add('is-closing');
+    modalCloseTimer=setTimeout(()=>closeModal({...opts,afterAnimation:true}),240);
+    return;
+  }
+  els.modal.classList.remove('is-closing');
   try { state.lastFocus?.focus?.(); } catch {}
   els.modal.classList.remove("is-open");
   els.modal.setAttribute("aria-hidden", "true");
@@ -352,3 +363,38 @@ window.addEventListener("popstate", async () => {
 
 initMobileNav();
 loadDataAndRender();
+
+// Navigate the currently filtered gallery; variations remain on their own buttons.
+function navigateGalleryItem(direction) {
+  if(galleryNavigationBusy || !els.modal.classList.contains('is-open') || els.modal.classList.contains('is-closing')) return;
+  const index=state.filtered.findIndex(it=>it.id===currentGalleryItem?.id);
+  const next=state.filtered[index+direction];
+  if(index<0 || !next) return;
+  const card=els.modal.querySelector('.modal__card');
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches) {openModal(next);return;}
+  galleryNavigationBusy=true;
+  const outgoing=card.animate([{translate:'0px',opacity:1},{translate:(-direction*45)+'px',opacity:0}],{duration:130,easing:'ease-in',fill:'forwards'});
+  outgoing.finished.then(()=>{
+    if(!els.modal.classList.contains('is-open') || els.modal.classList.contains('is-closing')) return;
+    openModal(next);
+    outgoing.cancel();
+    return card.animate([{translate:(direction*45)+'px',opacity:0},{translate:'0px',opacity:1}],{duration:210,easing:'ease-out'}).finished;
+  }).catch(()=>{}).finally(()=>{outgoing.cancel();galleryNavigationBusy=false;});
+}
+window.addEventListener('keydown',e=>{
+  if(e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.target.closest?.('input,textarea,select,[contenteditable=true]')) return;
+  if(els.modal.classList.contains('is-open') && ['ArrowLeft','ArrowRight'].includes(e.key)) {
+    e.preventDefault(); navigateGalleryItem(e.key==='ArrowRight'?1:-1);
+  }
+});
+let gallerySwipe=null;
+els.modal.addEventListener('pointerdown',e=>{
+  // Keep image panning, model rotation, and video controls available: swipe the details panel.
+  if(e.pointerType==='touch' && e.target.closest('.modal__meta') && !e.target.closest('button,a,input')) gallerySwipe={x:e.clientX,y:e.clientY,id:e.pointerId};
+});
+els.modal.addEventListener('pointerup',e=>{
+  if(!gallerySwipe || gallerySwipe.id!==e.pointerId) return;
+  const dx=e.clientX-gallerySwipe.x,dy=e.clientY-gallerySwipe.y; gallerySwipe=null;
+  if(Math.abs(dx)>55 && Math.abs(dx)>Math.abs(dy)*1.5) navigateGalleryItem(dx<0?1:-1);
+});
+els.modal.addEventListener('pointercancel',()=>gallerySwipe=null);

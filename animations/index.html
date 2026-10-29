@@ -6,29 +6,27 @@
   <title>animation • sparkskye</title>
   <link rel="icon" href="/public/img/favicon.png" />
   <link rel="stylesheet" href="/assets/css/site.css" />
+  <link rel="stylesheet" href="/assets/css/liquid-home.css" />
+  <script defer src="/assets/js/liquid-home.js"></script>
+  <script defer src="/assets/js/liquid-gallery.js"></script>
 </head>
-<body class="theme-animations animation-page">
-  <header class="topbar">
-    <a class="brand" href="/">
-      <img class="brand__logo" src="/public/img/favicon.png" alt="Sparkskye" />
-      <span class="brand__name">SPARKSKYE</span>
-    </a>
-    <nav class="topnav">
-      <div class="topnav__links">
-        <a class="topnav__btn is-active" style="--item-color:#598ffe" href="/animations/">ANIMATION</a>
-        <a class="topnav__btn" style="--item-color:#f0593a" href="/editing/">EDITING</a>
-        <a class="topnav__btn" style="--item-color:#894bdd" href="/design/">DESIGN</a>
-        <a class="topnav__btn" style="--item-color:#fbbc42" href="/art/">ART</a>
+<body class="theme-animations animation-page liquid-subpage">
+  <header class="liquid-subnav" aria-label="Site navigation">
+    <section class="island-stage" data-page="animation" data-base-color="#598ffe" aria-label="Explore Sparkskye">
+      <canvas class="liquid-canvas" aria-hidden="true"></canvas>
+      <div class="island-hit">
+        <h1 class="island-heading"><button class="island-toggle" aria-expanded="false" aria-controls="island-links">animation</button></h1>
+        <nav id="island-links" aria-label="Explore other pages">
+          <a href="/" data-color="#00aaff">home</a>
+          <a href="/editing/" data-color="#f0593a">editing</a>
+          <a href="/design/" data-color="#894bdd">design</a>
+          <a href="/art/" data-color="#fbbc42">art</a>
+        </nav>
       </div>
-    </nav>
+    </section>
   </header>
 
   <main class="page page--wide">
-    <section class="hero">
-      <h1 class="hero__title">ANIMATION</h1>
-      <p class="hero__sub">2d and 3d animations i've made</p>
-    </section>
-
     <section class="panel" id="filtersPanel">
       <div class="panel__row panel__row--center">
         <div class="panel__label">TYPE</div>
@@ -63,9 +61,9 @@
     </div>
   </div>
 
-  <footer class="site-footer" aria-label="Site footer">
-    <div class="site-footer__copy"><span class="site-footer__symbol">&copy;</span>2026 sparkskye</div>
-    <div class="site-footer__ai">This website was made with the help of AI tools.</div>
+  <footer class="liquid-footer">
+    <nav aria-label="More Sparkskye"><a href="https://www.youtube.com/@sparkskye" target="_blank" rel="noreferrer">youtube</a><a href="https://x.com/sparkskyemc" target="_blank" rel="noreferrer">x / twitter</a><a href="http://dsc.gg/sparkskye" target="_blank" rel="noreferrer">discord</a><a href="/hive-resources/">hive resources</a></nav>
+    <p>© 2026 sparkskye <span>this website was made with the help of AI tools.</span></p>
   </footer>
 
   <script type="module" src="/assets/js/animations.js"></script>

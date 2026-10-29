@@ -197,13 +197,17 @@ export function createPanZoomImageViewer({
   zoomGroup.appendChild(createControl("+", () => zoomBy(1.25)));
   zoomGroup.appendChild(createControl("-", () => zoomBy(0.8)));
 
-  const zoomLabel = document.createElement("span");
+  const zoomLabel = document.createElement("button");
+  zoomLabel.type = "button";
+  zoomLabel.title = "Reset zoom and position";
+  zoomLabel.setAttribute("aria-label", "Reset zoom and position");
+  zoomLabel.addEventListener("click", () => scheduleFit());
   zoomLabel.className = "map-preview__zoom";
   zoomLabel.textContent = "100%";
   zoomLabel.setAttribute("aria-live", "polite");
   zoomGroup.appendChild(zoomLabel);
 
-  zoomGroup.appendChild(createControl("HOME", () => scheduleFit()));
+  
   controls.appendChild(zoomGroup);
 
   viewport.appendChild(img);
