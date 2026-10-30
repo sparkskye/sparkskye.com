@@ -458,7 +458,26 @@ function exitTheater() { els.modal.classList.remove('lp-theater'); }
   });
   // File and item changes recreate the viewer. Reattach the overlay afterward.
   const keepInsideViewer = () => {
-    if (enter.parentNode !== viewer) viewer.appendChild(enter);
+    let toolbar = viewer.querySelector(':scope > .lp-preview-toolbar');
+    if (!toolbar) {
+      toolbar = document.createElement('div');
+      toolbar.className = 'lp-preview-toolbar';
+      toolbar.setAttribute('role', 'group');
+      toolbar.setAttribute('aria-label', 'Preview controls');
+      viewer.appendChild(toolbar);
+    }
+    // The pan/zoom viewer is rebuilt for each image. Move its accessible
+    // controls into the stable toolbar without recreating the handlers.
+    const panzoom = viewer.querySelector('.shared-panzoom-preview');
+    const dimensions = panzoom?.querySelector('.map-preview__resolution');
+    const zoom = panzoom?.querySelector('.map-preview__controls');
+    if (dimensions && dimensions.parentNode !== toolbar) {
+      toolbar.insertBefore(dimensions, toolbar.firstChild);
+    }
+    if (zoom && zoom.parentNode !== toolbar) {
+      toolbar.insertBefore(zoom, enter.parentNode === toolbar ? enter : null);
+    }
+    if (enter.parentNode !== toolbar) toolbar.appendChild(enter);
   };
   keepInsideViewer();
   new MutationObserver(keepInsideViewer).observe(viewer, { childList: true });

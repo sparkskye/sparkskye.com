@@ -617,44 +617,40 @@ html, body { overflow-x: clip; }
 .liquid-subpage .modal .design-variant-arrow { border-radius:9999px!important; }
 
 
-/* v14 — distinguish the window contour from the rounded CONTENT inside. */
+/* v15: keep the original preview-window contour; round only image content. */
 .liquid-subpage .modal__viewer,
 .liquid-subpage .modal__viewer--media {
   border-radius: 24px !important;
   background: var(--panel2) !important;
-  padding: 10px !important;
+  padding: 0 !important;
 }
 .liquid-subpage .modal__viewer > .map-preview,
 .liquid-subpage .modal__viewer > .timelapse-preview {
-  width: 100%; height: 100%;
+  width: 100%;
+  height: 100%;
 }
-.liquid-subpage .modal__viewer > .map-preview,
-.liquid-subpage .modal__viewer > .timelapse-preview,
-.liquid-subpage .modal__viewer > video,
-.liquid-subpage .modal__viewer > iframe,
-.liquid-subpage .modal__viewer .shared-panzoom-preview,
-.liquid-subpage .modal__viewer .map-preview__viewport {
-  border-radius: 52px !important;
+.liquid-subpage .modal__viewer .map-preview,
+.liquid-subpage .modal__viewer .map-preview__viewport,
+.liquid-subpage .modal__viewer > .timelapse-preview {
+  border-radius: 24px !important;
   overflow: hidden;
 }
+/* Percentage radii follow the image's aspect ratio, not its pixel resolution. */
 .liquid-subpage .modal__viewer img,
 .liquid-subpage .modal__viewer video,
 .liquid-subpage .modal__viewer iframe,
-.liquid-subpage .modal__viewer .shared-panzoom-preview .map-preview__img {
-  border-radius: 52px !important;
+.liquid-subpage .modal__viewer .map-preview__img {
+  border-radius: 5% / 8% !important;
 }
 .liquid-subpage .modal.lp-theater .modal__viewer {
   padding: 0 !important;
   border-radius: 0 !important;
 }
-.liquid-subpage .modal.lp-theater .modal__viewer > .map-preview,
-.liquid-subpage .modal.lp-theater .modal__viewer > .timelapse-preview,
-.liquid-subpage .modal.lp-theater .modal__viewer > video,
-.liquid-subpage .modal.lp-theater .modal__viewer > iframe,
-.liquid-subpage .modal.lp-theater .modal__viewer .map-preview__viewport {
+.liquid-subpage .modal.lp-theater .map-preview,
+.liquid-subpage .modal.lp-theater .map-preview__viewport,
+.liquid-subpage .modal.lp-theater .modal__viewer > .timelapse-preview {
   border-radius: 0 !important;
 }
-
 /* File versions are attached to the name, followed by a deliberate gap to actions. */
 .liquid-subpage .modal__name:has(+ .modal__variant:not([hidden])) {
   margin-bottom: 4px !important;
@@ -698,6 +694,103 @@ html, body { overflow-x: clip; }
 .liquid-subpage .modal__viewer:not(.lp-preview-active) .lp-theater-enter {
   opacity: 0;
   pointer-events: none;
+}
+
+/* v15: one top-center toolbar for dimensions, zoom, and fullscreen. */
+.liquid-subpage .modal__viewer > .lp-preview-toolbar {
+  position: absolute !important;
+  z-index: 20;
+  top: 14px;
+  left: 50%;
+  right: auto;
+  bottom: auto;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  max-width: calc(100% - 22px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .38s ease;
+}
+.liquid-subpage .modal__viewer.lp-preview-active > .lp-preview-toolbar,
+.liquid-subpage .modal__viewer > .lp-preview-toolbar:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
+.liquid-subpage .lp-preview-toolbar > .map-preview__resolution,
+.liquid-subpage .lp-preview-toolbar > .map-preview__controls,
+.liquid-subpage .lp-preview-toolbar > .lp-theater-enter {
+  position: static !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  width: auto;
+  margin: 0 !important;
+  flex: 0 0 auto;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  translate: none;
+}
+.liquid-subpage .lp-preview-toolbar > .lp-theater-enter {
+  display: grid;
+  width: 44px !important;
+  height: 40px;
+  transform: none !important;
+  background: rgb(20 20 20 / 50%) !important;
+}
+.liquid-subpage .lp-preview-toolbar > .map-preview__resolution,
+.liquid-subpage .lp-preview-toolbar .map-preview__zoom,
+.liquid-subpage .lp-preview-toolbar > .lp-theater-enter {
+  background: rgb(20 20 20 / 50%) !important;
+  border: none !important;
+  border-radius: 9999px !important;
+  box-shadow: none !important;
+  color: #fff;
+  white-space: nowrap;
+}
+.liquid-subpage .lp-preview-toolbar > .map-preview__controls {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+.liquid-subpage .lp-preview-toolbar .map-preview__group {
+  display: flex;
+  justify-content: center !important;
+  flex-wrap: nowrap;
+}
+.liquid-subpage .modal__meta {
+  text-align: center !important;
+}
+.liquid-subpage .modal__meta .modal__name,
+.liquid-subpage .modal__meta .modal__variant,
+.liquid-subpage .modal__meta .modal__stats,
+.liquid-subpage .modal__meta .modal__path {
+  text-align: center;
+}
+.liquid-subpage .modal__meta .modal__stats,
+.liquid-subpage .modal__actions {
+  justify-content: center !important;
+  align-items: center;
+}
+@media(max-width: 460px) {
+  .liquid-subpage .modal__viewer > .lp-preview-toolbar { gap: 6px; top: 10px; }
+  .liquid-subpage .lp-preview-toolbar > .map-preview__resolution {
+    font-size: 8px;
+    padding: 9px 9px;
+  }
+  .liquid-subpage .lp-preview-toolbar .map-preview__zoom {
+    min-width: 48px;
+    padding: 8px 7px;
+    font-size: 9px;
+  }
+  .liquid-subpage .lp-preview-toolbar > .lp-theater-enter {
+    width: 39px !important;
+    height: 36px;
+  }
 }
 
 /* Lift the visible hero group into the vertical center before scrolling.
