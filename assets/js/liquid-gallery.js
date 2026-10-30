@@ -27,19 +27,38 @@
     }
   }).observe(grid, { childList: true, subtree: true });
 
+  // Shared floating preview controls fade after movement stops.
+  const modal = document.getElementById('modal');
+  const viewer = document.getElementById('modalViewer');
+  if (modal && viewer) {
+    let chromeTimer = 0;
+    const revealChrome = () => {
+      viewer.classList.add('lp-preview-active');
+      modal.classList.add('lp-preview-active');
+      clearTimeout(chromeTimer);
+      chromeTimer = setTimeout(() => {
+        viewer.classList.remove('lp-preview-active');
+        modal.classList.remove('lp-preview-active');
+      }, 2050);
+    };
+    viewer.addEventListener('pointerenter', revealChrome, { passive: true });
+    viewer.addEventListener('pointermove', revealChrome, { passive: true });
+    viewer.addEventListener('pointerdown', revealChrome, { passive: true });
+    modal.addEventListener('pointermove', () => {
+      if (modal.classList.contains('lp-theater')) revealChrome();
+    }, { passive: true });
+    modal.addEventListener('focusin', revealChrome);
+  }
+
   if (reduced.matches) return;
   const selector = 'input.search, .map-preview__resolution, .map-preview__zoom, .map-preview__helper, .chip, .btn, .card, .modal__close, .card__reload, .design-variant-arrow';
   const springs = new WeakMap();
+  const searchRects = new WeakMap();
   const target = event => {
     const el = event.target instanceof Element ? event.target.closest(selector) : null;
     return el && el.closest('.liquid-subpage') ? el : null;
   };
   function spring(el, mode) {
-    if(el.matches('input.search')) {
-      springs.get(el)?.cancel();
-      const anim=el.animate([{scale:'1'},{scale:'.995 .96',offset:.25},{scale:'1.003 1.025',offset:.6},{scale:'1'}],{duration:260,easing:'ease-out'});
-      springs.set(el,anim); return;
-    }
     const fromScale = getComputedStyle(el).scale;
     const fromRotate = getComputedStyle(el).rotate;
     springs.get(el)?.cancel();
@@ -47,7 +66,9 @@
       rotate: fromRotate === 'none' ? '0deg' : fromRotate };
     const hover = mode === 'enter';
     const click = mode === 'press';
-    const finalScale = hover ? '1.025' : (mode === 'leave' ? '1' : (el.matches(':hover') ? '1.025' : '1'));
+    const small = el.matches('input.search');
+    const finalScale = hover ? (small ? '1.003' : '1.025') :
+      (mode === 'leave' ? '1' : (el.matches(':hover') ? (small ? '1.003' : '1.025') : '1'));
     el.style.scale = finalScale;
     el.style.rotate = '0deg';
     let frames;
@@ -57,6 +78,10 @@
       {scale:'.99',rotate:'.55deg',offset:.73}, {scale:finalScale,rotate:'0deg'}];
     else frames = [start,{scale:'.985',rotate:'.4deg',offset:.58},{scale:'1',rotate:'0deg'}];
     if (el.matches('.card, input')) frames = frames.map(f => ({...f, rotate:'0deg'}));
+    if (small) frames = frames.map(f => ({
+      ...f, scale: f.scale === '1' ? '1' :
+        (f.scale === finalScale ? finalScale : (mode === 'press' ? '.997' : '1.008'))
+    }));
     const anim = el.animate(frames, { duration: click ? 410 : hover ? 440 : 300,
       easing:'ease-out', fill:'both'});
     springs.set(el,anim);
@@ -71,12 +96,14 @@
     const el = target(e);
     if (!el || el.contains(e.relatedTarget)) return;
     el.classList.add('lp-motion-target','lp-motion-active');
+    if (el.matches('input.search')) searchRects.set(el, el.getBoundingClientRect());
     if (e.pointerType !== 'touch') spring(el,'enter');
   });
   document.addEventListener('pointerout', e => {
     const el = target(e);
     if (!el || el.contains(e.relatedTarget)) return;
     resetTilt(el);
+    searchRects.delete(el);
     el.classList.remove('lp-motion-active');
     spring(el,'leave');
   });
@@ -84,13 +111,23 @@
     if (e.pointerType === 'touch' || coarse.matches) return;
     const el = target(e);
     if (!el || !el.matches(':hover')) return;
-    const r = el.getBoundingClientRect();
+    const r = el.matches('input.search') ?
+      (searchRects.get(el) || el.getBoundingClientRect()) : el.getBoundingClientRect();
     if (r.width < 2 || r.height < 2) return;
     const x = Math.max(-1,Math.min(1,(e.clientX-r.left-r.width/2)/(r.width/2)));
     const y = Math.max(-1,Math.min(1,(e.clientY-r.top-r.height/2)/(r.height/2)));
     el.classList.add('lp-motion-target');
     const card = el.classList.contains('card');
     if(card) el.style.translate = `${x*7}px ${y*5}px`;
+    if (el.matches('input.search')) {
+      // Use the original, untransformed bounds so the search field follows the
+      // pointer instead of feeding its own movement back into the calculation.
+      el.style.setProperty('--lp-x', `${(x * 6).toFixed(2)}px`);
+      el.style.setProperty('--lp-y', `${(y * 3).toFixed(2)}px`);
+      el.style.setProperty('--lp-rx', '0deg');
+      el.style.setProperty('--lp-ry', '0deg');
+      return;
+    }
     if(el.matches('.design-variant-arrow')) return;
     el.style.setProperty('--lp-x', `${(x * (card ? 3.5 : 2.0)).toFixed(2)}px`);
     el.style.setProperty('--lp-y', `${(-2 + y * (card ? 2.5 : 1.5)).toFixed(2)}px`);
