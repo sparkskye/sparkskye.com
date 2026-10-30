@@ -87,7 +87,7 @@ export function createPanZoomImageViewer({
     if (!container.closest('.liquid-subpage')) return;
     state.shell?.classList.add('lp-zoom-feedback');
     clearTimeout(feedbackTimer);
-    feedbackTimer = setTimeout(() => state.shell?.classList.remove('lp-zoom-feedback'), 1100);
+    feedbackTimer = setTimeout(() => state.shell?.classList.remove('lp-zoom-feedback'), 2100);
   }
   function applyTransform() {
     if (!state.img) return;
@@ -115,10 +115,11 @@ export function createPanZoomImageViewer({
     const vh = state.viewport.clientHeight || 0;
     const iw = state.img.naturalWidth || 0;
     const ih = state.img.naturalHeight || 0;
-    if (vw < 10 || vh < 10 || iw < 2 || ih < 2) return;
+    if (vw < 10 || vh < 10 || iw < 2 || ih < 2) return false;
     const fitScale = Math.min(vw / iw, vh / ih);
-    if (!Number.isFinite(fitScale) || fitScale <= 0) return;
+    if (!Number.isFinite(fitScale) || fitScale <= 0) return false;
     applyFitScale(fitScale);
+    return true;
   }
 
   function scheduleFit(tries = 0) {
@@ -129,7 +130,11 @@ export function createPanZoomImageViewer({
       if (tries < 12) requestAnimationFrame(() => scheduleFit(tries + 1));
       return;
     }
-    fitToView();
+    if (fitToView() && state.img.style.opacity === "0") {
+      requestAnimationFrame(() => {
+        if (state.img?.isConnected) state.img.style.opacity = "1";
+      });
+    }
   }
 
   function zoomTo(nextZoom, clientX = null, clientY = null) {
@@ -170,6 +175,11 @@ export function createPanZoomImageViewer({
 
   function destroy() {
     clearTimeout(feedbackTimer);
+    if (state.viewport) {
+      state.viewport.removeEventListener('pointerenter', indicateHover);
+      state.viewport.removeEventListener('pointermove', indicateHover);
+      state.viewport.removeEventListener('pointerdown', indicateHover);
+    }
     if (state.viewport && state.wheelHandler) state.viewport.removeEventListener("wheel", state.wheelHandler);
     if (state.viewport && state.pointerDownHandler) state.viewport.removeEventListener("pointerdown", state.pointerDownHandler);
     if (window && state.pointerMoveHandler) window.removeEventListener("pointermove", state.pointerMoveHandler);
@@ -193,6 +203,10 @@ export function createPanZoomImageViewer({
   img.className = `modal__thumb map-preview__img ${imageClass}`.trim();
   img.alt = alt;
   img.draggable = false;
+  if (container.closest('.liquid-subpage')) {
+    img.style.opacity = '0';
+    img.style.transition = 'opacity 220ms ease-out';
+  }
 
   const resolution = document.createElement("div");
   resolution.className = "map-preview__resolution";
@@ -338,6 +352,10 @@ export function createPanZoomImageViewer({
 
   state.resizeHandler = () => scheduleFit();
 
+  const indicateHover = () => showFeedback();
+  viewport.addEventListener('pointerenter', indicateHover);
+  viewport.addEventListener('pointermove', indicateHover, { passive: true });
+  viewport.addEventListener('pointerdown', indicateHover, { passive: true });
   viewport.addEventListener("wheel", state.wheelHandler, { passive: false });
   viewport.addEventListener("pointerdown", state.pointerDownHandler);
   window.addEventListener("pointermove", state.pointerMoveHandler);
