@@ -699,6 +699,7 @@ function openModal(it, opts = {}) {
 }
 
 function closeModal(opts = {}) {
+  stopItemMotion();
   if (els.modal.classList.contains('lp-theater')) { exitTheater(); return; }
   if (!opts.afterAnimation && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
     if (els.modal.classList.contains('is-closing')) return;

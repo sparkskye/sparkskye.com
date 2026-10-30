@@ -611,3 +611,7 @@ html, body { overflow-x: clip; }
  .liquid-subpage .modal.is-closing .modal__card,
  .liquid-subpage .modal__viewer>iframe,.liquid-subpage .modal__viewer>video{animation:none!important}
 }
+
+/* Gallery-only: every remaining preview control uses the same pill outline. */
+.liquid-subpage .modal button,.liquid-subpage .modal .btn,
+.liquid-subpage .modal .design-variant-arrow { border-radius:9999px!important; }
