@@ -618,13 +618,29 @@ function stopItemMotion() { itemMotion?.cancel(); itemMotion = null; }
 function exitTheater() { els.modal.classList.remove('lp-theater'); }
 (function addTheaterControl(){
   const card = els.modal.querySelector('.modal__card');
+  const viewer = els.modalViewer;
   const enter = document.createElement('button');
-  enter.className = 'lp-theater-enter'; enter.type = 'button'; enter.textContent = 'THEATER MODE';
-  enter.addEventListener('click', () => els.modal.classList.add('lp-theater'));
+  enter.className = 'lp-theater-enter';
+  enter.type = 'button';
+  enter.title = 'Fullscreen';
+  enter.setAttribute('aria-label', 'Fullscreen');
+  enter.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M21 16v5h-5M3 16v5h5"/></svg>';
+  enter.addEventListener('click', e => {
+    e.stopPropagation();
+    els.modal.classList.add('lp-theater', 'lp-preview-active');
+  });
+  // File and item changes recreate the viewer. Reattach the overlay afterward.
+  const keepInsideViewer = () => {
+    if (enter.parentNode !== viewer) viewer.appendChild(enter);
+  };
+  keepInsideViewer();
+  new MutationObserver(keepInsideViewer).observe(viewer, { childList: true });
   const exit = document.createElement('button');
-  exit.className = 'lp-theater-exit'; exit.type = 'button'; exit.textContent = 'EXIT THEATER';
-  exit.addEventListener('click', exitTheater);
-  card.append(enter, exit);
+  exit.className = 'lp-theater-exit';
+  exit.type = 'button';
+  exit.textContent = 'EXIT FULLSCREEN';
+  exit.addEventListener('click', e => { e.stopPropagation(); exitTheater(); });
+  card.appendChild(exit);
 })();
 window.addEventListener('keydown', e => {
   if (e.key === 'Escape' && els.modal.classList.contains('lp-theater')) {
@@ -825,15 +841,29 @@ function navigateGalleryItem(direction) {
   const index = state.filtered.findIndex(it => it.id === currentGalleryItem?.id);
   const next = state.filtered[index + direction];
   if (index < 0 || !next) return;
-  const rapid = !!itemMotion;
+  const rapid = Boolean(itemMotion);
   stopItemMotion();
   openModal(next);
   if (rapid || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const card = els.modal.querySelector('.modal__card');
-  const anim = card.animate([{translate: (direction * 25) + 'px 0', opacity:.87},{translate:'0 0',opacity:1}],{
-    duration:180,easing:'cubic-bezier(.16,1,.3,1)'});
-  itemMotion=anim;
-  anim.onfinish=()=>{if(itemMotion===anim){anim.cancel();itemMotion=null;}};
+
+  // Move the preview content, not the modal window. Fast input cancels motion.
+  const distance = direction * 78;
+  const frames = [
+    { transform: `translateX(${distance}px)`, opacity: .18, offset: 0 },
+    { transform: `translateX(${-direction * 6}px)`, opacity: 1, offset: .8 },
+    { transform: 'translateX(0px)', opacity: 1, offset: 1 }
+  ];
+  const settings = { duration: 340, easing: 'cubic-bezier(.16,.82,.3,1)', fill: 'both' };
+  const viewerMotion = els.modalViewer.animate(frames, settings);
+  const metaMotion = els.modal.querySelector('.modal__meta').animate(frames, {...settings,duration:370});
+  const pair = { cancel: () => { viewerMotion.cancel(); metaMotion.cancel(); } };
+  itemMotion = pair;
+  metaMotion.onfinish = () => {
+    if (itemMotion === pair) {
+      pair.cancel();
+      itemMotion = null;
+    }
+  };
 }
 
 window.addEventListener('keydown',e=>{
