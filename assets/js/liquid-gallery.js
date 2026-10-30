@@ -54,6 +54,59 @@
     modal.addEventListener('focusin', revealChrome);
   }
 
+  // Proportional corner radii depend on image aspect ratio, not resolution.
+  if (viewer) {
+    const seen = new WeakSet();
+    const setCorners = media => {
+      const w = media.naturalWidth || media.videoWidth || 0;
+      const h = media.naturalHeight || media.videoHeight || 0;
+      if (w < 1 || h < 1) return;
+      const r = Math.min(w, h) * .04;
+      media.style.setProperty('--lp-radius-x', `${(r / w * 100).toFixed(3)}%`);
+      media.style.setProperty('--lp-radius-y', `${(r / h * 100).toFixed(3)}%`);
+    };
+    const inspect = () => {
+      viewer.querySelectorAll('img,video').forEach(media => {
+        if (!seen.has(media)) {
+          seen.add(media);
+          media.addEventListener('load', () => setCorners(media));
+          media.addEventListener('loadedmetadata', () => setCorners(media));
+        }
+        setCorners(media);
+      });
+    };
+    inspect();
+    new MutationObserver(inspect).observe(viewer, { childList:true, subtree:true });
+  }
+
+  // Keep gallery result counts for filtering, display them in the search hint.
+  const search = document.getElementById('searchInput');
+  const countLabel = document.getElementById('countLabel');
+  if (search && countLabel) {
+    const noun = document.body.classList.contains('animation-page') ? 'animations' :
+      document.body.classList.contains('editing-page') ? 'videos' :
+      document.body.classList.contains('art-page') ? 'artworks' : 'designs';
+    search.setAttribute('aria-label', `Search ${noun}`);
+    const measure = document.createElement('canvas').getContext('2d');
+    const updateWidth = () => {
+      const style = getComputedStyle(search);
+      measure.font = `${style.fontSize} ${style.fontFamily}`;
+      const measured = measure.measureText(search.value || search.placeholder).width;
+      const max = Math.max(150, search.parentElement.clientWidth - 24);
+      search.style.setProperty('--lp-search-width', `${Math.min(max, Math.max(174, Math.ceil(measured + 58)))}px`);
+    };
+    const updatePlaceholder = () => {
+      const count = countLabel.textContent.match(/\d[\d,]*/)?.[0] || '0';
+      search.placeholder = `search ${count} ${noun}`;
+      updateWidth();
+    };
+    search.addEventListener('input', updateWidth, {passive:true});
+    window.addEventListener('resize', updateWidth, {passive:true});
+    new MutationObserver(updatePlaceholder).observe(countLabel, {childList:true, characterData:true, subtree:true});
+    document.fonts?.ready.then(updateWidth);
+    updatePlaceholder();
+  }
+
   if (reduced.matches) return;
   const selector = 'input.search, .map-preview__resolution, .map-preview__zoom, .map-preview__helper, .lp-theater-enter, .lp-theater-exit, .chip, .btn, .card, .modal__close, .card__reload, .design-variant-arrow';
   const springs = new WeakMap();
