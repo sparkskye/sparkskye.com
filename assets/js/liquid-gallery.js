@@ -44,14 +44,18 @@
     viewer.addEventListener('pointerenter', revealChrome, { passive: true });
     viewer.addEventListener('pointermove', revealChrome, { passive: true });
     viewer.addEventListener('pointerdown', revealChrome, { passive: true });
+    viewer.addEventListener('lp-preview-interaction', revealChrome);
     modal.addEventListener('pointermove', () => {
+      if (modal.classList.contains('lp-theater')) revealChrome();
+    }, { passive: true });
+    modal.addEventListener('pointerdown', () => {
       if (modal.classList.contains('lp-theater')) revealChrome();
     }, { passive: true });
     modal.addEventListener('focusin', revealChrome);
   }
 
   if (reduced.matches) return;
-  const selector = 'input.search, .map-preview__resolution, .map-preview__zoom, .map-preview__helper, .chip, .btn, .card, .modal__close, .card__reload, .design-variant-arrow';
+  const selector = 'input.search, .map-preview__resolution, .map-preview__zoom, .map-preview__helper, .lp-theater-enter, .lp-theater-exit, .chip, .btn, .card, .modal__close, .card__reload, .design-variant-arrow';
   const springs = new WeakMap();
   const searchRects = new WeakMap();
   const target = event => {

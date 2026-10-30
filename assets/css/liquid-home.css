@@ -615,3 +615,110 @@ html, body { overflow-x: clip; }
 /* Gallery-only: every remaining preview control uses the same pill outline. */
 .liquid-subpage .modal button,.liquid-subpage .modal .btn,
 .liquid-subpage .modal .design-variant-arrow { border-radius:9999px!important; }
+
+
+/* v14 — distinguish the window contour from the rounded CONTENT inside. */
+.liquid-subpage .modal__viewer,
+.liquid-subpage .modal__viewer--media {
+  border-radius: 24px !important;
+  background: var(--panel2) !important;
+  padding: 10px !important;
+}
+.liquid-subpage .modal__viewer > .map-preview,
+.liquid-subpage .modal__viewer > .timelapse-preview {
+  width: 100%; height: 100%;
+}
+.liquid-subpage .modal__viewer > .map-preview,
+.liquid-subpage .modal__viewer > .timelapse-preview,
+.liquid-subpage .modal__viewer > video,
+.liquid-subpage .modal__viewer > iframe,
+.liquid-subpage .modal__viewer .shared-panzoom-preview,
+.liquid-subpage .modal__viewer .map-preview__viewport {
+  border-radius: 52px !important;
+  overflow: hidden;
+}
+.liquid-subpage .modal__viewer img,
+.liquid-subpage .modal__viewer video,
+.liquid-subpage .modal__viewer iframe,
+.liquid-subpage .modal__viewer .shared-panzoom-preview .map-preview__img {
+  border-radius: 52px !important;
+}
+.liquid-subpage .modal.lp-theater .modal__viewer {
+  padding: 0 !important;
+  border-radius: 0 !important;
+}
+.liquid-subpage .modal.lp-theater .modal__viewer > .map-preview,
+.liquid-subpage .modal.lp-theater .modal__viewer > .timelapse-preview,
+.liquid-subpage .modal.lp-theater .modal__viewer > video,
+.liquid-subpage .modal.lp-theater .modal__viewer > iframe,
+.liquid-subpage .modal.lp-theater .modal__viewer .map-preview__viewport {
+  border-radius: 0 !important;
+}
+
+/* File versions are attached to the name, followed by a deliberate gap to actions. */
+.liquid-subpage .modal__name:has(+ .modal__variant:not([hidden])) {
+  margin-bottom: 4px !important;
+}
+.liquid-subpage .modal__variant:not([hidden]) {
+  margin-top: 0;
+  margin-bottom: 22px !important;
+}
+
+/* Fullscreen uses exactly the same surface and opacity timing as image metadata. */
+.liquid-subpage .lp-theater-enter {
+  background: rgb(20 20 20 / 50%) !important;
+  box-shadow: none !important;
+  border: 0 !important;
+  color: white;
+  font-family: MCFive, monospace;
+}
+.liquid-subpage .lp-theater-enter:hover,
+.liquid-subpage .lp-theater-enter:focus-visible {
+  background: rgb(20 20 20 / 60%) !important;
+}
+.liquid-subpage .modal__viewer .map-preview__resolution,
+.liquid-subpage .modal__viewer .map-preview__zoom,
+.liquid-subpage .modal__viewer .lp-theater-enter {
+  background: rgb(20 20 20 / 50%) !important;
+  border-radius: 9999px !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.liquid-subpage .modal__viewer .lp-theater-enter {
+  transition: opacity .38s ease, transform .28s cubic-bezier(.2,1.25,.36,1),
+    scale .32s cubic-bezier(.2,1.25,.36,1), background .2s ease;
+}
+/* One preview-active state drives all overlays. */
+.liquid-subpage .modal__viewer.lp-preview-active .map-preview__resolution,
+.liquid-subpage .modal__viewer.lp-preview-active .map-preview__controls,
+.liquid-subpage .modal__viewer.lp-preview-active .lp-theater-enter {
+  opacity: 1;
+  pointer-events: auto;
+}
+.liquid-subpage .modal__viewer:not(.lp-preview-active) .lp-theater-enter {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Lift the visible hero group into the vertical center before scrolling.
+   On the first scroll, it settles into its previous higher placement. */
+.liquid-home .home-hero-core {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translateY(clamp(48px, 10svh, 110px));
+  transition: transform .78s cubic-bezier(.19,1,.22,1);
+}
+.liquid-home.lp-scrolled .home-hero-core {
+  transform: translateY(0);
+}
+@media (max-width: 600px) {
+  .liquid-home .home-hero-core {
+    transform: translateY(clamp(35px, 7svh, 68px));
+  }
+  .liquid-home.lp-scrolled .home-hero-core { transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .liquid-home .home-hero-core { transition: none; }
+}

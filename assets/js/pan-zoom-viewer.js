@@ -85,9 +85,8 @@ export function createPanZoomImageViewer({
   let feedbackTimer = 0;
   function showFeedback() {
     if (!container.closest('.liquid-subpage')) return;
-    state.shell?.classList.add('lp-zoom-feedback');
-    clearTimeout(feedbackTimer);
-    feedbackTimer = setTimeout(() => state.shell?.classList.remove('lp-zoom-feedback'), 2100);
+    // Gallery chrome shares one timer for dimensions, scale, and fullscreen.
+    container.dispatchEvent(new Event('lp-preview-interaction', { bubbles: true }));
   }
   function applyTransform() {
     if (!state.img) return;
