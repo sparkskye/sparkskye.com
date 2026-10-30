@@ -76,6 +76,21 @@
       word.appendChild(letter);
     });
     headingTextNode.replaceWith(word);
+    // Fit complete title inside the liquid shape after fonts load or on resize.
+    const fitCompactHeading = () => {
+      toggle.style.fontSize = '';
+      const preferred = parseFloat(getComputedStyle(toggle).fontSize) || 38;
+      const available = Math.max(148, Math.min(
+        smallScreen() ? 336 : 280, stage.clientWidth - (smallScreen() ? 20 : 32)
+      ) - 28);
+      const measured = word.getBoundingClientRect().width;
+      if (measured > available && measured > 0) {
+        toggle.style.fontSize = `${Math.max(26, preferred * available / measured)}px`;
+      }
+    };
+    requestAnimationFrame(fitCompactHeading);
+    document.fonts?.ready.then(fitCompactHeading);
+    window.addEventListener('resize', fitCompactHeading, { passive: true });
   }
 
   const letterState = new WeakMap();
@@ -195,7 +210,7 @@
     return Math.max(0.05, 1 - Math.exp(-4.8 * t) * Math.cos(14 * t));
   }
   function geometry() {
-    const closedWidth = Math.min(280, width - 32);
+    const closedWidth = smallScreen() ? Math.min(336, width - 20) : Math.min(280, width - 32);
     const openedWidth = smallScreen() ? width - 12 : width - 200;
     const scale = entranceScale(clock || performance.now() / 1000);
     return {
