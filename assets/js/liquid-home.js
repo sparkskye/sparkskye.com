@@ -79,6 +79,8 @@
     // Fit complete title inside the liquid shape after fonts load or on resize.
     const fitCompactHeading = () => {
       toggle.style.fontSize = '';
+      // Desktop styling already fits; only shrink when the navigation is compact.
+      if (!smallScreen()) return;
       const preferred = parseFloat(getComputedStyle(toggle).fontSize) || 38;
       const available = Math.max(148, Math.min(
         smallScreen() ? 336 : 280, stage.clientWidth - (smallScreen() ? 20 : 32)
