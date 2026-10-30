@@ -457,6 +457,13 @@ function exitTheater() { els.modal.classList.remove('lp-theater'); }
     els.modal.classList.add('lp-theater', 'lp-preview-active');
   });
   // File and item changes recreate the viewer. Reattach the overlay afterward.
+  const exit = document.createElement('button');
+  exit.className = 'lp-theater-exit';
+  exit.type = 'button';
+  exit.title = 'Exit fullscreen';
+  exit.setAttribute('aria-label', 'Exit fullscreen');
+  exit.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9h6V3M21 9h-6V3M21 15h-6v6M3 15h6v6"/></svg>';
+  exit.addEventListener('click', e => { e.stopPropagation(); exitTheater(); });
   const keepInsideViewer = () => {
     let toolbar = viewer.querySelector(':scope > .lp-preview-toolbar');
     if (!toolbar) {
@@ -478,15 +485,11 @@ function exitTheater() { els.modal.classList.remove('lp-theater'); }
       toolbar.insertBefore(zoom, enter.parentNode === toolbar ? enter : null);
     }
     if (enter.parentNode !== toolbar) toolbar.appendChild(enter);
+    if (exit.parentNode !== toolbar) toolbar.appendChild(exit);
   };
   keepInsideViewer();
   new MutationObserver(keepInsideViewer).observe(viewer, { childList: true });
-  const exit = document.createElement('button');
-  exit.className = 'lp-theater-exit';
-  exit.type = 'button';
-  exit.textContent = 'EXIT FULLSCREEN';
-  exit.addEventListener('click', e => { e.stopPropagation(); exitTheater(); });
-  card.appendChild(exit);
+  // Exit fullscreen reuses the centered toolbar control slot.
 })();
 window.addEventListener('keydown', e => {
   if (e.key === 'Escape' && els.modal.classList.contains('lp-theater')) {
