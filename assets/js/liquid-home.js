@@ -209,14 +209,16 @@
     if (reduced.matches) return 1;
     const t = clamp((time - entranceStart) / 0.70, 0, 1);
     // A quick, springy pop with a small overshoot, no sluggish viscosity.
-    return Math.max(0.05, 1 - Math.exp(-4.8 * t) * Math.cos(14 * t));
+    // Small restrained bounce; mobile islands never overshoot beyond the viewport.
+    return clamp(1 - Math.exp(-7.3 * t) * Math.cos(9 * t), .05, smallScreen() ? 1.045 : 1.10);
   }
   function geometry() {
     const closedWidth = smallScreen() ? Math.min(336, width - 20) : Math.min(280, width - 32);
-    const openedWidth = smallScreen() ? width - 12 : width - 200;
+    const openedWidth = smallScreen() ? width - 28 : width - 200;
     const scale = entranceScale(clock || performance.now() / 1000);
     return {
-      w: (closedWidth + (openedWidth - closedWidth) * expansion) * scale,
+      w: Math.min((closedWidth + (openedWidth - closedWidth) * expansion) * scale,
+        smallScreen() ? width - 28 : width - 12),
       h: (90 + ((smallScreen() ? 186 : 124) - 90) * expansion) * scale
     };
   }
@@ -478,6 +480,9 @@
     function activate(x, y) { setColor(link.dataset.color, x, y); showDescription(link); }
     link.addEventListener('pointerenter', e => {
       const pt = position(e);
+      if (e.pointerType !== 'touch') {
+        links.forEach(other => { if (other !== link) animateLetters(other, false); });
+      }
       animateLetters(link, true);
       activate(pt.x, pt.y);
     });
@@ -543,6 +548,14 @@
       {translate:'0px 0px',scale:'1'}],{duration:620,easing:'ease-out'});
     if(p.moved) {const r=stage.getBoundingClientRect(); splash({x:p.x-r.left-width/2,y:p.y-r.top-height/2},1500);}
     if(p.link.hasPointerCapture(p.id)) p.link.releasePointerCapture(p.id);
+    if (e.pointerType !== 'touch') {
+      // Captured drag events can skip pointerleave. Reconcile every letter
+      // with the actual cursor location, never the stale captured target.
+      const hovered = document.elementFromPoint(e.clientX, e.clientY)?.closest('#island-links a');
+      const active = open && links.includes(hovered) ? hovered : null;
+      links.forEach(link => animateLetters(link, link === active));
+      showDescription(active);
+    }
   }
   window.addEventListener('pointerup',releasePull);
   window.addEventListener('pointercancel',releasePull);

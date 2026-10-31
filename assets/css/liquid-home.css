@@ -934,3 +934,25 @@ html, body { overflow-x: clip; }
   }
   #island-links a { font-size: clamp(17px, 5vw, 20px) !important; }
 }
+
+/* v17: let the single liquid engine own entrance scaling.
+   Scaling the entire gallery stage scaled its viewport-sized canvas too,
+   clipping the island on one side before landing. Translate only. */
+@media (prefers-reduced-motion: no-preference) {
+  .liquid-subnav .island-stage {
+    animation-name: lp-island-land-v17;
+    animation-duration: .78s;
+    animation-timing-function: cubic-bezier(.2,.8,.22,1);
+  }
+}
+@keyframes lp-island-land-v17 {
+  0%   { opacity: .35; transform: translateY(74px); }
+  48%  { opacity: 1; transform: translateY(-9px); }
+  73%  { transform: translateY(3px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@media (max-width:820px) {
+  .liquid-subnav .island-stage[data-open="true"] .island-hit {
+    width: calc(100% - 28px);
+  }
+}
