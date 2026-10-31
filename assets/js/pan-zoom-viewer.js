@@ -41,6 +41,7 @@ export function createPanZoomImageViewer({
     pointerMoveHandler: null,
     pointerUpHandler: null,
     resizeHandler: null,
+    viewportResizeObserver: null,
   };
 
   function clearNode(node) {
@@ -187,6 +188,7 @@ export function createPanZoomImageViewer({
       window.removeEventListener("pointercancel", state.pointerUpHandler);
     }
     if (window && state.resizeHandler) window.removeEventListener("resize", state.resizeHandler);
+    state.viewportResizeObserver?.disconnect();
     clearNode(container);
   }
 
@@ -355,6 +357,14 @@ export function createPanZoomImageViewer({
   viewport.addEventListener('pointerenter', indicateHover);
   viewport.addEventListener('pointermove', indicateHover, { passive: true });
   viewport.addEventListener('pointerdown', indicateHover, { passive: true });
+  // Responsive gallery previews may resize after the source image loads.
+  // Refit only when the viewport dimensions change; preserve user zoom otherwise.
+  if (container.closest('.liquid-subpage') && typeof ResizeObserver !== 'undefined') {
+    state.viewportResizeObserver = new ResizeObserver(() => {
+      if (state.img?.complete && state.img.naturalWidth > 0) scheduleFit();
+    });
+    state.viewportResizeObserver.observe(viewport);
+  }
   viewport.addEventListener("wheel", state.wheelHandler, { passive: false });
   viewport.addEventListener("pointerdown", state.pointerDownHandler);
   window.addEventListener("pointermove", state.pointerMoveHandler);
