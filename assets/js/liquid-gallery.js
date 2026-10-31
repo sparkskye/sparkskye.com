@@ -79,6 +79,56 @@
     new MutationObserver(inspect).observe(viewer, { childList:true, subtree:true });
   }
 
+  // Use the content's true aspect ratio on roomy desktop windows. A
+  // thumbnail can occupy a full 16:9 viewer instead of sitting in letterbox.
+  // Never shrink the modal to make it fit: use the default constrained viewer
+  // when there is not enough space around the expanded window.
+  if (viewer && modal) {
+    let fitFrame = 0;
+    const fitViewer = () => {
+      fitFrame = 0;
+      if (!modal.classList.contains('is-open') || modal.classList.contains('lp-theater') ||
+          window.innerWidth < 960 || window.innerHeight < 700) {
+        viewer.removeAttribute('data-fluid-fit');
+        viewer.style.removeProperty('--lp-fluid-viewer-height');
+        return;
+      }
+      const img = viewer.querySelector('img.map-preview__img, img.modal__thumb');
+      const video = viewer.querySelector('video');
+      const iframe = viewer.querySelector('iframe');
+      const ratio = img?.naturalWidth && img?.naturalHeight
+        ? img.naturalWidth / img.naturalHeight
+        : video?.videoWidth && video?.videoHeight
+          ? video.videoWidth / video.videoHeight
+          : iframe ? 16 / 9 : 0;
+      const card = modal.querySelector('.modal__card');
+      if (!card || ratio <= 0 || !Number.isFinite(ratio)) {
+        viewer.removeAttribute('data-fluid-fit');
+        viewer.style.removeProperty('--lp-fluid-viewer-height');
+        return;
+      }
+      const width = viewer.clientWidth;
+      const contentHeight = width / ratio;
+      const otherHeight = card.offsetHeight - viewer.offsetHeight;
+      const available = Math.min(850, window.innerHeight - 40 - otherHeight);
+      if (contentHeight >= 220 && contentHeight <= available) {
+        viewer.style.setProperty('--lp-fluid-viewer-height', `${Math.round(contentHeight)}px`);
+        viewer.dataset.fluidFit = 'true';
+      } else {
+        viewer.removeAttribute('data-fluid-fit');
+        viewer.style.removeProperty('--lp-fluid-viewer-height');
+      }
+    };
+    const scheduleViewerFit = () => {
+      if (!fitFrame) fitFrame = requestAnimationFrame(fitViewer);
+    };
+    new MutationObserver(scheduleViewerFit).observe(viewer, {childList:true,subtree:true});
+    viewer.addEventListener('load', scheduleViewerFit, true);
+    viewer.addEventListener('loadedmetadata', scheduleViewerFit, true);
+    window.addEventListener('resize', scheduleViewerFit, {passive:true});
+    scheduleViewerFit();
+  }
+
   // Keep gallery result counts for filtering, display them in the search hint.
   const search = document.getElementById('searchInput');
   const countLabel = document.getElementById('countLabel');
