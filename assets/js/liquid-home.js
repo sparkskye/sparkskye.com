@@ -21,9 +21,35 @@
   const detail = document.querySelector('.island-detail');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   if (!subpage) {
-    const revealCopy = () => { if (window.scrollY > 24) document.body.classList.add('lp-scrolled'); };
+    // Home should always start with the clean island view, even on reload.
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+    const resetHome = () => {
+      window.scrollTo(0, 0);
+      document.body.classList.remove('lp-scrolled');
+    };
+    const revealCopy = () => {
+      document.body.classList.toggle('lp-scrolled', window.scrollY > 44);
+    };
+    resetHome();
+    window.addEventListener('pageshow', () => {
+      resetHome();
+      requestAnimationFrame(resetHome);
+    });
     window.addEventListener('scroll', revealCopy, { passive: true });
-    revealCopy();
+  } else {
+    // Preserve a stable native scrollbar gutter while the gallery modal locks
+    // page scrolling. Auto-hide its colored thumb after scroll activity.
+    let fadeTimer = 0;
+    const showScrollThumb = () => {
+      document.documentElement.classList.add('lp-scroll-active');
+      clearTimeout(fadeTimer);
+      fadeTimer = setTimeout(() => {
+        document.documentElement.classList.remove('lp-scroll-active');
+      }, 1100);
+    };
+    window.addEventListener('scroll', showScrollThumb, { passive: true });
+    window.addEventListener('wheel', showScrollThumb, { passive: true });
+    window.addEventListener('touchmove', showScrollThumb, { passive: true });
   }
   document.documentElement.classList.add('liquid-enhanced');
   const CELL = 4; // The one and only spatial resolution for every liquid effect.
@@ -634,14 +660,24 @@
       {x,y,dx:1,dy:.25,start:time+.10,power:18*strength}
     );
     if (waves.length > 18) waves.splice(0,waves.length-18);
-    const count=Math.round(8*strength);
-    for (let i=0;i<count;i++) {
-      const angle=(Math.PI*2*i/count)+Math.random()*.18;
-      const speed=(85+Math.random()*155)*strength;
-      droplets.push({ax:x,ay:y,x,y,
-        vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,
-        r:3+Math.random()*6, born:time, lifetime:.5+Math.random()*.25,
-        color:[...color],tether:false,attached:false});
+    // Irregular spray like the island entrance: a few large lobes and some
+    // tiny flecks, with unequal spacing, timing, travel and direction.
+    const count = strength > .95 ? 6 : 3;
+    const heading = Math.random() * Math.PI * 2;
+    for (let i=0; i<count; i++) {
+      const angle = heading + (Math.random()-.5) * Math.PI * 1.85;
+      const distance = 5 + Math.random()*24;
+      const speed = (35 + Math.random()*185) * strength;
+      const radius = Math.random() < .27
+        ? 10 + Math.random()*7 : 2.5 + Math.random()*6.5;
+      droplets.push({
+        ax:x, ay:y,
+        x:x+Math.cos(angle)*distance, y:y+Math.sin(angle)*distance,
+        vx:Math.cos(angle)*speed, vy:Math.sin(angle)*speed,
+        r:radius, born:time+Math.random()*.09,
+        lifetime:.42+Math.random()*.46,
+        color:[...color], tether:false, attached:false
+      });
     }
     if (droplets.length>50) droplets.splice(0,droplets.length-50);
     requestFrame();

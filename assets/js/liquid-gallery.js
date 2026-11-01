@@ -61,7 +61,8 @@
   window.addEventListener('scroll', updateJumpTop, {passive:true});
   window.addEventListener('resize', updateJumpTop, {passive:true});
   jumpTop.addEventListener('click', () => {
-    jumpTop.classList.remove('is-visible');
+    // Keep the button visible through the press bounce. Normal scroll
+    // activity hides it only after reaching the top of the page.
     window.scrollTo({top:0,behavior:reduced.matches?'instant':'smooth'});
   });
   updateJumpTop();
@@ -289,6 +290,59 @@
     if (e.pointerType === 'touch') touchPressUntil.set(el, performance.now()+530);
     spring(el,'press',e.pointerType === 'touch');
   });
+  // On quick touch taps, filter handlers replace the button before its
+  // spring finishes. A noninteractive echo completes the same bounce.
+  const touchStarts = new Map();
+  document.addEventListener('pointerdown', e => {
+    if (e.pointerType !== 'touch') return;
+    const el = target(e);
+    if (!el || !el.matches('button, .btn, .chip, .card__reload')) return;
+    touchStarts.set(e.pointerId, {el, x:e.clientX, y:e.clientY});
+  }, true);
+  function touchEcho(el) {
+    if (!el.isConnected || reduced.matches) return;
+    const rect = el.getBoundingClientRect();
+    if (rect.width < 3 || rect.height < 3) return;
+    const computed = getComputedStyle(el);
+    const echo = el.cloneNode(true);
+    echo.removeAttribute('id');
+    echo.querySelectorAll('[id]').forEach(node => node.removeAttribute('id'));
+    echo.removeAttribute('aria-label');
+    echo.setAttribute('aria-hidden','true');
+    echo.tabIndex = -1;
+    echo.classList.add('lp-touch-echo');
+    Object.assign(echo.style, {
+      position:'fixed', left:rect.left+'px', top:rect.top+'px',
+      width:rect.width+'px', height:rect.height+'px',
+      margin:'0', boxSizing:'border-box', zIndex:'10050',
+      pointerEvents:'none', transformOrigin:'center center',
+      translate:'none', rotate:'none', scale:'1',
+      backgroundColor:computed.backgroundColor,
+      color:computed.color, border:computed.border,
+      borderRadius:computed.borderRadius,
+      font:computed.font, textAlign:computed.textAlign,
+      opacity:'1'
+    });
+    document.body.appendChild(echo);
+    const motion=echo.animate([
+      {transform:'scale(1)',opacity:1},
+      {transform:'scale(.91)',opacity:1,offset:.19},
+      {transform:'scale(1.12)',opacity:1,offset:.51},
+      {transform:'scale(.97)',opacity:1,offset:.72},
+      {transform:'scale(1)',opacity:0,offset:1}
+    ],{duration:490,easing:'cubic-bezier(.2,.8,.32,1)',fill:'forwards'});
+    motion.finished.catch(()=>{}).finally(()=>echo.remove());
+  }
+  document.addEventListener('pointerup', e => {
+    if (e.pointerType !== 'touch') return;
+    const started = touchStarts.get(e.pointerId);
+    touchStarts.delete(e.pointerId);
+    if (!started) return;
+    if (Math.hypot(e.clientX-started.x,e.clientY-started.y)>14) return;
+    touchEcho(started.el);
+  }, true);
+  document.addEventListener('pointercancel', e => touchStarts.delete(e.pointerId), true);
+
   document.addEventListener('click', e => {
     // Keyboard and assistive technology activate click without pointerdown.
     if (e.detail !== 0) return;
