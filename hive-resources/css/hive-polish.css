@@ -291,3 +291,138 @@ body.hive-polished .hive-reveal-item.is-visible {
 body.hive-polished .card__meta {
   padding-top: 9px !important;
 }
+
+/* v24 Hive motion system: pixel typography, staggered entry and hover recoil.
+   Motion is only visual; existing controls and resource viewers own input. */
+body.hive-polished .hero__title {
+  text-align:center;
+  width:100%;
+  font-size:clamp(46px,6vw,68px);
+  margin:0 auto;
+}
+body.hive-polished .hero__sub,
+body.hive-polished .hero__quicklinks,
+body.hive-polished .hero__downloads {
+  text-align:center;
+  justify-content:center;
+}
+body.hive-polished .hero__sub {
+  line-height:1.7;
+  margin-top:16px;
+}
+body.hive-polished .hero {
+  text-align:center;
+  padding:26px 6px 19px;
+}
+body.hive-polished .hive-letter {
+  display:inline-block;
+  white-space:pre;
+  transform-origin:center bottom;
+  backface-visibility:hidden;
+  vertical-align:baseline;
+}
+body.hive-polished .hive-letter-parent {
+  text-align:inherit;
+}
+body.hive-polished .hero__title .hive-letter,
+body.hive-polished .hero__sub .hive-letter {
+  animation:hive-letter-entrance .70s cubic-bezier(.16,1,.29,1) both;
+  animation-delay:calc(70ms + min(var(--hive-i),32) * 28ms);
+}
+body.hive-polished .panel__label .hive-letter {
+  animation:hive-letter-entrance .55s cubic-bezier(.16,1,.29,1) both;
+  animation-delay:calc(170ms + min(var(--hive-i),22) * 18ms);
+}
+@keyframes hive-letter-entrance {
+  0% {opacity:0;transform:translateY(15px) scale(.78)}
+  58% {opacity:1;transform:translateY(-5px) scale(1.08)}
+  78% {opacity:1;transform:translateY(2px) scale(.97)}
+  100% {opacity:1;transform:none}
+}
+body.hive-polished .hive-letter-parent.hive-hovering .hive-letter,
+body.hive-polished .hive-letter-parent.hive-touch-letters .hive-letter {
+  animation:hive-letter-ripple .42s cubic-bezier(.16,1,.3,1) both;
+  animation-delay:calc(min(var(--hive-i),30) * 17ms);
+}
+@keyframes hive-letter-ripple {
+  0% {transform:translateY(0);color:inherit}
+  45% {transform:translateY(-6px) scale(1.045);color:#fff}
+  77% {transform:translateY(1px) scale(.985);color:#fff}
+  100% {transform:none;color:#fff}
+}
+body.hive-polished .hive-letter-parent:not(.hive-hovering):not(.hive-touch-letters) .hive-letter {
+  transition:color .25s ease,transform .28s cubic-bezier(.2,1.2,.3,1);
+}
+body.hive-polished .chip.hive-chip-entrance,
+body.hive-polished .topnav__btn.hive-chip-entrance,
+body.hive-polished .contrib.hive-chip-entrance {
+  animation:hive-chip-entrance .46s cubic-bezier(.16,1,.29,1) both;
+  animation-delay:calc(min(var(--hive-order),12) * 46ms);
+}
+@keyframes hive-chip-entrance {
+  from {opacity:0;transform:translateY(15px) scale(.88)}
+  72% {opacity:1;transform:translateY(-3px) scale(1.045)}
+  to {opacity:1;transform:none}
+}
+body.hive-polished .card.hive-reveal-item {
+  --hive-px:0px;--hive-py:0px;
+  --hive-rx:0deg;--hive-ry:0deg;
+  transform:translate3d(0,20px,0);
+  transition:opacity .48s ease,transform .54s cubic-bezier(.16,1,.29,1),
+    border-color .22s ease;
+}
+body.hive-polished .card.hive-reveal-item.is-visible {
+  transform:translate3d(var(--hive-px),var(--hive-py),0)
+    rotateX(var(--hive-rx)) rotateY(var(--hive-ry));
+}
+body.hive-polished .card:focus-visible {
+  outline:2px solid var(--accent);
+  outline-offset:4px;
+}
+body.hive-polished .card__viewer {
+  background:var(--panel2) !important;
+}
+body.hive-polished .card .card__viewer img {
+  transition:filter .28s ease;
+}
+body.hive-polished .card:is(:hover,:focus-visible) .card__viewer img {
+  filter:brightness(1.045);
+}
+body.hive-polished .modal__name,
+body.hive-polished .modal__path {
+  text-align:center;
+}
+body.hive-polished .modal.is-open .modal__actions {
+  animation:hive-modal-actions-enter .42s .12s cubic-bezier(.16,1,.29,1) both;
+}
+@keyframes hive-modal-actions-enter {
+  from {opacity:0;transform:translateY(12px)}
+  to {opacity:1;transform:none}
+}
+body.hive-polished .panel__row--center {
+  align-items:center;
+  text-align:center;
+}
+body.hive-polished .contrib {
+  transition:border-color .22s ease;
+}
+@media(max-width:680px) {
+  body.hive-polished .hero__title {font-size:clamp(43px,10vw,60px)}
+  body.hive-polished .hero__sub {font-size:10px}
+  body.hive-polished .card.hive-reveal-item.is-visible {
+    transform:translate3d(0,0,0);
+  }
+}
+@media(prefers-reduced-motion:reduce) {
+  body.hive-polished .hive-letter,
+  body.hive-polished .hive-letter-parent.hive-hovering .hive-letter,
+  body.hive-polished .hive-letter-parent.hive-touch-letters .hive-letter,
+  body.hive-polished .hive-chip-entrance,
+  body.hive-polished .modal.is-open .modal__actions {
+    animation:none!important;
+  }
+  body.hive-polished .card.hive-reveal-item,
+  body.hive-polished .card.hive-reveal-item.is-visible {
+    transform:none!important;transition:none!important;
+  }
+}
