@@ -21,7 +21,11 @@
         } else {
           const span = document.createElement('span');
           span.className = 'hive-letter';
-          span.style.setProperty('--hive-i', i++);
+          span.style.setProperty('--hive-i', String(i));
+          span.style.setProperty('--hive-intro-delay', Math.min(i,32)*28+'ms');
+          span.style.setProperty('--hive-label-delay', Math.min(i,22)*18+'ms');
+          span.style.setProperty('--hive-hover-delay', Math.min(i,30)*17+'ms');
+          i++;
           span.textContent = char;
           frag.appendChild(span);
         }
@@ -41,6 +45,7 @@
       if (el.dataset.hiveChipAnimated) return;
       el.dataset.hiveChipAnimated='true';
       el.style.setProperty('--hive-order',i);
+      el.style.setProperty('--hive-order-delay',Math.min(i,12)*46+'ms');
       if (!reduced.matches) el.classList.add('hive-chip-entrance');
     });
   };
