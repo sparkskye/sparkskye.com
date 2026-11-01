@@ -141,27 +141,43 @@ export function initMobileNav() {
     dropdown.appendChild(a);
   }
 
-  burger.addEventListener("click", () => {
-    dropdown.classList.toggle("is-open");
-    burger.classList.toggle("is-open", dropdown.classList.contains("is-open"));
-  });
+  // One continuous surface morphs from the compact menu control into the
+  // expanded navigation. The original links remain ordinary native anchors.
+  const shell = document.createElement("div");
+  shell.className = "topnav__mobile-shell";
+  shell.appendChild(burger);
+  shell.appendChild(dropdown);
+  burger.setAttribute("aria-controls", "hive-mobile-nav");
+  burger.setAttribute("aria-expanded", "false");
+  dropdown.id = "hive-mobile-nav";
+  dropdown.setAttribute("aria-label", "Hive pages");
 
-  document.addEventListener("click", (ev) => {
-    if (!dropdown.classList.contains("is-open")) return;
-    if (dropdown.contains(ev.target) || burger.contains(ev.target)) return;
-    dropdown.classList.remove("is-open");
-    burger.classList.remove("is-open");
-  });
+  const setOpen = (open, restoreFocus = false) => {
+    shell.classList.toggle("is-open", open);
+    dropdown.classList.toggle("is-open", open);
+    burger.classList.toggle("is-open", open);
+    burger.setAttribute("aria-expanded", String(open));
+    burger.setAttribute("aria-label", open ? "Close menu" : "Menu");
+    if (restoreFocus) burger.focus({preventScroll:true});
+  };
+  burger.addEventListener("click", () =>
+    setOpen(!shell.classList.contains("is-open")));
 
-  window.addEventListener("resize", () => {
-    if (window.innerWidth > 680) {
-      dropdown.classList.remove("is-open");
-      burger.classList.remove("is-open");
+  document.addEventListener("pointerdown", (ev) => {
+    if (shell.classList.contains("is-open") && !shell.contains(ev.target))
+      setOpen(false);
+  });
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key === "Escape" && shell.classList.contains("is-open")) {
+      ev.preventDefault();
+      setOpen(false, true);
     }
   });
+  window.addEventListener("resize", () => {
+    if (window.innerWidth > 680) setOpen(false);
+  });
 
-  nav.appendChild(burger);
-  nav.appendChild(dropdown);
+  nav.appendChild(shell);
 }
 
 // --- Latest news (option 1) -------------------------------------------------
