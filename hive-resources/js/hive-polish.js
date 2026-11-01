@@ -69,13 +69,14 @@
   }
   document.addEventListener('pointerenter',e=>{
     if(e.pointerType==='touch')return;
-    const el=selected(e);if(el)bounce(el,'hover');
+    const el=selected(e);
+    // Nested spans/icons can dispatch additional pointerenter events.
+    if(el && e.target===el)bounce(el,'hover');
   },true);
   document.addEventListener('pointerdown',e=>{
-    if(e.pointerType!=='touch')return;
     const el=selected(e);
     if(el)lastTouch={el,label:el.textContent.trim(),parent:el.parentElement,
-      time:performance.now(),id:e.pointerId};
+      time:performance.now(),id:e.pointerId,type:e.pointerType};
   },true);
   document.addEventListener('pointercancel',e=>{
     if(lastTouch?.id===e.pointerId)lastTouch=null;
@@ -92,13 +93,27 @@
       requestAnimationFrame(()=>{
         const live=t.el.isConnected?t.el:
           [...(t.parent?.querySelectorAll('button,a')||[])].find(x=>x.textContent.trim()===t.label);
-        if(live?.isConnected)bounce(live,'press',true);
+        if(live?.isConnected)bounce(live,'press',t.type==='touch');
       });
-    }else if(e.detail===0 || !lastTouch) {
+    }else if(e.detail===0) {
       requestAnimationFrame(()=>{if(el.isConnected)bounce(el,'press')});
     }
   },true);
 
+  // Introduce the Hive home and Rewind panels without changing their content.
+  if(!gallery && !reduce.matches){
+    const observer=new IntersectionObserver(entries=>{
+      for(const item of entries)if(item.isIntersecting){
+        item.target.classList.add('is-visible');
+        observer.unobserve(item.target);
+      }
+    },{threshold:.08,rootMargin:'0px 0px 40px 0px'});
+    document.querySelectorAll('.panel,.contrib').forEach((el,i)=>{
+      el.classList.add('hive-reveal-item');
+      el.style.transitionDelay=Math.min(i,5)*50+'ms';
+      observer.observe(el);
+    });
+  }
   if(!gallery)return;
 
   // Match the newer gallery search bars without modifying filter logic.
@@ -212,14 +227,31 @@
   };
   new MutationObserver(reconcile).observe(viewer,{childList:true});
   reconcile();
-  new MutationObserver(()=>{
-    if(!modal.classList.contains('is-open')){
+  let openedBefore=false;
+  let modalSettleTimer=0;
+  const updateOpenState=()=>{
+    if(modal.classList.contains('is-open')){
+      if(!openedBefore){
+        openedBefore=true;
+        clearTimeout(modalSettleTimer);
+        modalSettleTimer=setTimeout(()=>{
+          if(modal.classList.contains('is-open')) modal.classList.add('hive-opened');
+        },370);
+      }
+    }else{
+      openedBefore=false;
+      clearTimeout(modalSettleTimer);
+      modal.classList.remove('hive-opened');
       if(modal.classList.contains('hive-fullscreen')){
         modal.classList.remove('hive-fullscreen');
         updateFullscreen();
       }
     }
-  }).observe(modal,{attributes:true,attributeFilter:['class']});
+  };
+  new MutationObserver(updateOpenState).observe(modal,{
+    attributes:true,attributeFilter:['class']
+  });
+  updateOpenState();
   window.addEventListener('keydown',e=>{
     if(e.key==='Escape' && modal.classList.contains('hive-fullscreen')){
       e.stopImmediatePropagation();e.preventDefault();
