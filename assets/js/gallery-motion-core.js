@@ -5,7 +5,8 @@ window.SparkGalleryMotion.init = function initGalleryMotion(options) {
   options = options || {};
   const stage = document.querySelector('.liquid-subnav .island-stage');
   const grid = document.getElementById('grid');
-  if (!grid || document.body.dataset.galleryMotionReady) return;
+  // Hive home and Rewind have no grid, but still share page and button motion.
+  if ((!grid && !options.hive) || document.body.dataset.galleryMotionReady) return;
   document.body.dataset.galleryMotionReady = '1';
   document.body.classList.add('gallery-motion');
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -73,12 +74,14 @@ window.SparkGalleryMotion.init = function initGalleryMotion(options) {
       node.classList.add('lp-reveal-card');
     });
   };
-  reveal(grid);
-  new MutationObserver(mutations => {
-    for (const m of mutations) for (const node of m.addedNodes) {
-      if (node.nodeType === Node.ELEMENT_NODE) reveal(node);
-    }
-  }).observe(grid, { childList: true, subtree: true });
+  if (grid) {
+    reveal(grid);
+    new MutationObserver(mutations => {
+      for (const m of mutations) for (const node of m.addedNodes) {
+        if (node.nodeType === Node.ELEMENT_NODE) reveal(node);
+      }
+    }).observe(grid, { childList: true, subtree: true });
+  }
 
   // A small gallery shortcut appears only when scrolling UP after travelling
   // far enough down the page. It never obscures an open preview.
