@@ -1877,3 +1877,17 @@ body.theme-art .topnav__dropitem.is-active{
 @media (max-width: 720px){
   .art-page .card--model .card__viewer{ height: 170px; }
 }
+
+/* v24: Animation and Art share the same uniform card surface as Design/Editing.
+   Only the image itself may provide a different background. */
+.animation-page .card--animation .card__viewer,
+.art-page .card--art .card__viewer,
+.art-page .card--model .card__viewer {
+  background: var(--panel2) !important;
+}
+.animation-page .card--animation .card__meta,
+.art-page .card--art .card__meta,
+.editing-page .card--media .card__meta,
+.design-page .card--design .card__meta {
+  padding-top: 6px !important;
+}

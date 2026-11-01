@@ -286,3 +286,8 @@ body.hive-polished .hive-reveal-item.is-visible {
     animation:hive-hero-arrive .65s cubic-bezier(.16,1,.3,1) both;
   }
 }
+
+/* Tighten the image-to-title spacing without altering 3D thumbnails. */
+body.hive-polished .card__meta {
+  padding-top: 9px !important;
+}

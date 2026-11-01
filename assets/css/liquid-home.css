@@ -1202,3 +1202,15 @@ html:has(body.liquid-home)::-webkit-scrollbar {
   .liquid-home .home-copy,
   .liquid-home .liquid-footer { transition: none; }
 }
+
+/* v24: reserve actual document space between the translated island/copy
+   and the footer. The footer is never overlaid on the intro while scrolling. */
+body.liquid-home .liquid-footer {
+  margin: clamp(148px, 17svh, 215px) auto 0 !important;
+  flex-shrink: 0;
+}
+@media(max-width:600px) {
+  body.liquid-home .liquid-footer {
+    margin-top: 155px !important;
+  }
+}
