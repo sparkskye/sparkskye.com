@@ -424,3 +424,24 @@ body.hive-polished .card:focus-visible {
     opacity:1!important;transform:none!important;transition:none!important;
   }
 }
+
+/* Complements the opening squash with a short downward, centered close.
+   Body scrolling and preview resources unlock through original closeModal. */
+body.hive-polished .modal.is-open.hive-is-closing:not(.hive-fullscreen) .modal__card {
+  animation:hive-modal-close .26s cubic-bezier(.3,.1,.55,1) both!important;
+  pointer-events:none;
+}
+body.hive-polished .modal.is-open.hive-is-closing .modal__backdrop {
+  animation:hive-backdrop-close .26s ease both!important;
+}
+@keyframes hive-modal-close {
+  from {opacity:1;transform:translate(-50%,-50%) scale(1)}
+  to {opacity:0;transform:translate(-50%,calc(-50% + 54px)) scale(.965,.94)}
+}
+@keyframes hive-backdrop-close {from{opacity:1}to{opacity:0}}
+/* Contributor avatar hover still triggers the name's smooth letter transition. */
+body.hive-polished .contrib:is(:hover,:focus-visible) .contrib__name .hive-hover-character {
+  transform:translateY(-4px);
+  color:#fff;
+  transition-delay:var(--hive-hover-delay,0ms);
+}

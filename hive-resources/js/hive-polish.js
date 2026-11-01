@@ -233,12 +233,49 @@
     attributes:true,attributeFilter:['class']
   });
   updateOpenState();
-  window.addEventListener('keydown',e=>{
-    if(e.key==='Escape' && modal.classList.contains('hive-fullscreen')){
-      e.stopImmediatePropagation();e.preventDefault();
+  // Match creation-gallery exit motion without changing the original
+  // Maps/Models closeModal functions, URL restoration, or preview disposal.
+  let closing = false, completeClose = false;
+  const closeButton = document.getElementById('modalClose');
+  const backdrop = document.getElementById('modalBackdrop');
+  const visuallyClose = event => {
+    if (!modal.classList.contains('is-open') || completeClose) return;
+    if (modal.classList.contains('hive-fullscreen')) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
       toggleFullscreen();
+      return;
     }
-  },true);
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (closing) return;
+    closing = true;
+    modal.classList.add('hive-is-closing');
+    setTimeout(() => {
+      closing = false;
+      modal.classList.remove('hive-is-closing');
+      if (!modal.classList.contains('is-open')) return;
+      completeClose = true;
+      // Call the existing close handler so all state and URLs are restored.
+      closeButton?.click();
+      completeClose = false;
+    }, reduce.matches ? 0 : 260);
+  };
+  document.addEventListener('click', e => {
+    if (closeButton?.contains(e.target) || backdrop?.contains(e.target)) {
+      visuallyClose(e);
+    }
+  }, true);
+  window.addEventListener('keydown', e => {
+    if (e.key !== 'Escape' || !modal.classList.contains('is-open')) return;
+    if (modal.classList.contains('hive-fullscreen')) {
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      toggleFullscreen();
+      return;
+    }
+    visuallyClose(e);
+  }, true);
   // Native scroll remains locked by the existing modal. The document gutter
   // is reserved by CSS, preventing a sudden horizontal shift.
 })();
