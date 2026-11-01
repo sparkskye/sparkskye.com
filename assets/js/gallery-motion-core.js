@@ -37,7 +37,8 @@ window.SparkGalleryMotion.init = function initGalleryMotion(options) {
         }),{threshold:.04,rootMargin:'0px 0px 80px 0px'})
       : null;
     targets.forEach((el,i)=>{
-      if(!io)return;
+      // Filters panels already receive the exact main-gallery entrance once.
+      if(!io || el.id === 'filtersPanel')return;
       el.classList.add('gm-reveal');
       el.style.setProperty('--gm-delay',Math.min(i,5)*55+'ms');
       io.observe(el);
@@ -105,10 +106,10 @@ window.SparkGalleryMotion.init = function initGalleryMotion(options) {
     jumpTop.classList.toggle('is-visible', show);
     if (show && !wasVisible && !reduced.matches) {
       jumpTop.animate([
-        {transform:'translate(-50%,-18px) scale(.90)',opacity:0},
-        {transform:'translate(-50%,5px) scale(1.075)',opacity:1,offset:.48},
-        {transform:'translate(-50%,-3px) scale(.978)',opacity:1,offset:.75},
-        {transform:'translate(-50%,0) scale(1)',opacity:1}
+        {transform:'translateY(-18px) scale(.90)',opacity:0},
+        {transform:'translateY(5px) scale(1.075)',opacity:1,offset:.48},
+        {transform:'translateY(-3px) scale(.978)',opacity:1,offset:.75},
+        {transform:'translateY(0) scale(1)',opacity:1}
       ],{duration:500,easing:'ease-out'});
     }
     jumpTop.tabIndex = show ? 0 : -1;
