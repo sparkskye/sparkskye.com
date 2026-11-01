@@ -100,20 +100,7 @@
     }
   },true);
 
-  // Introduce the Hive home and Rewind panels without changing their content.
-  if(!gallery && !reduce.matches){
-    const observer=new IntersectionObserver(entries=>{
-      for(const item of entries)if(item.isIntersecting){
-        item.target.classList.add('is-visible');
-        observer.unobserve(item.target);
-      }
-    },{threshold:.08,rootMargin:'0px 0px 40px 0px'});
-    document.querySelectorAll('.panel,.contrib').forEach((el,i)=>{
-      el.classList.add('hive-reveal-item');
-      el.style.transitionDelay=Math.min(i,5)*50+'ms';
-      observer.observe(el);
-    });
-  }
+  // The visual motion module owns all reveal effects.
   if(!gallery)return;
 
   // Match the newer gallery search bars without modifying filter logic.
@@ -137,35 +124,6 @@
     window.addEventListener('resize',update,{passive:true});
     document.fonts?.ready.then(update);
     update();
-  }
-
-  // Only animate visible cards, including asynchronously loaded ones.
-  const grid=document.querySelector('#grid');
-  if(grid) {
-    const observe=new IntersectionObserver(entries=>{
-      for(const entry of entries){
-        if(entry.isIntersecting){
-          entry.target.classList.add('is-visible');
-          observe.unobserve(entry.target);
-        }
-      }
-    },{threshold:.08,rootMargin:'0px 0px 65px 0px'});
-    const attach=()=>{
-      for(const card of grid.querySelectorAll('.card:not(.hive-reveal-item)')){
-        if(reduce.matches)continue;
-        card.classList.add('hive-reveal-item');
-        observe.observe(card);
-      }
-    };
-    new MutationObserver(attach).observe(grid,{childList:true});
-    attach();
-  }
-  const panel=document.querySelector('#filtersPanel');
-  if(panel && !reduce.matches){
-    panel.animate([{opacity:0,transform:'translateY(24px)'},
-      {opacity:1,transform:'translateY(-4px)',offset:.75},
-      {opacity:1,transform:'translateY(0)'}],
-      {duration:670,easing:'cubic-bezier(.16,1,.3,1)'});
   }
 
   if(!modal || !viewer)return;
