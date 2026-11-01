@@ -185,3 +185,24 @@ body.hive-polished :is(.hero__title,.hero__sub,.hero__quicklinks,.hero__download
   body.hive-polished .gm-reveal {opacity:1!important;transform:none!important;transition:none!important}
   body.gallery-motion .lp-motion-target {transform:none!important;transition:none!important}
 }
+
+/* Nested contributor and updates content should not double its parent's
+   translation. The panel moves as a unit, then its content fades gently. */
+body.hive-polished .panel .gm-reveal {
+  transform:none;
+  transition-property:opacity;
+}
+body.hive-polished .panel .gm-reveal.gm-visible {transform:none}
+/* Unified modal text and action entrance, including Hive variants. */
+@media(prefers-reduced-motion:no-preference) {
+  body.hive-gallery.gallery-motion .modal.is-open .modal__name {
+    animation:gm-detail-appear .38s .08s both;
+  }
+  body.hive-gallery.gallery-motion .modal.is-open .modal__actions {
+    animation:gm-detail-appear .38s .14s both;
+  }
+}
+@keyframes gm-detail-appear {
+  from{opacity:0;transform:translateY(12px)}
+  to{opacity:1;transform:none}
+}

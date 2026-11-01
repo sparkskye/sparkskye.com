@@ -30,7 +30,7 @@ window.SparkGalleryMotion.init = function initGalleryMotion(options) {
       }
       title.replaceChildren(fragment);
     }
-    const targets=document.querySelectorAll('.hero__sub,.hero__quicklinks,.hero__downloads,.panel,.contributors,.latest,.contrib,.footer');
+    const targets=document.querySelectorAll('.topbar,.hero__sub,.hero__quicklinks,.hero__downloads,.panel,.contributors,.latest,.contrib,.footer');
     const io=typeof IntersectionObserver!=='undefined'
       ? new IntersectionObserver(entries=>entries.forEach(entry=>{
           if(entry.isIntersecting) {entry.target.classList.add('gm-visible');io.unobserve(entry.target);}

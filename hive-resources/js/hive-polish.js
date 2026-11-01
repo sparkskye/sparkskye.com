@@ -123,7 +123,7 @@
       // Call the existing close handler so all state and URLs are restored.
       closeButton?.click();
       completeClose = false;
-    }, reduce.matches ? 0 : 260);
+    }, reduce.matches ? 0 : 370);
   };
   document.addEventListener('click', e => {
     if (closeButton?.contains(e.target) || backdrop?.contains(e.target)) {
