@@ -92,7 +92,8 @@ window.SparkGalleryMotion.init = function initGalleryMotion(options) {
       if(link.tagName === 'A') link.setAttribute('aria-label',label);
       const wrapper=document.createElement('span');
       wrapper.className='lp-label';
-      wrapper.setAttribute('aria-hidden','true');
+      // Non-anchor contributor/brand text must retain an accessible name.
+      if(link.tagName === 'A') wrapper.setAttribute('aria-hidden','true');
       [...label].forEach((char,i) => {
         const letter=document.createElement('span');
         letter.className='lp-letter';
@@ -141,13 +142,15 @@ window.SparkGalleryMotion.init = function initGalleryMotion(options) {
       });
     };
     socialLinks.forEach(link=>{
-      link.addEventListener('pointerenter',()=>animateSocial(link,true));
-      link.addEventListener('pointerleave',()=>{
-        if(document.activeElement!==link)animateSocial(link,false);
+      // Contributor links respond when hovering the WHOLE contributor card.
+      const control=link.matches('.contrib__name') ? (link.closest('.contrib')||link) : link;
+      control.addEventListener('pointerenter',()=>animateSocial(link,true));
+      control.addEventListener('pointerleave',()=>{
+        if(document.activeElement!==control)animateSocial(link,false);
       });
-      link.addEventListener('focus',()=>animateSocial(link,true));
-      link.addEventListener('blur',()=>{
-        if(!link.matches(':hover'))animateSocial(link,false);
+      control.addEventListener('focus',()=>animateSocial(link,true));
+      control.addEventListener('blur',()=>{
+        if(!control.matches(':hover'))animateSocial(link,false);
       });
     });
 
@@ -183,6 +186,17 @@ window.SparkGalleryMotion.init = function initGalleryMotion(options) {
     });
   };
   if (grid) {
+    // Let Hive model-card entrance layers decompose after the animation.
+    // Keeping animation-fill:both permanently on a WebGL canvas can cause
+    // GPU-compositor edge trails whenever its border changes on hover.
+    if (options.hive) {
+      grid.addEventListener('animationend', e => {
+        if (e.animationName === 'gm-card-arrive' &&
+            e.target instanceof Element && e.target.matches('.card')) {
+          e.target.classList.add('gm-card-settled');
+        }
+      });
+    }
     reveal(grid);
     new MutationObserver(mutations => {
       for (const m of mutations) for (const node of m.addedNodes) {

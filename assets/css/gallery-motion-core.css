@@ -360,3 +360,12 @@ html.hive-scroll-active:has(body.hive-polished) {
 html.hive-scroll-active:has(body.hive-polished)::-webkit-scrollbar-thumb {
   background:#00aaff !important;
 }
+
+/* Remove persistent compositor layers after the initial Hive card arrival.
+   The card remains static; only its overlay outline responds to hover. */
+body.hive-gallery.gallery-motion .card.gm-card-settled.lp-reveal-card {
+  animation:none !important;
+  transform:none !important;
+  scale:1 !important;
+  rotate:none !important;
+}
