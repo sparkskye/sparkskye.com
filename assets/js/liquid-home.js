@@ -180,6 +180,7 @@
   let touchDownAt = -Infinity, touchDownPosition = null, touchedLink = null;
   let suppressTouchClickUntil = 0;
   let suppressOpeningTap = false;
+  let touchBeganCollapsed = false;
   let heldTouchLink = null;
   const TOUCH_OPEN_MS = 10000;
   function stopTouchTimer() { clearTimeout(touchTimeout); touchTimeout = 0; }
@@ -209,16 +210,17 @@
     if (reduced.matches) return 1;
     const t = clamp((time - entranceStart) / 0.70, 0, 1);
     // A quick, springy pop with a small overshoot, no sluggish viscosity.
-    // Small restrained bounce; mobile islands never overshoot beyond the viewport.
-    return clamp(1 - Math.exp(-7.3 * t) * Math.cos(9 * t), .05, smallScreen() ? 1.045 : 1.10);
+    // Damped spring with a continuous overshoot and recoil; never clamp the
+    // peak flat. Geometry below leaves room for its natural ~8% overshoot.
+    return Math.max(.05, 1 - Math.exp(-8.8 * t) * Math.cos(11 * t));
   }
   function geometry() {
-    const closedWidth = smallScreen() ? Math.min(336, width - 20) : Math.min(280, width - 32);
-    const openedWidth = smallScreen() ? width - 28 : width - 200;
+    const closedWidth = smallScreen()
+      ? Math.min(336, (width - 32) / 1.09) : Math.min(280, width - 32);
+    const openedWidth = smallScreen() ? (width - 32) / 1.09 : width - 200;
     const scale = entranceScale(clock || performance.now() / 1000);
     return {
-      w: Math.min((closedWidth + (openedWidth - closedWidth) * expansion) * scale,
-        smallScreen() ? width - 28 : width - 12),
+      w: (closedWidth + (openedWidth - closedWidth) * expansion) * scale,
       h: (90 + ((smallScreen() ? 186 : 124) - 90) * expansion) * scale
     };
   }
@@ -420,7 +422,10 @@
     if (e.pointerType !== 'touch') return;
     // First tap always opens the island, even if a link occupies the same coordinates.
     suppressOpeningTap = !open;
-    if (heldTouchLink) clearHeldTouchLink();
+    touchBeganCollapsed = !open;
+    clearHeldTouchLink();
+    // First tap never activates buttons hidden under the compact island.
+    links.forEach(link => animateLetters(link, false));
     activeTouchId = e.pointerId;
     touchDownAt = performance.now();
     touchDownPosition = { x: e.clientX, y: e.clientY };
@@ -453,16 +458,19 @@
     if (e.pointerId !== activeTouchId) return;
     if (touchDragged) suppressTouchClickUntil = performance.now() + 380;
     activeTouchId = null; lastPointer = null; pointer = null;
-    if (touchedLink && touchDragged) {
+    if (!touchBeganCollapsed && touchedLink && touchDragged) {
       heldTouchLink = touchedLink;
+      links.forEach(link => animateLetters(link, link === heldTouchLink));
       showDescription(heldTouchLink);
-    } else if (touchedLink) { clearHeldTouchLink(); }
+    } else clearHeldTouchLink();
     touchedLink = null;
+    touchBeganCollapsed = false;
     armTouchTimer();
   });
   window.addEventListener('pointercancel', e => {
     if (e.pointerId !== activeTouchId) return;
     activeTouchId = null; lastPointer = null; pointer = null;
+    touchBeganCollapsed = false;
     clearHeldTouchLink();
     armTouchTimer();
   });
@@ -479,6 +487,9 @@
   links.forEach(link => {
     function activate(x, y) { setColor(link.dataset.color, x, y); showDescription(link); }
     link.addEventListener('pointerenter', e => {
+      // Touch pointerenter may be fired before the first tap opens the island.
+      // Only finger DRAG within an already expanded menu selects a page.
+      if (e.pointerType === 'touch' || !open || stage.dataset.ready !== 'true') return;
       const pt = position(e);
       if (e.pointerType !== 'touch') {
         links.forEach(other => { if (other !== link) animateLetters(other, false); });
@@ -487,6 +498,7 @@
       activate(pt.x, pt.y);
     });
     link.addEventListener('focus', () => {
+      if (activeTouchId !== null || performance.now() - touchDownAt < 700) return;
       const r = link.getBoundingClientRect();
       const s = stage.getBoundingClientRect();
       animateLetters(link, true);
@@ -501,7 +513,7 @@
       }
     });
     link.addEventListener('blur', () => {
-      if (!link.matches(':hover')) {
+      if (!link.matches(':hover') && heldTouchLink !== link) {
         animateLetters(link, false);
         showDescription(null);
       }
@@ -509,7 +521,7 @@
   });
 
 
-  let pull = null;
+  let pull = null, returningBlob = null;
   function splash(p, strength=650) {
     if (reduced.matches) return;
     const t=performance.now()/1000;
@@ -534,7 +546,11 @@
     const stretch=110*(1-Math.exp(-distance/180));
     pull.dx=distance?ux/distance*stretch:0; pull.dy=distance?uy/distance*stretch:0;
     if(Math.hypot(pull.dx,pull.dy)>6) pull.moved=true;
-    if(!reduced.matches && pull.link!==hit) {pull.link.style.translate=pull.dx+'px '+pull.dy+'px'; pull.link.style.scale=(1+Math.abs(pull.dx)/260)+' '+(1+Math.abs(pull.dy)/220);}
+    // Let fingers slide across stable links; only mouse can pull link text.
+    if(!reduced.matches && pull.link!==hit && e.pointerType !== 'touch') {
+      pull.link.style.translate=pull.dx+'px '+pull.dy+'px';
+      pull.link.style.scale=(1+Math.abs(pull.dx)/260)+' '+(1+Math.abs(pull.dy)/220);
+    }
   });
   function releasePull(e) {
     if(!pull || e.pointerId!==pull.id) return;
@@ -546,7 +562,14 @@
       {translate:(-p.dx*.22)+'px '+(-p.dy*.22)+'px',scale:'.92',offset:.45},
       {translate:(p.dx*.08)+'px '+(p.dy*.08)+'px',scale:'1.04',offset:.72},
       {translate:'0px 0px',scale:'1'}],{duration:620,easing:'ease-out'});
-    if(p.moved) {const r=stage.getBoundingClientRect(); splash({x:p.x-r.left-width/2,y:p.y-r.top-height/2},1500);}
+    if(p.moved && !reduced.matches) {
+      const r=stage.getBoundingClientRect();
+      const ax=p.x-r.left-width/2, ay=p.y-r.top-height/2;
+      returningBlob={ ax,ay,x:p.fx??p.dx,y:p.fy??p.dy,
+        vx:p.vx??0,vy:p.vy??0,r:23,color:rgb(currentKey),age:0 };
+      emitRipple(ax,ay,0,0,460,performance.now()/1000,true);
+      requestFrame();
+    }
     if(p.link.hasPointerCapture(p.id)) p.link.releasePointerCapture(p.id);
     if (e.pointerType !== 'touch') {
       // Captured drag events can skip pointerleave. Reconcile every letter
@@ -614,14 +637,15 @@
     if (reduced.matches || !width || !height) return;
     const isTouch = e.pointerType === 'touch';
     if (isTouch && e.pointerId !== activeTouchId) return;
-    if (isTouch && touchDownPosition &&
+    if (isTouch && !touchBeganCollapsed && touchDownPosition &&
         Math.hypot(e.clientX-touchDownPosition.x, e.clientY-touchDownPosition.y)>9) {
       touchDragged = true;
       // Keep the menu open while the finger is actively dragging.
       stopTouchTimer();
       const element = document.elementFromPoint(e.clientX, e.clientY);
       const link = element?.closest('#island-links a') || null;
-      if (link !== touchedLink) {
+      // Keep the last selected page while the finger moves away to release.
+      if (link && link !== touchedLink && stage.dataset.ready === 'true') {
         if (touchedLink) animateLetters(touchedLink, false);
         touchedLink = link;
         if (link) {
@@ -629,7 +653,7 @@
           animateLetters(link, true);
           setColor(link.dataset.color, p.x, p.y);
           showDescription(link);
-        } else showDescription(null);
+        }
       }
     }
     const r = stage.getBoundingClientRect();
@@ -873,21 +897,42 @@
     if (!reduced.matches) {
       renderDroplets(dt,time);
       if(pull && pull.moved) {
-        const r=stage.getBoundingClientRect(), ax=pull.x-r.left-width/2, ay=pull.y-r.top-height/2;
+        const rect=stage.getBoundingClientRect();
+        const ax=pull.x-rect.left-width/2, ay=pull.y-rect.top-height/2;
         pull.fx ??= 0; pull.fy ??= 0; pull.vx ??= 0; pull.vy ??= 0;
-        pull.vx+=((pull.dx-pull.fx)*160-pull.vx*18)*dt;
-        pull.vy+=((pull.dy-pull.fy)*160-pull.vy*18)*dt;
+        pull.vx+=((pull.dx-pull.fx)*130-pull.vx*17)*dt;
+        pull.vy+=((pull.dy-pull.fy)*130-pull.vy*17)*dt;
         pull.fx+=pull.vx*dt; pull.fy+=pull.vy*dt;
-        const bx=ax+pull.fx, by=ay+pull.fy, length=Math.hypot(pull.fx,pull.fy)||1;
-        const nx=-pull.fy/length, ny=pull.fx/length, color=rgb(currentKey);
-        const bend=Math.max(-14,Math.min(14,(pull.vx*nx+pull.vy*ny)*.06));
-        const steps=Math.max(24,Math.ceil(length/2));
-        for(let j=0;j<=steps;j++) {
-          const f=j/steps, curve=Math.sin(f*Math.PI)*(bend+Math.sin(time*8-f*4)*3);
-          const neck=6+10*Math.pow(Math.abs(f-.5)*2,2)+Math.sin(time*7-f*6)*1.5;
-          dot(ax+pull.fx*f+nx*curve,ay+pull.fy*f+ny*curve,neck,neck,color);
+        const bx=ax+pull.fx, by=ay+pull.fy;
+        const distance=Math.hypot(pull.fx,pull.fy);
+        const color=rgb(currentKey);
+        // A detached, rounded pool follows like magnetic attraction: NO thread.
+        dot(bx,by,25+Math.sin(time*9)*1.8,22+Math.cos(time*7)*1.8,color);
+        dot(bx-8,by+4,17,16,color);
+        if(distance<32) {
+          // Surface tension only reconnects the pool when it nears its origin.
+          const f=.5; dot(ax+pull.fx*f,ay+pull.fy*f,12,12,color);
         }
-        dot(bx,by,20+Math.sin(time*9)*2,18+Math.cos(time*7)*2,color);
+      }
+      if(returningBlob) {
+        const b=returningBlob;
+        b.age+=dt;
+        // Under-damped spring home, with a visible recoil and landing ripples.
+        const steps=2;
+        for(let i=0;i<steps;i++) {
+          const h=dt/steps;
+          b.vx+=(-b.x*108-b.vx*13)*h;
+          b.vy+=(-b.y*108-b.vy*13)*h;
+          b.x+=b.vx*h; b.y+=b.vy*h;
+        }
+        dot(b.ax+b.x,b.ay+b.y,b.r,b.r*.91,b.color);
+        if(Math.hypot(b.x,b.y)<29) {
+          dot(b.ax+b.x*.5,b.ay+b.y*.5,13,12,b.color);
+        }
+        if(b.age>.82 || (b.age>.23 && Math.hypot(b.x,b.y)<2.8 && Math.hypot(b.vx,b.vy)<16)) {
+          emitRipple(b.ax,b.ay,0,0,460,time,true);
+          returningBlob=null;
+        }
       }
     }
     if (!reduced.matches || colorFronts.length || Math.abs(expansion - Number(open)) > .01) requestFrame();
