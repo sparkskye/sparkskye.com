@@ -536,7 +536,11 @@
     if(e.button!==0) return;
     splash(position(e));
     const link=e.target.closest('#island-links a') || hit;
-    if(link) { pull={link,id:e.pointerId,x:e.clientX,y:e.clientY,dx:0,dy:0,moved:false}; link.setPointerCapture(e.pointerId); }
+    if(link) {
+      pull={link,captureTarget:link,id:e.pointerId,x:e.clientX,y:e.clientY,
+        dx:0,dy:0,moved:false};
+      link.setPointerCapture(e.pointerId);
+    }
   });
   hit.addEventListener('dragstart',e=>e.preventDefault());
   window.addEventListener('pointermove',e=>{
@@ -546,10 +550,13 @@
     const stretch=110*(1-Math.exp(-distance/180));
     pull.dx=distance?ux/distance*stretch:0; pull.dy=distance?uy/distance*stretch:0;
     if(Math.hypot(pull.dx,pull.dy)>6) pull.moved=true;
-    // Let fingers slide across stable links; only mouse can pull link text.
-    if(!reduced.matches && pull.link!==hit && e.pointerType !== 'touch') {
+    // Finger dragging moves the label just as mouse dragging does.
+    // The first tap on a collapsed island still cannot drag a hidden link.
+    if(!reduced.matches && pull.link!==hit && !(e.pointerType==='touch' && touchBeganCollapsed)) {
       pull.link.style.translate=pull.dx+'px '+pull.dy+'px';
-      pull.link.style.scale=(1+Math.abs(pull.dx)/260)+' '+(1+Math.abs(pull.dy)/220);
+      const scaleX=1+Math.abs(pull.dx)/(e.pointerType==='touch'?390:260);
+      const scaleY=1+Math.abs(pull.dy)/(e.pointerType==='touch'?370:220);
+      pull.link.style.scale=scaleX+' '+scaleY;
     }
   });
   function releasePull(e) {
@@ -565,12 +572,16 @@
     if(p.moved && !reduced.matches) {
       const r=stage.getBoundingClientRect();
       const ax=p.x-r.left-width/2, ay=p.y-r.top-height/2;
-      returningBlob={ ax,ay,x:p.fx??p.dx,y:p.fy??p.dy,
-        vx:p.vx??0,vy:p.vy??0,r:23,color:rgb(currentKey),age:0 };
-      emitRipple(ax,ay,0,0,460,performance.now()/1000,true);
+      const px=p.fx??p.dx, py=p.fy??p.dy;
+      const color=rgb(currentKey);
+      returningBlob={ ax,ay,x:px,y:py, vx:p.vx??0,vy:p.vy??0,
+        r:24,color,age:0,merge:0,merged:false };
+      // Initial release disturbs the liquid around the moving pool.
+      poolBurst(ax+px, ay+py, color, performance.now()/1000, .62);
       requestFrame();
     }
-    if(p.link.hasPointerCapture(p.id)) p.link.releasePointerCapture(p.id);
+    if(p.captureTarget?.hasPointerCapture(p.id))
+      p.captureTarget.releasePointerCapture(p.id);
     if (e.pointerType !== 'touch') {
       // Captured drag events can skip pointerleave. Reconcile every letter
       // with the actual cursor location, never the stale captured target.
@@ -616,6 +627,25 @@
       power: clamp((edge ? 11 : 4.5) + speed * .009, 4.5, 25) });
     if (waves.length > 18) waves.shift();
   }
+  // A broader splash when a pulled pool releases and when it rejoins the island.
+  function poolBurst(x, y, color, time, strength=1) {
+    waves.push(
+      {x,y,dx:0,dy:-1,start:time,power:26*strength},
+      {x,y,dx:1,dy:.25,start:time+.10,power:18*strength}
+    );
+    if (waves.length > 18) waves.splice(0,waves.length-18);
+    const count=Math.round(8*strength);
+    for (let i=0;i<count;i++) {
+      const angle=(Math.PI*2*i/count)+Math.random()*.18;
+      const speed=(85+Math.random()*155)*strength;
+      droplets.push({ax:x,ay:y,x,y,
+        vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,
+        r:3+Math.random()*6, born:time, lifetime:.5+Math.random()*.25,
+        color:[...color],tether:false,attached:false});
+    }
+    if (droplets.length>50) droplets.splice(0,droplets.length-50);
+    requestFrame();
+  }
   function emitEntranceSplash(time) {
     if (reduced.matches || entranceSpraySent) return;
     entranceSpraySent = true;
@@ -648,6 +678,13 @@
       if (link && link !== touchedLink && stage.dataset.ready === 'true') {
         if (touchedLink) animateLetters(touchedLink, false);
         touchedLink = link;
+        if (pull?.id === e.pointerId && pull.link !== link) {
+          if (pull.link !== hit) {
+            pull.link.style.translate = '';
+            pull.link.style.scale = '';
+          }
+          pull.link = link;
+        }
         if (link) {
           const p = position(e);
           animateLetters(link, true);
@@ -741,6 +778,24 @@
         const u = (ix + .5 - cx) / ax, v = (iy + .5 - cy) / ay;
         if (u * u + v * v <= 1) ctx.fillRect(ix, iy, 1, 1);
       }
+    }
+  }
+  // Pixel pools deform along their velocity vector without drawing a
+  // permanent line to their origin. All lobes use the same 4px cell renderer.
+  function drawMagneticPool(x,y,vx,vy,r,color,opacity=1) {
+    const speed=Math.hypot(vx,vy);
+    const ux=speed>1?vx/speed:1, uy=speed>1?vy/speed:0;
+    const stretch=Math.min(1, speed/550);
+    const radius=r*Math.max(0,opacity);
+    const reach=radius*(.08+.62*stretch);
+    dot(x-ux*reach*.58,y-uy*reach*.58,
+      radius*(.9+.08*stretch),radius*(.9+.08*stretch),color);
+    dot(x,y,radius*(1-.10*stretch),radius*(1-.10*stretch),color);
+    dot(x+ux*reach*.72,y+uy*reach*.72,
+      radius*(.82+.06*stretch),radius*(.82+.06*stretch),color);
+    if(stretch>.45) {
+      dot(x+ux*reach*1.26,y+uy*reach*1.26,
+        radius*.51,radius*.51,color);
     }
   }
   function renderDroplets(dt, time) {
@@ -904,20 +959,37 @@
         pull.vy+=((pull.dy-pull.fy)*130-pull.vy*17)*dt;
         pull.fx+=pull.vx*dt; pull.fy+=pull.vy*dt;
         const bx=ax+pull.fx, by=ay+pull.fy;
-        const distance=Math.hypot(pull.fx,pull.fy);
         const color=rgb(currentKey);
-        // A detached, rounded pool follows like magnetic attraction: NO thread.
-        dot(bx,by,25+Math.sin(time*9)*1.8,22+Math.cos(time*7)*1.8,color);
-        dot(bx-8,by+4,17,16,color);
-        if(distance<32) {
-          // Surface tension only reconnects the pool when it nears its origin.
-          const f=.5; dot(ax+pull.fx*f,ay+pull.fy*f,12,12,color);
+        drawMagneticPool(bx,by,pull.vx,pull.vy,24,color);
+        // Only short, temporary contact when the pool approaches a liquid edge.
+        const edgeDistance=distanceToIsland(bx,by,g);
+        if(edgeDistance>0 && edgeDistance<36) {
+          const gradX=distanceToIsland(bx+4,by,g)-distanceToIsland(bx-4,by,g);
+          const gradY=distanceToIsland(bx,by+4,g)-distanceToIsland(bx,by-4,g);
+          const norm=Math.hypot(gradX,gradY)||1;
+          const nx=gradX/norm, ny=gradY/norm;
+          const gap=Math.max(0,edgeDistance-24);
+          if(gap<12) {
+            const bridgeX=bx-nx*(23+gap*.40), bridgeY=by-ny*(23+gap*.40);
+            const contact=1-gap/12;
+            dot(bridgeX,bridgeY,6+8*contact,6+8*contact,color);
+          }
+        }
+        const velocity=Math.hypot(pull.vx,pull.vy);
+        if(velocity>240 && time-(pull.lastFleck||0)>.075) {
+          pull.lastFleck=time;
+          const norm=velocity||1;
+          droplets.push({ax:bx,ay:by,x:bx,y:by,
+            vx:-pull.vx/norm*(32+Math.random()*80)+pull.vy/norm*18,
+            vy:-pull.vy/norm*(32+Math.random()*80)-pull.vx/norm*18,
+            r:3+Math.random()*3,born:time,lifetime:.3+Math.random()*.18,
+            color:[...color],tether:false,attached:false});
+          if(droplets.length>50) droplets.shift();
         }
       }
       if(returningBlob) {
         const b=returningBlob;
         b.age+=dt;
-        // Under-damped spring home, with a visible recoil and landing ripples.
         const steps=2;
         for(let i=0;i<steps;i++) {
           const h=dt/steps;
@@ -925,14 +997,22 @@
           b.vy+=(-b.y*108-b.vy*13)*h;
           b.x+=b.vx*h; b.y+=b.vy*h;
         }
-        dot(b.ax+b.x,b.ay+b.y,b.r,b.r*.91,b.color);
-        if(Math.hypot(b.x,b.y)<29) {
-          dot(b.ax+b.x*.5,b.ay+b.y*.5,13,12,b.color);
+        const bx=b.ax+b.x, by=b.ay+b.y;
+        const edgeDistance=distanceToIsland(bx,by,g);
+        if((edgeDistance < b.r*.72 || b.age>.9) && !b.merged) {
+          b.merged=true;
+          b.merge=0;
+          poolBurst(bx,by,b.color,time,1.25);
         }
-        if(b.age>.82 || (b.age>.23 && Math.hypot(b.x,b.y)<2.8 && Math.hypot(b.vx,b.vy)<16)) {
-          emitRipple(b.ax,b.ay,0,0,460,time,true);
+        if(b.merged) b.merge=Math.min(1,b.merge+dt/.25);
+        const radiusScale=b.merged ? (1-b.merge*.93) : 1;
+        drawMagneticPool(bx,by,b.vx,b.vy,b.r,b.color,radiusScale);
+        if(b.merged && b.merge<.92 && edgeDistance>0 && edgeDistance<36) {
+          const x=b.ax+b.x*.55, y=b.ay+b.y*.55;
+          dot(x,y,9*(1-b.merge),9*(1-b.merge),b.color);
+        }
+        if((b.merged && b.merge>=1) || b.age>1.35)
           returningBlob=null;
-        }
       }
     }
     if (!reduced.matches || colorFronts.length || Math.abs(expansion - Number(open)) > .01) requestFrame();
