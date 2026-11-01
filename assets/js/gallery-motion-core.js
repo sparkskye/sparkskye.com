@@ -30,21 +30,36 @@ window.SparkGalleryMotion.init = function initGalleryMotion(options) {
       }
       title.replaceChildren(fragment);
     }
-    const targets=document.querySelectorAll('.topbar,.hero__sub,.hero__quicklinks,.hero__downloads,.panel,.contributors,.latest,.contrib,.footer');
+    const targets=document.querySelectorAll(
+      '.topbar,.hero__sub,.hero__quicklinks,.hero__downloads,'+
+      '.panel,.contributors,.latest,.contrib,.footer'
+    );
+    // Big containers rise as units; smaller children fade without moving
+    // their parent and without making individual gallery tags bounce in.
+    const secondary=document.querySelectorAll(
+      '.topnav__btn,.panel__label,.panel__row,.footer > div,.footer__ai,'+
+      '.hero__dot,.brand,.topnav__burger'
+    );
     const io=typeof IntersectionObserver!=='undefined'
       ? new IntersectionObserver(entries=>entries.forEach(entry=>{
           if(entry.isIntersecting) {entry.target.classList.add('gm-visible');io.unobserve(entry.target);}
         }),{threshold:.04,rootMargin:'0px 0px 80px 0px'})
       : null;
     targets.forEach((el,i)=>{
-      // Filters panels already receive the exact main-gallery entrance once.
       if(!io || el.id === 'filtersPanel')return;
       el.classList.add('gm-reveal');
       el.style.setProperty('--gm-delay',Math.min(i,5)*55+'ms');
       io.observe(el);
     });
+    secondary.forEach((el,i)=>{
+      if(!io || el.classList.contains('gm-reveal'))return;
+      el.classList.add('gm-reveal','gm-fade-only');
+      el.style.setProperty('--gm-delay',Math.min(i%7,6)*42+170+'ms');
+      io.observe(el);
+    });
     // Link letters use reversible transitions, not repeating keyframes.
-    const selectors='.topnav__btn,.topnav__dropitem,.hero__quicklinks a,.hero__downloads a,.contrib__name,.brand__name';
+    // Menu controls spring as whole pills. Letter ripples are for links only.
+    const selectors='.hero__quicklinks a,.hero__downloads a,.footer a,.contrib__name,.brand__name';
     document.querySelectorAll(selectors).forEach(el=>{
       let i=0;
       for(const node of [...el.childNodes]) {
@@ -257,7 +272,7 @@ window.SparkGalleryMotion.init = function initGalleryMotion(options) {
   }
 
   if (reduced.matches) return;
-  const selector = 'input.search, .map-preview__resolution, .map-preview__zoom, .map-preview__helper, .lp-theater-enter, .lp-theater-exit, .lp-jump-top, .chip, .btn, .card, .modal__close, .card__reload, .design-variant-arrow, .hive-fullscreen-toggle, .contrib, .topnav__btn, .topnav__dropitem, .hero__quicklinks a';
+  const selector = 'input.search, .map-preview__resolution, .map-preview__zoom, .map-preview__helper, .lp-theater-enter, .lp-theater-exit, .lp-jump-top, .chip, .btn, .card, .modal__close, .card__reload, .design-variant-arrow, .hive-fullscreen-toggle, .contrib, .topnav__btn, .topnav__dropitem, .topnav__burger, .hero__quicklinks a, .hero__downloads a, .footer a';
   const springs = new WeakMap();
   const searchRects = new WeakMap();
   const touchPressUntil = new WeakMap();
@@ -326,6 +341,10 @@ window.SparkGalleryMotion.init = function initGalleryMotion(options) {
     const y = Math.max(-1,Math.min(1,(e.clientY-r.top-r.height/2)/(r.height/2)));
     el.classList.add('lp-motion-target');
     const card = el.classList.contains('card');
+    // Do not continuously transform Hive cards with WebGL thumbnails:
+    // Chromium may leave cyan/colored canvas edge trails at fast speeds.
+    // Whole-card hover and click springs still use the same shared code.
+    if (card && document.body.classList.contains('hive-gallery')) return;
     if(card) el.style.translate = `${x*7}px ${y*5}px`;
     if (el.matches('input.search')) {
       // Use the original, untransformed bounds so the search field follows the
