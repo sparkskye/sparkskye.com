@@ -270,3 +270,126 @@ body.hive-polished .hive-reveal-item.is-visible {
 }
 
 
+
+/* Mobile Hive navigation is a single morphing surface, not an abrupt
+   replacement of a burger by a second, disconnected dropdown. */
+@media(max-width:680px) {
+  body.hive-polished .topnav {
+    position:relative;
+    flex:0 0 48px;
+    width:48px;
+    height:48px;
+    overflow:visible;
+    z-index:40;
+  }
+  body.hive-polished .topnav__mobile-shell {
+    display:block;
+    position:absolute;
+    right:0;
+    top:0;
+    width:48px;
+    height:48px;
+    overflow:hidden;
+    background:#1b1b1b;
+    border:var(--ui-border);
+    border-radius:17px;
+    box-sizing:border-box;
+    box-shadow:0 8px 28px rgb(0 0 0 / 0%);
+    transition:
+      width .54s cubic-bezier(.18,1.22,.30,1),
+      height .57s cubic-bezier(.18,1.17,.30,1),
+      border-radius .50s cubic-bezier(.18,1.15,.30,1),
+      box-shadow .35s ease,
+      border-color .22s ease;
+    transform-origin:top right;
+  }
+  body.hive-polished .topnav__mobile-shell.is-open {
+    width:min(224px,calc(100vw - 32px));
+    height:288px;
+    border-radius:28px;
+    border-color:var(--accent);
+    box-shadow:0 16px 48px rgb(0 0 0 / 28%);
+  }
+  body.hive-polished .topnav__mobile-shell .topnav__burger {
+    position:absolute;
+    right:0;
+    top:0;
+    width:44px;
+    min-width:44px;
+    height:44px;
+    min-height:44px;
+    display:inline-flex;
+    border:0;
+    border-radius:999px;
+    padding:11px;
+    background:transparent;
+    z-index:2;
+    color:#fff;
+    cursor:pointer;
+  }
+  body.hive-polished .topnav__mobile-shell .topnav__burger-icon {
+    transition:transform .42s cubic-bezier(.16,1.25,.3,1);
+  }
+  body.hive-polished .topnav__mobile-shell.is-open .topnav__burger-icon {
+    transform:rotate(90deg);
+  }
+  body.hive-polished .topnav__mobile-shell .topnav__dropdown {
+    display:flex !important;
+    flex-direction:column;
+    gap:8px;
+    position:absolute;
+    left:10px;
+    right:10px;
+    top:51px;
+    padding:0;
+    margin:0;
+    border:0;
+    min-width:0;
+    border-radius:0;
+    background:transparent;
+    box-shadow:none;
+    opacity:0;
+    visibility:hidden;
+    pointer-events:none;
+    transform:translateY(-13px) scale(.95);
+    transform-origin:top center;
+    transition:
+      opacity .24s ease,
+      transform .43s cubic-bezier(.16,1.16,.3,1),
+      visibility 0s linear .43s;
+  }
+  body.hive-polished .topnav__mobile-shell.is-open .topnav__dropdown {
+    opacity:1;
+    visibility:visible;
+    pointer-events:auto;
+    transform:none;
+    transition:opacity .28s .11s ease,
+      transform .48s .05s cubic-bezier(.16,1.16,.3,1),
+      visibility 0s;
+  }
+  body.hive-polished .topnav__mobile-shell .topnav__dropitem {
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    min-height:42px;
+    padding:8px 11px;
+    margin:0 !important;
+    border-radius:9999px;
+    background:#202020;
+    font:12px MCFive,Minecraftia,monospace;
+    text-align:center;
+  }
+  body.hive-polished .topnav__mobile-shell .topnav__dropitem:hover {
+    border-color:var(--accent);
+  }
+}
+@media(min-width:681px) {
+  body.hive-polished .topnav__mobile-shell {display:none;}
+}
+@media(prefers-reduced-motion:reduce) {
+  body.hive-polished .topnav__mobile-shell,
+  body.hive-polished .topnav__mobile-shell *,
+  body.hive-polished .topnav__mobile-shell .topnav__dropdown {
+    transition:none !important;
+  }
+}

@@ -206,3 +206,79 @@ body.hive-polished .panel .gm-reveal.gm-visible {transform:none}
   from{opacity:0;transform:translateY(12px)}
   to{opacity:1;transform:none}
 }
+
+/* Shared Hive parity: social-like text links, separate from pill controls. */
+body.hive-polished .gm-hover-text {
+  color:#fff !important;
+  text-decoration:none !important;
+  white-space:nowrap;
+  display:inline-block;
+}
+body.hive-polished .gm-hover-char {
+  color:inherit;
+  text-decoration:none !important;
+  transform:translateY(0);
+  transition:transform .43s cubic-bezier(.2,1.5,.28,1),color .25s ease;
+  transition-delay:0ms;
+}
+body.hive-polished .gm-hover-text:is(:hover,:focus-visible) .gm-hover-char,
+body.hive-polished .contrib:is(:hover,:focus-visible) .gm-hover-char {
+  color:#00aaff !important;
+  transform:translateY(-4px);
+  transition-delay:var(--gm-stagger,0ms);
+}
+body.hive-polished .gm-hover-text:not(:hover):not(:focus-visible) .gm-hover-char {
+  transform:translateY(0);
+  transition-delay:0ms;
+}
+body.hive-polished :is(.hero__downloads,.hero__quicklinks,.footer) a {
+  text-decoration:none !important;
+}
+body.hive-polished :is(.hero__downloads,.hero__quicklinks,.footer) a:not(.gm-hover-text) {
+  color:white;
+}
+body.hive-polished :is(.hero__downloads,.hero__quicklinks,.footer) a:not(.gm-hover-text):is(:hover,:focus-visible) {
+  color:#00aaff;
+}
+/* Whole-menu buttons behave like gallery filters: no character movement. */
+body.hive-polished :is(.topnav__btn,.topnav__dropitem,.topnav__burger) .gm-hover-char {
+  transform:none !important;
+  transition:none !important;
+}
+body.hive-polished .gm-reveal.gm-fade-only {
+  transform:none;
+  transition-property:opacity;
+}
+body.hive-polished .gm-reveal.gm-fade-only.gm-visible {
+  transform:none;
+}
+body.hive-polished .latest {
+  width:100%;
+  max-width:900px;
+  margin-inline:auto;
+  text-align:center;
+  text-wrap:pretty;
+  white-space:normal;
+  overflow-wrap:break-word;
+  line-height:1.75;
+}
+/* Model-card GPU thumbnail compositing: no rapidly shifted WebGL canvas.
+   Paint and shadows remain bounded to the same rounded card silhouette. */
+body.hive-gallery.gallery-motion .card {
+  isolation:isolate;
+  contain:paint;
+  backface-visibility:hidden;
+  transform:translateZ(0);
+  translate:none !important;
+}
+body.hive-gallery.gallery-motion .card.lp-motion-target {
+  --lp-x:0px;--lp-y:0px;--lp-rx:0deg;--lp-ry:0deg;
+  transform:translateZ(0) !important;
+}
+body.hive-gallery.gallery-motion .card__viewer {
+  contain:paint;
+  isolation:isolate;
+}
+@media(prefers-reduced-motion:reduce) {
+  body.hive-polished .gm-hover-char {transform:none !important;transition:none !important;}
+}
