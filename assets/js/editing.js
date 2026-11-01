@@ -459,53 +459,21 @@ window.addEventListener('keydown',e=>{
     e.preventDefault(); navigateGalleryItem(e.key==='ArrowRight'?1:-1);
   }
 });
-// One-finger swipes still navigate. Two-finger lateral slides navigate too,
-// while a pinch (fingers moving apart/together) remains image zoom.
-const galleryTouches = new Map();
-let singleSwipe = null;
-let pairSwipe = null;
+// Gallery swipes start only OUTSIDE the content viewer. Inside the viewer,
+// one-finger panning and two-finger pinching always belong to the media.
+let gallerySwipe = null;
 els.modal.addEventListener('pointerdown', e => {
-  if (e.pointerType !== 'touch' || e.target.closest('button,a,input,video,iframe')) return;
-  galleryTouches.set(e.pointerId, {x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY});
-  if (galleryTouches.size === 1) {
-    singleSwipe = {id:e.pointerId,x:e.clientX,y:e.clientY};
-    pairSwipe = null;
-  } else if (galleryTouches.size === 2) {
-    singleSwipe = null;
-    pairSwipe = {ids:[...galleryTouches.keys()],used:false};
-  } else {
-    singleSwipe = null;
-    pairSwipe = null;
-  }
-}, true);
-els.modal.addEventListener('pointermove', e => {
-  const point = galleryTouches.get(e.pointerId);
-  if (point) { point.x=e.clientX; point.y=e.clientY; }
+  if (e.pointerType !== 'touch' || !els.modal.classList.contains('is-open')) return;
+  if (els.modalViewer.contains(e.target) || e.target.closest('button,a,input,video,iframe')) return;
+  gallerySwipe = {id:e.pointerId,x:e.clientX,y:e.clientY};
 }, true);
 els.modal.addEventListener('pointerup', e => {
-  const point = galleryTouches.get(e.pointerId);
-  if (!point) return;
-  point.x=e.clientX; point.y=e.clientY;
-  if (pairSwipe && !pairSwipe.used && pairSwipe.ids.every(id => galleryTouches.has(id))) {
-    const [a,b] = pairSwipe.ids.map(id => galleryTouches.get(id));
-    const dxA=a.x-a.startX, dxB=b.x-b.startX;
-    const dyA=a.y-a.startY, dyB=b.y-b.startY;
-    const dx=(dxA+dxB)/2, dy=(dyA+dyB)/2;
-    // Both fingertips must translate together, not merely spread to zoom.
-    if (Math.abs(dx)>70 && Math.min(Math.abs(dxA),Math.abs(dxB))>45 &&
-        Math.sign(dxA)===Math.sign(dxB) && Math.abs(dx)>Math.abs(dy)*1.25) {
-      pairSwipe.used=true;
-      navigateGalleryItem(dx<0?1:-1);
-    }
-  } else if (!pairSwipe && singleSwipe && singleSwipe.id===e.pointerId) {
-    const dx=e.clientX-singleSwipe.x, dy=e.clientY-singleSwipe.y;
-    if (Math.abs(dx)>56 && Math.abs(dx)>Math.abs(dy)*1.35)
-      navigateGalleryItem(dx<0?1:-1);
-  }
-  galleryTouches.delete(e.pointerId);
-  if (galleryTouches.size===0) { pairSwipe=null; singleSwipe=null; }
+  if (!gallerySwipe || gallerySwipe.id !== e.pointerId) return;
+  const dx=e.clientX-gallerySwipe.x, dy=e.clientY-gallerySwipe.y;
+  gallerySwipe=null;
+  if (Math.abs(dx)>64 && Math.abs(dx)>Math.abs(dy)*1.35)
+    navigateGalleryItem(dx<0?1:-1);
 }, true);
 els.modal.addEventListener('pointercancel', e => {
-  galleryTouches.delete(e.pointerId);
-  if (galleryTouches.size===0) { pairSwipe=null; singleSwipe=null; }
+  if (gallerySwipe?.id===e.pointerId) gallerySwipe=null;
 }, true);
