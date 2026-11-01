@@ -11,6 +11,21 @@ window.SparkGalleryMotion.init = function initGalleryMotion(options) {
   document.body.classList.add('gallery-motion');
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
   const coarse = window.matchMedia('(pointer: coarse)');
+  if (options.hive) {
+    // The previous Hive-specific scroll listener was removed during the
+    // shared-engine migration; restore it here for every Hive page.
+    let scrollFade;
+    const showScrollbar = () => {
+      document.documentElement.classList.add('hive-scroll-active');
+      clearTimeout(scrollFade);
+      scrollFade = setTimeout(() => {
+        document.documentElement.classList.remove('hive-scroll-active');
+      }, 1350);
+    };
+    window.addEventListener('scroll', showScrollbar, {passive:true});
+    window.addEventListener('wheel', showScrollbar, {passive:true});
+    window.addEventListener('touchmove', showScrollbar, {passive:true});
+  }
   const markLanded = () => { if(stage) stage.dataset.landed = 'true'; };
   if (reduced.matches) markLanded(); else setTimeout(markLanded, 840);
 
@@ -45,38 +60,115 @@ window.SparkGalleryMotion.init = function initGalleryMotion(options) {
           if(entry.isIntersecting) {entry.target.classList.add('gm-visible');io.unobserve(entry.target);}
         }),{threshold:.04,rootMargin:'0px 0px 80px 0px'})
       : null;
+    const pending = [];
     targets.forEach((el,i)=>{
-      if(!io || el.id === 'filtersPanel')return;
+      if(el.id === 'filtersPanel')return;
       el.classList.add('gm-reveal');
       el.style.setProperty('--gm-delay',Math.min(i,5)*55+'ms');
-      io.observe(el);
+      if(io) pending.push(el); else el.classList.add('gm-visible');
     });
     secondary.forEach((el,i)=>{
-      if(!io || el.classList.contains('gm-reveal'))return;
+      if(el.classList.contains('gm-reveal'))return;
       el.classList.add('gm-reveal','gm-fade-only');
       el.style.setProperty('--gm-delay',Math.min(i%7,6)*42+170+'ms');
-      io.observe(el);
+      if(io) pending.push(el); else el.classList.add('gm-visible');
     });
-    // Link letters use reversible transitions, not repeating keyframes.
-    // Menu controls spring as whole pills. Letter ripples are for links only.
-    const selectors='.hero__quicklinks a,.hero__downloads a,.footer a,.contrib__name,.brand__name';
-    document.querySelectorAll(selectors).forEach(el=>{
-      let i=0;
-      for(const node of [...el.childNodes]) {
-        if(node.nodeType!==Node.TEXT_NODE||!node.textContent.trim())continue;
-        const frag=document.createDocumentFragment();
-        for(const ch of node.textContent) {
-          if(/\s/.test(ch))frag.append(ch);
-          else {
-            const letter=document.createElement('span');
-            letter.className='gm-hover-char';
-            letter.style.setProperty('--gm-stagger',Math.min(i++,22)*14+'ms');
-            letter.textContent=ch;frag.append(letter);
-          }
-        }
-        node.replaceWith(frag);
-      }
-      el.classList.add('gm-hover-text');
+    // Allow the initial hidden layout to paint before revealing. Otherwise
+    // IntersectionObserver can set both classes in the same frame and skip
+    // the actual fade on fast/cached navigations.
+    if(io) requestAnimationFrame(() => requestAnimationFrame(() => {
+      pending.forEach(el => io.observe(el));
+    }));
+
+    // Use the EXACT hover timing, keyframes and interrupted-return behavior
+    // of the homepage footer's social links (liquid-home.js).
+    const socialSelector = '.hero__quicklinks a,.hero__downloads a,.footer a,.contrib__name,.brand__name';
+    const socialLinks = [...document.querySelectorAll(socialSelector)];
+    const letterState = new WeakMap();
+    const colorTimers = new WeakMap();
+    socialLinks.forEach(link => {
+      const label=link.textContent.trim();
+      if(!label) return;
+      if(link.tagName === 'A') link.setAttribute('aria-label',label);
+      const wrapper=document.createElement('span');
+      wrapper.className='lp-label';
+      wrapper.setAttribute('aria-hidden','true');
+      [...label].forEach((char,i) => {
+        const letter=document.createElement('span');
+        letter.className='lp-letter';
+        letter.textContent=char;
+        letter.style.setProperty('--lp-char',i);
+        wrapper.append(letter);
+      });
+      link.replaceChildren(wrapper);
+      link.classList.add('gm-social-link');
+    });
+    const animateSocial = (link, active) => {
+      if(letterState.get(link)===active)return;
+      letterState.set(link,active);
+      (colorTimers.get(link)||[]).forEach(clearTimeout);
+      const timers=[];
+      colorTimers.set(link,timers);
+      link.querySelectorAll('.lp-letter').forEach((letter,i)=>{
+        const pose=getComputedStyle(letter).transform;
+        letter.getAnimations().forEach(a=>a.cancel());
+        const restColor='#ffffff', hoverColor='#00aaff';
+        if(active){
+          letter.style.color=restColor;
+          const paint=()=>{if(letterState.get(link)===true)letter.style.color=hoverColor;};
+          if(reduced.matches || i===0)paint();
+          else timers.push(setTimeout(paint,i*27));
+        }else letter.style.color=restColor;
+        if(reduced.matches)return;
+        const from=pose==='none'?'translateY(0px) scale(1)':pose;
+        const frames=active?[
+          {transform:from,offset:0},
+          {transform:'translateY(-8px) scale(1.13)',offset:.46},
+          {transform:'translateY(2px) scale(.975)',offset:.76},
+          {transform:'translateY(0px) scale(1)',offset:1}
+        ]:[
+          {transform:from,offset:0},
+          {transform:'translateY(2px) scale(.98)',offset:.52},
+          {transform:'translateY(-1px) scale(1.01)',offset:.82},
+          {transform:'translateY(0px) scale(1)',offset:1}
+        ];
+        const motion=letter.animate(frames,{
+          duration:active?440:330,
+          delay:active?i*27:i*6,
+          easing:'ease-out',fill:'both'
+        });
+        motion.onfinish=()=>motion.cancel();
+      });
+    };
+    socialLinks.forEach(link=>{
+      link.addEventListener('pointerenter',()=>animateSocial(link,true));
+      link.addEventListener('pointerleave',()=>{
+        if(document.activeElement!==link)animateSocial(link,false);
+      });
+      link.addEventListener('focus',()=>animateSocial(link,true));
+      link.addEventListener('blur',()=>{
+        if(!link.matches(':hover'))animateSocial(link,false);
+      });
+    });
+
+    // Browser back/forward cache restores existing classes and finished
+    // animations. Explicitly replay visible entrances on return.
+    window.addEventListener('pageshow',event=>{
+      if(!event.persisted)return;
+      const shown=[...document.querySelectorAll('.gm-reveal.gm-visible')];
+      shown.forEach(el=>el.classList.remove('gm-visible'));
+      const restarting=[
+        ...document.querySelectorAll('.gm-title-char'),
+        document.getElementById('filtersPanel'),
+        document.getElementById('grid'),
+        ...document.querySelectorAll('.lp-reveal-card')
+      ].filter(Boolean);
+      restarting.forEach(el=>{el.style.animation='none';});
+      void document.body.offsetHeight;
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{
+        restarting.forEach(el=>{el.style.removeProperty('animation');});
+        shown.forEach(el=>el.classList.add('gm-visible'));
+      }));
     });
   }
   // Newly rendered cards and empty/loading messages enter as they arrive.
@@ -110,6 +202,7 @@ window.SparkGalleryMotion.init = function initGalleryMotion(options) {
   document.body.appendChild(jumpTop);
   let lastScrollY = window.scrollY;
   let lastDirection = 0;
+  let entranceAnimation = null;
   const updateJumpTop = () => {
     const y = window.scrollY || 0;
     const delta = y - lastScrollY;
@@ -118,9 +211,11 @@ window.SparkGalleryMotion.init = function initGalleryMotion(options) {
     const modalOpen = document.getElementById('modal')?.classList.contains('is-open');
     const show = y > Math.max(420, window.innerHeight * .65) && lastDirection < 0 && !modalOpen;
     const wasVisible = jumpTop.classList.contains('is-visible');
+    if (!show && wasVisible) entranceAnimation?.cancel();
     jumpTop.classList.toggle('is-visible', show);
     if (show && !wasVisible && !reduced.matches) {
-      jumpTop.animate([
+      entranceAnimation?.cancel();
+      entranceAnimation = jumpTop.animate([
         {transform:'translateY(-18px) scale(.90)',opacity:0},
         {transform:'translateY(5px) scale(1.075)',opacity:1,offset:.48},
         {transform:'translateY(-3px) scale(.978)',opacity:1,offset:.75},
@@ -281,6 +376,19 @@ window.SparkGalleryMotion.init = function initGalleryMotion(options) {
     return el && el.closest('.gallery-motion') ? el : null;
   };
   function spring(el, mode, fromTouch = false) {
+    // Moving/scaling a Hive card containing a live canvas can leave GPU
+    // compositing trails. Animate the inset border overlay instead.
+    if (el.classList.contains('card') &&
+        document.body.classList.contains('hive-gallery')) {
+      el.classList.toggle('gm-card-hover',mode !== 'leave');
+      if(mode === 'press') {
+        el.classList.remove('gm-card-press');
+        void el.offsetWidth;
+        el.classList.add('gm-card-press');
+        setTimeout(()=>el.classList.remove('gm-card-press'),390);
+      }
+      return;
+    }
     const fromScale = getComputedStyle(el).scale;
     const fromRotate = getComputedStyle(el).rotate;
     springs.get(el)?.cancel();
@@ -317,7 +425,8 @@ window.SparkGalleryMotion.init = function initGalleryMotion(options) {
   document.addEventListener('pointerover', e => {
     const el = target(e);
     if (!el || el.contains(e.relatedTarget)) return;
-    el.classList.add('lp-motion-target','lp-motion-active');
+    if (!(el.classList.contains('card') && document.body.classList.contains('hive-gallery')))
+      el.classList.add('lp-motion-target','lp-motion-active');
     if (el.matches('input.search')) searchRects.set(el, el.getBoundingClientRect());
     if (e.pointerType !== 'touch') spring(el,'enter');
   });
@@ -339,7 +448,8 @@ window.SparkGalleryMotion.init = function initGalleryMotion(options) {
     if (r.width < 2 || r.height < 2) return;
     const x = Math.max(-1,Math.min(1,(e.clientX-r.left-r.width/2)/(r.width/2)));
     const y = Math.max(-1,Math.min(1,(e.clientY-r.top-r.height/2)/(r.height/2)));
-    el.classList.add('lp-motion-target');
+    if (!(el.classList.contains('card') && document.body.classList.contains('hive-gallery')))
+      el.classList.add('lp-motion-target');
     const card = el.classList.contains('card');
     // Do not continuously transform Hive cards with WebGL thumbnails:
     // Chromium may leave cyan/colored canvas edge trails at fast speeds.
@@ -367,7 +477,8 @@ window.SparkGalleryMotion.init = function initGalleryMotion(options) {
   document.addEventListener('pointerdown', e => {
     const el = target(e);
     if (!el) return;
-    el.classList.add('lp-motion-target');
+    if (!(el.classList.contains('card') && document.body.classList.contains('hive-gallery')))
+      el.classList.add('lp-motion-target');
     if (e.pointerType === 'touch') {
       touchPressUntil.set(el, performance.now()+620);
       lastTouchTap = { el, id:e.pointerId, x:e.clientX, y:e.clientY,
