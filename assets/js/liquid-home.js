@@ -21,14 +21,34 @@
   const detail = document.querySelector('.island-detail');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   if (!subpage) {
-    // Home should always start with the clean island view, even on reload.
+    // A separate reveal and hide threshold prevents flicker when scrolling
+    // upward. The clean homepage returns only at the very top.
     if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
-    const resetHome = () => {
-      window.scrollTo(0, 0);
-      document.body.classList.remove('lp-scrolled');
-    };
+    const initialWidth = window.innerWidth;
+    const narrowHome = initialWidth <= 600;
+    // Cache the entrance offset: iOS toolbar height changes during a swipe
+    // must not suddenly change the hero's vertical placement.
+    const heroRise = narrowHome
+      ? Math.min(68, Math.max(35, window.innerHeight * .07))
+      : Math.min(110, Math.max(48, window.innerHeight * .10));
+    let previousY = 0;
+    let revealed = false;
     const revealCopy = () => {
-      document.body.classList.toggle('lp-scrolled', window.scrollY > 44);
+      const y = Math.max(0, window.scrollY || 0);
+      if (!revealed && y >= 135) revealed = true;
+      else if (revealed && y <= 1 && y < previousY) revealed = false;
+      previousY = y;
+      document.body.classList.toggle('lp-scrolled', revealed);
+      const fraction = Math.min(1, y / 220);
+      const offset = Math.max(0, heroRise * (1 - fraction));
+      document.body.style.setProperty('--lp-home-hero-offset', offset.toFixed(2) + 'px');
+    };
+    const resetHome = () => {
+      revealed = false;
+      previousY = 0;
+      document.body.classList.remove('lp-scrolled');
+      document.body.style.setProperty('--lp-home-hero-offset', heroRise.toFixed(2) + 'px');
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     };
     resetHome();
     window.addEventListener('pageshow', () => {
@@ -714,13 +734,8 @@
       if (link && link !== touchedLink && stage.dataset.ready === 'true') {
         if (touchedLink) animateLetters(touchedLink, false);
         touchedLink = link;
-        if (pull?.id === e.pointerId && pull.link !== link) {
-          if (pull.link !== hit) {
-            pull.link.style.translate = '';
-            pull.link.style.scale = '';
-          }
-          pull.link = link;
-        }
+        // Hover selection and the dragged link are independent.
+        // Only the link at pointerdown may physically follow the finger.
         if (link) {
           const p = position(e);
           animateLetters(link, true);
