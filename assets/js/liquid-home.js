@@ -40,7 +40,7 @@
       const revealAt = Math.min(80, Math.max(12, scrollRange * .27));
       const wasRevealed = revealed;
       if (!revealed && y >= revealAt) revealed = true;
-      else if (revealed && y <= 2) revealed = false;
+      // After the first reveal, keep this copy visible until page reload.
       document.body.classList.toggle('lp-scrolled', revealed);
       const fraction = Math.min(1, y / 220);
       const offset = Math.max(0, heroRise * (1 - fraction));
