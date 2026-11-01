@@ -27,6 +27,36 @@
     }
   }).observe(grid, { childList: true, subtree: true });
 
+  // A small gallery shortcut appears only when scrolling UP after travelling
+  // far enough down the page. It never obscures an open preview.
+  const jumpTop = document.createElement('button');
+  jumpTop.type = 'button';
+  jumpTop.className = 'lp-jump-top';
+  jumpTop.textContent = '↑ TOP';
+  jumpTop.setAttribute('aria-label', 'Jump to gallery navigation');
+  jumpTop.title = 'Return to gallery controls';
+  document.body.appendChild(jumpTop);
+  let lastScrollY = window.scrollY;
+  let lastDirection = 0;
+  const updateJumpTop = () => {
+    const y = window.scrollY || 0;
+    const delta = y - lastScrollY;
+    if (Math.abs(delta) > 3) lastDirection = Math.sign(delta);
+    lastScrollY = y;
+    const modalOpen = document.getElementById('modal')?.classList.contains('is-open');
+    const show = y > Math.max(420, window.innerHeight * .65) && lastDirection < 0 && !modalOpen;
+    jumpTop.classList.toggle('is-visible', show);
+    jumpTop.tabIndex = show ? 0 : -1;
+  };
+  jumpTop.tabIndex = -1;
+  window.addEventListener('scroll', updateJumpTop, {passive:true});
+  window.addEventListener('resize', updateJumpTop, {passive:true});
+  jumpTop.addEventListener('click', () => {
+    jumpTop.classList.remove('is-visible');
+    window.scrollTo({top:0,behavior:reduced.matches?'instant':'smooth'});
+  });
+  updateJumpTop();
+
   // Shared floating preview controls fade after movement stops.
   const modal = document.getElementById('modal');
   const viewer = document.getElementById('modalViewer');

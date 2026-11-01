@@ -965,3 +965,70 @@ html, body { overflow-x: clip; }
     min-height: 0 !important;
   }
 }
+
+
+/* v18: the compact island never exposes links before its menu is ready. */
+.island-stage:not([data-ready="true"]) #island-links {
+  pointer-events: none !important;
+}
+/* Reuse the natural document center position when returning from fullscreen.
+   The first open animation has already finished at this point. */
+.liquid-subpage .modal.lp-theater-used.is-open:not(.lp-theater):not(.is-closing) .modal__card {
+  animation: none !important;
+  transform: translate(-50%, -50%) !important;
+}
+/* Enter fullscreen with content and controls fading into place. */
+@keyframes lp-fullscreen-arrive {
+  from { opacity: 0; filter: brightness(.86); }
+  to { opacity: 1; filter: brightness(1); }
+}
+.liquid-subpage .modal.lp-theater .modal__viewer > .shared-panzoom-preview,
+.liquid-subpage .modal.lp-theater .modal__viewer > .map-preview,
+.liquid-subpage .modal.lp-theater .modal__viewer > .timelapse-preview,
+.liquid-subpage .modal.lp-theater .modal__viewer > video,
+.liquid-subpage .modal.lp-theater .modal__viewer > iframe {
+  animation: lp-fullscreen-arrive .36s cubic-bezier(.2,.75,.3,1) both !important;
+}
+.liquid-subpage .modal.lp-theater .lp-preview-toolbar {
+  animation: lp-fullscreen-arrive .36s .10s ease both;
+}
+/* Fixed, accessible gallery jump shortcut (only while scrolling upward). */
+.liquid-subpage .lp-jump-top {
+  position: fixed;
+  z-index: 42;
+  left: 50%;
+  top: calc(14px + env(safe-area-inset-top, 0px));
+  transform: translate(-50%, -16px) scale(.93);
+  opacity: 0;
+  pointer-events: none;
+  border: 1px solid #555;
+  border-radius: 9999px;
+  padding: 13px 23px;
+  color: white;
+  background: rgb(29 29 29 / 90%);
+  backdrop-filter: blur(10px);
+  font: 12px MCFive,monospace;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform .34s cubic-bezier(.2,1.2,.3,1), opacity .22s ease;
+}
+.liquid-subpage .lp-jump-top.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%,0) scale(1);
+}
+.liquid-subpage .lp-jump-top:hover,
+.liquid-subpage .lp-jump-top:focus-visible {
+  background: #363636;
+  transform: translate(-50%,-3px) scale(1.04);
+}
+.liquid-subpage .lp-jump-top:active {
+  transform: translate(-50%,2px) scale(.98);
+}
+@media(prefers-reduced-motion:reduce) {
+  .liquid-subpage .modal.lp-theater .modal__viewer > *,
+  .liquid-subpage .modal.lp-theater .lp-preview-toolbar {
+    animation: none !important;
+  }
+  .liquid-subpage .lp-jump-top { transition: none !important; }
+}
