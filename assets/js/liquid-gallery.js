@@ -292,25 +292,35 @@
     el.classList.add('lp-motion-target');
     if (e.pointerType === 'touch') {
       touchPressUntil.set(el, performance.now()+620);
-      lastTouchTap = { el, id:e.pointerId, x:e.clientX, y:e.clientY, time:performance.now() };
+      lastTouchTap = { el, id:e.pointerId, x:e.clientX, y:e.clientY,
+        time:performance.now(), parent:el.parentElement,
+        label:el.textContent.trim() };
       return;
     }
     spring(el,'press');
   });
-  // Capture-click runs before gallery filter handlers and preserves ordinary
-  // native activation. Only the ACTUAL button animates, never a visual clone.
+  // Wait for the real click handler to finish. Category filters often replace
+  // their own DOM nodes synchronously, which previously canceled tap springs.
+  // Find the replacement control by label and animate ONLY that real node.
   document.addEventListener('click', e => {
     const el = target(e);
     if (!el) return;
-    if (lastTouchTap && performance.now()-lastTouchTap.time < 850) {
-      const tapped = lastTouchTap;
+    const tapped = lastTouchTap;
+    const isTouchClick = tapped && performance.now()-tapped.time < 850 &&
+      (el === tapped.el || tapped.el.contains(el) || el.contains(tapped.el));
+    if (isTouchClick) {
       lastTouchTap = null;
-      if (el===tapped.el || tapped.el.contains(el) || el.contains(tapped.el)) {
-        spring(el,'press',true);
-      }
+      requestAnimationFrame(() => {
+        const live = tapped.el.isConnected ? tapped.el :
+          [...(tapped.parent?.querySelectorAll('button, .chip, .btn') || [])]
+            .find(item => item.textContent.trim() === tapped.label);
+        if (!live?.isConnected) return; // Page navigation has already begun.
+        touchPressUntil.set(live, performance.now()+650);
+        live.classList.add('lp-motion-target');
+        spring(live, 'press', true);
+      });
     } else if (e.detail === 0) {
-      // Keyboard / accessibility activation.
-      spring(el,'press');
+      requestAnimationFrame(() => { if (el.isConnected) spring(el,'press'); });
     }
   }, true);
   document.addEventListener('pointercancel', e => {

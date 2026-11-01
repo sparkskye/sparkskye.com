@@ -31,21 +31,31 @@
     const heroRise = narrowHome
       ? Math.min(68, Math.max(35, window.innerHeight * .07))
       : Math.min(110, Math.max(48, window.innerHeight * .10));
-    let previousY = 0;
     let revealed = false;
     const revealCopy = () => {
       const y = Math.max(0, window.scrollY || 0);
-      if (!revealed && y >= 135) revealed = true;
-      else if (revealed && y <= 1 && y < previousY) revealed = false;
-      previousY = y;
+      // Keep the reveal reachable even on short phone/desktop viewports.
+      const scrollRange = Math.max(0,
+        document.documentElement.scrollHeight - window.innerHeight);
+      const revealAt = Math.min(80, Math.max(12, scrollRange * .27));
+      const wasRevealed = revealed;
+      if (!revealed && y >= revealAt) revealed = true;
+      else if (revealed && y <= 2) revealed = false;
       document.body.classList.toggle('lp-scrolled', revealed);
       const fraction = Math.min(1, y / 220);
       const offset = Math.max(0, heroRise * (1 - fraction));
       document.body.style.setProperty('--lp-home-hero-offset', offset.toFixed(2) + 'px');
+      if (revealed && !wasRevealed) {
+        // If already hovering a page when the copy appears, replay its
+        // original colorful bounce instead of showing stale static text.
+        requestAnimationFrame(() => {
+          const hovered = links.find(link => link.matches(':hover'));
+          if (hovered) showDescription(hovered);
+        });
+      }
     };
     const resetHome = () => {
       revealed = false;
-      previousY = 0;
       document.body.classList.remove('lp-scrolled');
       document.body.style.setProperty('--lp-home-hero-offset', heroRise.toFixed(2) + 'px');
       window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
@@ -227,6 +237,7 @@
   let suppressTouchClickUntil = 0;
   let suppressOpeningTap = false;
   let touchBeganCollapsed = false;
+  let touchOriginLink = null;
   let heldTouchLink = null;
   const TOUCH_OPEN_MS = 10000;
   function stopTouchTimer() { clearTimeout(touchTimeout); touchTimeout = 0; }
@@ -469,6 +480,9 @@
     // First tap always opens the island, even if a link occupies the same coordinates.
     suppressOpeningTap = !open;
     touchBeganCollapsed = !open;
+    const startedOn = e.target.closest('#island-links a');
+    touchOriginLink = open && stage.dataset.ready === 'true' &&
+      links.includes(startedOn) ? startedOn : null;
     clearHeldTouchLink();
     // First tap never activates buttons hidden under the compact island.
     links.forEach(link => animateLetters(link, false));
@@ -510,6 +524,7 @@
       showDescription(heldTouchLink);
     } else clearHeldTouchLink();
     touchedLink = null;
+    touchOriginLink = null;
     touchBeganCollapsed = false;
     armTouchTimer();
   });
@@ -517,6 +532,7 @@
     if (e.pointerId !== activeTouchId) return;
     activeTouchId = null; lastPointer = null; pointer = null;
     touchBeganCollapsed = false;
+    touchOriginLink = null;
     clearHeldTouchLink();
     armTouchTimer();
   });
@@ -728,20 +744,15 @@
       touchDragged = true;
       // Keep the menu open while the finger is actively dragging.
       stopTouchTimer();
-      const element = document.elementFromPoint(e.clientX, e.clientY);
-      const link = element?.closest('#island-links a') || null;
-      // Keep the last selected page while the finger moves away to release.
-      if (link && link !== touchedLink && stage.dataset.ready === 'true') {
-        if (touchedLink) animateLetters(touchedLink, false);
-        touchedLink = link;
-        // Hover selection and the dragged link are independent.
-        // Only the link at pointerdown may physically follow the finger.
-        if (link) {
-          const p = position(e);
-          animateLetters(link, true);
-          setColor(link.dataset.color, p.x, p.y);
-          showDescription(link);
-        }
+      // A touch may ONLY select the button where it began. Passing over
+      // another button cannot change the selection, color or description.
+      if (touchOriginLink && touchedLink !== touchOriginLink &&
+          stage.dataset.ready === 'true') {
+        touchedLink = touchOriginLink;
+        const p = position(e);
+        links.forEach(link => animateLetters(link, link === touchOriginLink));
+        setColor(touchOriginLink.dataset.color, p.x, p.y);
+        showDescription(touchOriginLink);
       }
     }
     const r = stage.getBoundingClientRect();

@@ -494,16 +494,6 @@ html, body { overflow-x: clip; }
 .liquid-subpage .modal__meta {touch-action:pan-y;}
 
 
-/* v12: leave homepage copy hidden until the reader scrolls past the island. */
-.liquid-home:not(.lp-scrolled) .island-hint,
-.liquid-home:not(.lp-scrolled) .island-detail,
-.liquid-home:not(.lp-scrolled) .intro,
-.liquid-home:not(.lp-scrolled) .liquid-footer { visibility: hidden; opacity: 0 !important; pointer-events: none; animation: none !important; }
-@media (prefers-reduced-motion: no-preference) {
- .liquid-home.lp-scrolled .island-hint { animation: lp-copy-appear .52s both; }
- .liquid-home.lp-scrolled .intro { animation: lp-copy-appear .6s .12s both; }
- .liquid-home.lp-scrolled .liquid-footer { animation: lp-copy-appear .6s .22s both; }
-}
 @media (max-width:600px) {
  .liquid-subpage .island-toggle { font-size: clamp(35px, 9vw, 45px); }
  .liquid-home .island-toggle { font-size: clamp(37px, 9vw, 47px); }
@@ -1146,72 +1136,69 @@ html:has(body.liquid-home)::-webkit-scrollbar {
 }
 
 
-/* v21 — reversible homepage reveal, without layout snapping.
-   The hero follows scroll distance rather than switching between two fixed
-   translations when text first appears. The copy uses the same fade timing
-   when leaving and returning. */
-.liquid-home .home-hero-core,
-.liquid-home.lp-scrolled .home-hero-core {
+
+/* v22 — the island and its supporting copy form ONE moving layout group.
+   Copy can fade independently, but never drifts toward or across the island. */
+.liquid-home .home-hero-core {
   transform: translateY(var(--lp-home-hero-offset, clamp(48px, 10svh, 110px))) !important;
   transition: none !important;
 }
-@media (max-width:600px) {
-  .liquid-home .home-hero-core,
-  .liquid-home.lp-scrolled .home-hero-core {
+@media (max-width: 600px) {
+  .liquid-home .home-hero-core {
     transform: translateY(var(--lp-home-hero-offset, clamp(35px, 7svh, 68px))) !important;
   }
 }
-.liquid-home .island-hint,
-.liquid-home .island-detail,
-.liquid-home .intro,
-.liquid-home .liquid-footer {
-  animation: none !important;
+.liquid-home .home-copy {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  opacity: 0;
+  visibility: hidden;
   transform: translateY(12px);
-  transition:
-    opacity .54s ease,
-    transform .65s cubic-bezier(.18,.8,.28,1),
-    visibility 0s linear .65s;
+  pointer-events: none;
+  transition: opacity .55s ease, transform .60s cubic-bezier(.18,.8,.28,1),
+              visibility 0s linear .60s;
+}
+.liquid-home.lp-scrolled .home-copy {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  pointer-events: auto;
+  transition: opacity .55s ease, transform .60s cubic-bezier(.18,.8,.28,1),
+              visibility 0s;
+}
+/* Do NOT override .island-detail animations: the original JS spring plays
+   on the colored text, and handles quick hover-out fades. */
+.liquid-home .home-copy .island-hint,
+.liquid-home .home-copy .intro {
+  animation: none !important;
+}
+.liquid-home .liquid-footer {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(12px);
+  pointer-events: none;
+  transition: opacity .55s ease, transform .60s ease,
+              visibility 0s linear .60s;
+}
+.liquid-home.lp-scrolled .liquid-footer {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  pointer-events: auto;
+  transition: opacity .55s ease, transform .60s ease, visibility 0s;
 }
 .liquid-home .liquid-footer nav,
-.liquid-home .liquid-footer p {
-  animation: none !important;
+.liquid-home .liquid-footer p { animation: none !important; }
+/* Enough natural scroll range to reveal copy even on tall phone screens.
+   This is after the footer, so it never changes island-to-copy spacing. */
+.liquid-home::after {
+  content: '';
+  display: block;
+  flex: 0 0 clamp(120px, 18svh, 175px);
 }
-.liquid-home:not(.lp-scrolled) .island-hint,
-.liquid-home:not(.lp-scrolled) .island-detail,
-.liquid-home:not(.lp-scrolled) .intro,
-.liquid-home:not(.lp-scrolled) .liquid-footer {
-  transform: translateY(12px) !important;
-  pointer-events: none;
-}
-.liquid-home.lp-scrolled .island-hint,
-.liquid-home.lp-scrolled .intro,
-.liquid-home.lp-scrolled .liquid-footer,
-.liquid-home.lp-scrolled .island-detail {
-  visibility: visible !important;
-  transform: translateY(0) !important;
-  transition:
-    opacity .54s ease,
-    transform .65s cubic-bezier(.18,.8,.28,1),
-    visibility 0s;
-}
-.liquid-home.lp-scrolled .island-hint,
-.liquid-home.lp-scrolled .intro,
-.liquid-home.lp-scrolled .liquid-footer {
-  opacity: 1 !important;
-  pointer-events: auto;
-}
-.liquid-home.lp-scrolled .island-detail {
-  opacity: 0 !important;
-}
-.liquid-home.lp-scrolled .island-detail.is-visible {
-  opacity: 1 !important;
-}
-@media (prefers-reduced-motion:reduce) {
-  .liquid-home .island-hint,
-  .liquid-home .island-detail,
-  .liquid-home .intro,
-  .liquid-home .liquid-footer,
-  .liquid-home .home-hero-core {
-    transition: none !important;
-  }
+@media (prefers-reduced-motion: reduce) {
+  .liquid-home .home-copy,
+  .liquid-home .liquid-footer { transition: none; }
 }
