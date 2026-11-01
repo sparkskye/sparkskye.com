@@ -1144,3 +1144,74 @@ html:has(body.liquid-home)::-webkit-scrollbar {
 @media (max-width: 820px) {
   .liquid-subpage .liquid-subnav { padding-top: 23px !important; }
 }
+
+
+/* v21 — reversible homepage reveal, without layout snapping.
+   The hero follows scroll distance rather than switching between two fixed
+   translations when text first appears. The copy uses the same fade timing
+   when leaving and returning. */
+.liquid-home .home-hero-core,
+.liquid-home.lp-scrolled .home-hero-core {
+  transform: translateY(var(--lp-home-hero-offset, clamp(48px, 10svh, 110px))) !important;
+  transition: none !important;
+}
+@media (max-width:600px) {
+  .liquid-home .home-hero-core,
+  .liquid-home.lp-scrolled .home-hero-core {
+    transform: translateY(var(--lp-home-hero-offset, clamp(35px, 7svh, 68px))) !important;
+  }
+}
+.liquid-home .island-hint,
+.liquid-home .island-detail,
+.liquid-home .intro,
+.liquid-home .liquid-footer {
+  animation: none !important;
+  transform: translateY(12px);
+  transition:
+    opacity .54s ease,
+    transform .65s cubic-bezier(.18,.8,.28,1),
+    visibility 0s linear .65s;
+}
+.liquid-home .liquid-footer nav,
+.liquid-home .liquid-footer p {
+  animation: none !important;
+}
+.liquid-home:not(.lp-scrolled) .island-hint,
+.liquid-home:not(.lp-scrolled) .island-detail,
+.liquid-home:not(.lp-scrolled) .intro,
+.liquid-home:not(.lp-scrolled) .liquid-footer {
+  transform: translateY(12px) !important;
+  pointer-events: none;
+}
+.liquid-home.lp-scrolled .island-hint,
+.liquid-home.lp-scrolled .intro,
+.liquid-home.lp-scrolled .liquid-footer,
+.liquid-home.lp-scrolled .island-detail {
+  visibility: visible !important;
+  transform: translateY(0) !important;
+  transition:
+    opacity .54s ease,
+    transform .65s cubic-bezier(.18,.8,.28,1),
+    visibility 0s;
+}
+.liquid-home.lp-scrolled .island-hint,
+.liquid-home.lp-scrolled .intro,
+.liquid-home.lp-scrolled .liquid-footer {
+  opacity: 1 !important;
+  pointer-events: auto;
+}
+.liquid-home.lp-scrolled .island-detail {
+  opacity: 0 !important;
+}
+.liquid-home.lp-scrolled .island-detail.is-visible {
+  opacity: 1 !important;
+}
+@media (prefers-reduced-motion:reduce) {
+  .liquid-home .island-hint,
+  .liquid-home .island-detail,
+  .liquid-home .intro,
+  .liquid-home .liquid-footer,
+  .liquid-home .home-hero-core {
+    transition: none !important;
+  }
+}
