@@ -1032,3 +1032,63 @@ html, body { overflow-x: clip; }
   }
   .liquid-subpage .lp-jump-top { transition: none !important; }
 }
+
+
+/* v19: page-colored native scrollbars, with no contrasting track or arrows.
+   Color is assigned to the root scroll container so all page themes work. */
+html:has(body.liquid-home),
+html:has(body.liquid-subpage) {
+  --lp-scroll-thumb: #00aaff;
+  scrollbar-width: thin;
+  scrollbar-color: var(--lp-scroll-thumb) #141414;
+}
+html:has(body.theme-animations) { --lp-scroll-thumb: #598ffe; }
+html:has(body.theme-editing) { --lp-scroll-thumb: #f0593a; }
+html:has(body.theme-design) { --lp-scroll-thumb: #894bdd; }
+html:has(body.theme-art) { --lp-scroll-thumb: #fbbc42; }
+html:has(body.liquid-home)::-webkit-scrollbar,
+html:has(body.liquid-subpage)::-webkit-scrollbar { width: 9px; height: 9px; }
+html:has(body.liquid-home)::-webkit-scrollbar-track,
+html:has(body.liquid-subpage)::-webkit-scrollbar-track,
+html:has(body.liquid-home)::-webkit-scrollbar-corner,
+html:has(body.liquid-subpage)::-webkit-scrollbar-corner {
+  background: #141414;
+}
+html:has(body.liquid-home)::-webkit-scrollbar-thumb,
+html:has(body.liquid-subpage)::-webkit-scrollbar-thumb {
+  background: var(--lp-scroll-thumb);
+  border: 2px solid #141414;
+  border-radius: 999px;
+}
+html:has(body.liquid-home)::-webkit-scrollbar-button,
+html:has(body.liquid-subpage)::-webkit-scrollbar-button {
+  display: none; width: 0; height: 0;
+}
+
+/* Match gallery chips exactly; independent translation preserves centering. */
+.liquid-subpage .lp-jump-top {
+  border: var(--ui-border) !important;
+  background: #1b1b1b !important;
+  color: var(--text) !important;
+  padding: 10px 14px !important;
+  font: 12px MCFive, Minecraftia, sans-serif !important;
+  line-height: normal;
+  box-shadow: none !important;
+  backdrop-filter: none;
+  border-radius: 9999px !important;
+}
+.liquid-subpage .lp-jump-top:hover,
+.liquid-subpage .lp-jump-top:focus-visible {
+  border-color: var(--accent) !important;
+  background: #1b1b1b !important;
+}
+
+/* All fullscreen surfaces are truly black, including the pan/zoom viewport. */
+.liquid-subpage .modal.lp-theater .modal__backdrop,
+.liquid-subpage .modal.lp-theater .modal__card,
+.liquid-subpage .modal.lp-theater .modal__viewer,
+.liquid-subpage .modal.lp-theater .map-preview,
+.liquid-subpage .modal.lp-theater .map-preview__viewport,
+.liquid-subpage .modal.lp-theater .shared-panzoom-preview {
+  background: #000 !important;
+}

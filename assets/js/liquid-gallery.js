@@ -31,7 +31,7 @@
   // far enough down the page. It never obscures an open preview.
   const jumpTop = document.createElement('button');
   jumpTop.type = 'button';
-  jumpTop.className = 'lp-jump-top';
+  jumpTop.className = 'lp-jump-top chip';
   jumpTop.textContent = '↑ TOP';
   jumpTop.setAttribute('aria-label', 'Jump to gallery navigation');
   jumpTop.title = 'Return to gallery controls';
@@ -45,7 +45,16 @@
     lastScrollY = y;
     const modalOpen = document.getElementById('modal')?.classList.contains('is-open');
     const show = y > Math.max(420, window.innerHeight * .65) && lastDirection < 0 && !modalOpen;
+    const wasVisible = jumpTop.classList.contains('is-visible');
     jumpTop.classList.toggle('is-visible', show);
+    if (show && !wasVisible && !reduced.matches) {
+      jumpTop.animate([
+        {transform:'translate(-50%,-18px) scale(.90)',opacity:0},
+        {transform:'translate(-50%,5px) scale(1.075)',opacity:1,offset:.48},
+        {transform:'translate(-50%,-3px) scale(.978)',opacity:1,offset:.75},
+        {transform:'translate(-50%,0) scale(1)',opacity:1}
+      ],{duration:500,easing:'ease-out'});
+    }
     jumpTop.tabIndex = show ? 0 : -1;
   };
   jumpTop.tabIndex = -1;
@@ -188,14 +197,15 @@
   }
 
   if (reduced.matches) return;
-  const selector = 'input.search, .map-preview__resolution, .map-preview__zoom, .map-preview__helper, .lp-theater-enter, .lp-theater-exit, .chip, .btn, .card, .modal__close, .card__reload, .design-variant-arrow';
+  const selector = 'input.search, .map-preview__resolution, .map-preview__zoom, .map-preview__helper, .lp-theater-enter, .lp-theater-exit, .lp-jump-top, .chip, .btn, .card, .modal__close, .card__reload, .design-variant-arrow';
   const springs = new WeakMap();
   const searchRects = new WeakMap();
+  const touchPressUntil = new WeakMap();
   const target = event => {
     const el = event.target instanceof Element ? event.target.closest(selector) : null;
     return el && el.closest('.liquid-subpage') ? el : null;
   };
-  function spring(el, mode) {
+  function spring(el, mode, fromTouch = false) {
     const fromScale = getComputedStyle(el).scale;
     const fromRotate = getComputedStyle(el).rotate;
     springs.get(el)?.cancel();
@@ -204,7 +214,7 @@
     const hover = mode === 'enter';
     const click = mode === 'press';
     const small = el.matches('input.search');
-    const finalScale = hover ? (small ? '1.003' : '1.025') :
+    const finalScale = fromTouch ? '1' : hover ? (small ? '1.003' : '1.025') :
       (mode === 'leave' ? '1' : (el.matches(':hover') ? (small ? '1.003' : '1.025') : '1'));
     el.style.scale = finalScale;
     el.style.rotate = '0deg';
@@ -242,6 +252,7 @@
     resetTilt(el);
     searchRects.delete(el);
     el.classList.remove('lp-motion-active');
+    if (e.pointerType === 'touch' && performance.now() < (touchPressUntil.get(el) || 0)) return;
     spring(el,'leave');
   });
   document.addEventListener('pointermove', e => {
@@ -273,14 +284,27 @@
   }, {passive:true});
   document.addEventListener('pointerdown', e => {
     const el = target(e);
-    if (el) { el.classList.add('lp-motion-target'); spring(el,'press'); }
+    if (!el) return;
+    el.classList.add('lp-motion-target');
+    if (e.pointerType === 'touch') touchPressUntil.set(el, performance.now()+530);
+    spring(el,'press',e.pointerType === 'touch');
+  });
+  document.addEventListener('click', e => {
+    // Keyboard and assistive technology activate click without pointerdown.
+    if (e.detail !== 0) return;
+    const el = target(e);
+    if (el) spring(el,'press');
   });
   document.addEventListener('focusin', e => {
     const el = target(e);
-    if (el) { el.classList.add('lp-motion-target'); spring(el,'enter'); }
+    if (el && performance.now() >= (touchPressUntil.get(el) || 0)) {
+      el.classList.add('lp-motion-target'); spring(el,'enter');
+    }
   });
   document.addEventListener('focusout', e => {
     const el = target(e);
-    if (el && !el.matches(':hover')) { resetTilt(el); spring(el,'leave'); }
+    if (el && !el.matches(':hover') && performance.now() >= (touchPressUntil.get(el) || 0)) {
+      resetTilt(el); spring(el,'leave');
+    }
   });
 })();
