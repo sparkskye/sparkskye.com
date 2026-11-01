@@ -283,72 +283,39 @@
     el.style.setProperty('--lp-rx', `${(-y * (card ? 0 : 2)).toFixed(2)}deg`);
     el.style.setProperty('--lp-ry', `${(x * (card ? 0 : 2.3)).toFixed(2)}deg`);
   }, {passive:true});
+  // Do not animate/transform a touch target before the browser delivers click.
+  // A quick tap must activate the real control, not a cloned overlay.
+  let lastTouchTap = null;
   document.addEventListener('pointerdown', e => {
     const el = target(e);
     if (!el) return;
     el.classList.add('lp-motion-target');
-    if (e.pointerType === 'touch') touchPressUntil.set(el, performance.now()+530);
-    spring(el,'press',e.pointerType === 'touch');
+    if (e.pointerType === 'touch') {
+      touchPressUntil.set(el, performance.now()+620);
+      lastTouchTap = { el, id:e.pointerId, x:e.clientX, y:e.clientY, time:performance.now() };
+      return;
+    }
+    spring(el,'press');
   });
-  // On quick touch taps, filter handlers replace the button before its
-  // spring finishes. A noninteractive echo completes the same bounce.
-  const touchStarts = new Map();
-  document.addEventListener('pointerdown', e => {
-    if (e.pointerType !== 'touch') return;
-    const el = target(e);
-    if (!el || !el.matches('button, .btn, .chip, .card__reload')) return;
-    touchStarts.set(e.pointerId, {el, x:e.clientX, y:e.clientY});
-  }, true);
-  function touchEcho(el) {
-    if (!el.isConnected || reduced.matches) return;
-    const rect = el.getBoundingClientRect();
-    if (rect.width < 3 || rect.height < 3) return;
-    const computed = getComputedStyle(el);
-    const echo = el.cloneNode(true);
-    echo.removeAttribute('id');
-    echo.querySelectorAll('[id]').forEach(node => node.removeAttribute('id'));
-    echo.removeAttribute('aria-label');
-    echo.setAttribute('aria-hidden','true');
-    echo.tabIndex = -1;
-    echo.classList.add('lp-touch-echo');
-    Object.assign(echo.style, {
-      position:'fixed', left:rect.left+'px', top:rect.top+'px',
-      width:rect.width+'px', height:rect.height+'px',
-      margin:'0', boxSizing:'border-box', zIndex:'10050',
-      pointerEvents:'none', transformOrigin:'center center',
-      translate:'none', rotate:'none', scale:'1',
-      backgroundColor:computed.backgroundColor,
-      color:computed.color, border:computed.border,
-      borderRadius:computed.borderRadius,
-      font:computed.font, textAlign:computed.textAlign,
-      opacity:'1'
-    });
-    document.body.appendChild(echo);
-    const motion=echo.animate([
-      {transform:'scale(1)',opacity:1},
-      {transform:'scale(.91)',opacity:1,offset:.19},
-      {transform:'scale(1.12)',opacity:1,offset:.51},
-      {transform:'scale(.97)',opacity:1,offset:.72},
-      {transform:'scale(1)',opacity:0,offset:1}
-    ],{duration:490,easing:'cubic-bezier(.2,.8,.32,1)',fill:'forwards'});
-    motion.finished.catch(()=>{}).finally(()=>echo.remove());
-  }
-  document.addEventListener('pointerup', e => {
-    if (e.pointerType !== 'touch') return;
-    const started = touchStarts.get(e.pointerId);
-    touchStarts.delete(e.pointerId);
-    if (!started) return;
-    if (Math.hypot(e.clientX-started.x,e.clientY-started.y)>14) return;
-    touchEcho(started.el);
-  }, true);
-  document.addEventListener('pointercancel', e => touchStarts.delete(e.pointerId), true);
-
+  // Capture-click runs before gallery filter handlers and preserves ordinary
+  // native activation. Only the ACTUAL button animates, never a visual clone.
   document.addEventListener('click', e => {
-    // Keyboard and assistive technology activate click without pointerdown.
-    if (e.detail !== 0) return;
     const el = target(e);
-    if (el) spring(el,'press');
-  });
+    if (!el) return;
+    if (lastTouchTap && performance.now()-lastTouchTap.time < 850) {
+      const tapped = lastTouchTap;
+      lastTouchTap = null;
+      if (el===tapped.el || tapped.el.contains(el) || el.contains(tapped.el)) {
+        spring(el,'press',true);
+      }
+    } else if (e.detail === 0) {
+      // Keyboard / accessibility activation.
+      spring(el,'press');
+    }
+  }, true);
+  document.addEventListener('pointercancel', e => {
+    if (lastTouchTap?.id===e.pointerId) lastTouchTap=null;
+  }, true);
   document.addEventListener('focusin', e => {
     const el = target(e);
     if (el && performance.now() >= (touchPressUntil.get(el) || 0)) {
