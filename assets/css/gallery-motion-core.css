@@ -265,15 +265,16 @@ body.hive-polished .latest {
 /* Model-card GPU thumbnail compositing: no rapidly shifted WebGL canvas.
    Paint and shadows remain bounded to the same rounded card silhouette. */
 body.hive-gallery.gallery-motion .card {
+  position:relative;
   isolation:isolate;
   contain:paint;
-  backface-visibility:hidden;
-  transform:translateZ(0);
+  /* No persistent GPU transform layer on the card containing WebGL. */
   translate:none !important;
 }
 body.hive-gallery.gallery-motion .card.lp-motion-target {
   --lp-x:0px;--lp-y:0px;--lp-rx:0deg;--lp-ry:0deg;
-  transform:translateZ(0) !important;
+  transform:none !important;
+  scale:1 !important;
 }
 body.hive-gallery.gallery-motion .card__viewer {
   contain:paint;
@@ -281,4 +282,81 @@ body.hive-gallery.gallery-motion .card__viewer {
 }
 @media(prefers-reduced-motion:reduce) {
   body.hive-polished .gm-hover-char {transform:none !important;transition:none !important;}
+}
+
+/* v27 — retain the exact homepage-footer character animation in Hive.
+   The animation itself is shared in the JS: 440ms / 330ms / 27ms stagger. */
+body.hive-polished .gm-social-link {
+  display:inline-block;
+  color:#fff !important;
+  text-decoration:none !important;
+  white-space:nowrap;
+}
+body.hive-polished .gm-social-link .lp-label {display:inline-block}
+body.hive-polished .gm-social-link .lp-letter {
+  display:inline-block;
+  white-space:pre;
+  transform-origin:50% 100%;
+  color:#fff;
+  transition:color 0s !important;
+}
+/* A static outline pulses instead of rescaling/repainting the live 3D model. */
+body.hive-gallery.gallery-motion .card::after {
+  content:"";
+  pointer-events:none;
+  position:absolute;
+  inset:0;
+  border-radius:inherit;
+  border:2px solid var(--accent, #00aaff);
+  opacity:0;
+  scale:.988;
+  transform-origin:center;
+  transition:opacity .26s ease,scale .34s cubic-bezier(.2,1.3,.36,1);
+}
+body.hive-gallery.gallery-motion .card.gm-card-hover::after,
+body.hive-gallery.gallery-motion .card:is(:focus-visible,:focus-within)::after {
+  opacity:.9;
+  scale:1;
+}
+body.hive-gallery.gallery-motion .card.gm-card-press::after {
+  animation:gm-safe-card-press .39s cubic-bezier(.2,1,.3,1);
+}
+@keyframes gm-safe-card-press {
+  0%{scale:1}
+  30%{scale:.963}
+  62%{scale:1.015}
+  100%{scale:1}
+}
+/* Centered fixed shortcut: never let per-control tilt overwrite its anchor.
+   Visibility changes animate opacity and vertical translation only. */
+body.gallery-motion .lp-jump-top {
+  left:50% !important;
+  translate:-50% 0 !important;
+  rotate:none !important;
+  transform:translateY(-16px);
+  opacity:0;
+  transition:opacity .32s ease,transform .37s cubic-bezier(.2,1.12,.3,1),
+    border-color .2s ease;
+}
+body.gallery-motion .lp-jump-top.is-visible,
+body.gallery-motion .lp-jump-top.lp-motion-target.is-visible {
+  transform:translateY(0) !important;
+  opacity:1;
+}
+body.gallery-motion .lp-jump-top.lp-motion-target:not(.is-visible) {
+  transform:translateY(-16px) !important;
+  opacity:0;
+}
+@media(prefers-reduced-motion:reduce) {
+  body.hive-gallery.gallery-motion .card::after {
+    scale:1;transition:none;animation:none !important;
+  }
+}
+/* Native page-colored scrollbar with the same blue as Sparkskye's homepage.
+   The track stays dark; thumb is visible while the visitor scrolls. */
+html.hive-scroll-active:has(body.hive-polished) {
+  scrollbar-color:#00aaff #141414 !important;
+}
+html.hive-scroll-active:has(body.hive-polished)::-webkit-scrollbar-thumb {
+  background:#00aaff !important;
 }

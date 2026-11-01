@@ -5,10 +5,11 @@
 html:has(body.hive-polished) {
   scrollbar-gutter: stable;
   scrollbar-width: thin;
+  --hive-scroll-thumb: #00aaff;
   scrollbar-color: transparent #141414;
 }
 html.hive-scroll-active:has(body.hive-polished) {
-  scrollbar-color: var(--accent,#00aaff) #141414;
+  scrollbar-color: var(--hive-scroll-thumb) #141414;
 }
 html:has(body.hive-polished)::-webkit-scrollbar { width:9px; }
 html:has(body.hive-polished)::-webkit-scrollbar-track,
@@ -19,7 +20,7 @@ html:has(body.hive-polished)::-webkit-scrollbar-thumb {
   border-radius:9999px;
 }
 html.hive-scroll-active:has(body.hive-polished)::-webkit-scrollbar-thumb {
-  background:var(--accent,#00aaff);
+  background:var(--hive-scroll-thumb);
 }
 html:has(body.hive-polished)::-webkit-scrollbar-button {display:none;height:0;width:0}
 body.hive-polished {font-family:MCFive,Minecraftia,monospace;}
@@ -391,5 +392,19 @@ body.hive-polished .hive-reveal-item.is-visible {
   body.hive-polished .topnav__mobile-shell *,
   body.hive-polished .topnav__mobile-shell .topnav__dropdown {
     transition:none !important;
+  }
+}
+
+/* Make the currently open Hive page an unmistakable selected blue chip. */
+@media(max-width:680px) {
+  body.hive-polished .topnav__mobile-shell .topnav__dropitem.is-active,
+  body.hive-polished .topnav__mobile-shell .topnav__dropitem[aria-current="page"] {
+    background:#00aaff !important;
+    border-color:#00aaff !important;
+    color:#041018 !important;
+  }
+  body.hive-polished .topnav__mobile-shell .topnav__dropitem.is-active:hover {
+    background:#00aaff !important;
+    border-color:#00aaff !important;
   }
 }

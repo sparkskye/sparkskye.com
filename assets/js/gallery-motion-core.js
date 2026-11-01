@@ -418,6 +418,8 @@ window.SparkGalleryMotion.init = function initGalleryMotion(options) {
     anim.onfinish = () => { if (springs.get(el) === anim) { anim.cancel(); springs.delete(el); } };
   }
   function resetTilt(el) {
+    if (el.classList.contains('card') &&
+        document.body.classList.contains('hive-gallery')) return;
     el.style.translate='0px 0px';
     el.style.setProperty('--lp-x', '0px'); el.style.setProperty('--lp-y', '0px');
     el.style.setProperty('--lp-rx', '0deg'); el.style.setProperty('--lp-ry', '0deg');
@@ -442,7 +444,7 @@ window.SparkGalleryMotion.init = function initGalleryMotion(options) {
   document.addEventListener('pointermove', e => {
     if (e.pointerType === 'touch' || coarse.matches) return;
     const el = target(e);
-    if (!el || !el.matches(':hover')) return;
+    if (!el || !el.matches(':hover') || el.classList.contains('lp-jump-top')) return;
     const r = el.matches('input.search') ?
       (searchRects.get(el) || el.getBoundingClientRect()) : el.getBoundingClientRect();
     if (r.width < 2 || r.height < 2) return;

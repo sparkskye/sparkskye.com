@@ -136,7 +136,18 @@ export function initMobileNav() {
     }
     const color = b.style?.getPropertyValue("--item-color") || b.getAttribute?.("data-color") || "";
     if (color) a.style.setProperty("--item-color", color);
-    if (b.classList?.contains("is-active")) a.classList.add("is-active");
+    // Active state must follow the actual current route, even if the
+    // original nav links set their state after this menu is initialized.
+    const norm = (url) => {
+      const pathname = new URL(url, location.href).pathname
+        .replace(/index\.html$/i, "").replace(/\/+$/,"");
+      return pathname || "/";
+    };
+    const onPage = href && norm(href) === norm(location.pathname);
+    if (onPage || b.classList?.contains("is-active")) {
+      a.classList.add("is-active");
+      a.setAttribute("aria-current","page");
+    }
     a.textContent = (b.textContent || "").trim() || "Link";
     dropdown.appendChild(a);
   }
