@@ -1214,3 +1214,29 @@ body.liquid-home .liquid-footer {
     margin-top: 155px !important;
   }
 }
+
+/* v25: the footer belongs to the same moving/revealing block as the intro.
+   No independent scroll-time transform or different relative speed. */
+body.liquid-home .home-copy > .liquid-footer {
+  position: relative;
+  width: min(1120px,100%);
+  margin: clamp(52px, 7svh, 88px) auto 0 !important;
+  padding: 10px 20px 24px;
+  flex: none;
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: none !important;
+  transition: none !important;
+  pointer-events: auto;
+}
+body.liquid-home .home-copy > .liquid-footer nav,
+body.liquid-home .home-copy > .liquid-footer p {
+  animation: none !important;
+  transform: none !important;
+}
+@media(max-width:600px){
+  body.liquid-home .home-copy > .liquid-footer {
+    margin-top: 54px !important;
+    padding: 10px 10px 28px;
+  }
+}
