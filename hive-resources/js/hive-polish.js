@@ -241,7 +241,10 @@
     }else{
       openedBefore=false;
       clearTimeout(modalSettleTimer);
-      modal.classList.remove('hive-opened');
+      // Avoid MutationObserver feedback: only change the class if present.
+      if(modal.classList.contains('hive-opened')){
+        modal.classList.remove('hive-opened');
+      }
       if(modal.classList.contains('hive-fullscreen')){
         modal.classList.remove('hive-fullscreen');
         updateFullscreen();
