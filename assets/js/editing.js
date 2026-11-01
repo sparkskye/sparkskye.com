@@ -260,7 +260,7 @@ function exitTheater() { els.modal.classList.remove('lp-theater'); }
   enter.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M21 16v5h-5M3 16v5h5"/></svg>';
   enter.addEventListener('click', e => {
     e.stopPropagation();
-    els.modal.classList.add('lp-theater', 'lp-preview-active');
+    els.modal.classList.add('lp-theater', 'lp-preview-active', 'lp-theater-used');
   });
   // File and item changes recreate the viewer. Reattach the overlay afterward.
   const exit = document.createElement('button');
@@ -354,6 +354,7 @@ function closeModal(opts = {}) {
   els.modal.classList.remove('is-closing');
   try { state.lastFocus?.focus?.(); } catch {}
   els.modal.classList.remove("is-open");
+  els.modal.classList.remove('lp-theater-used');
   els.modal.setAttribute("aria-hidden", "true");
   els.modalViewer.innerHTML = '<div class="viewer__loading" id="modalLoading">Loading...</div>';
   unlockBodyScroll();
