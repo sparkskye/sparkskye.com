@@ -53,25 +53,45 @@
   const selected=e=>e.target instanceof Element ? e.target.closest(controls):null;
   function bounce(el,mode='press',touch=false) {
     if(!el?.isConnected || reduce.matches) return;
+    // Read the animated value BEFORE canceling. A short hover never snaps to
+    // neutral when the cursor leaves partway through the spring.
+    const style=getComputedStyle(el);
+    const startScale=style.scale && style.scale!=='none' ? style.scale : '1';
+    const startRotate=style.rotate && style.rotate!=='none' ? style.rotate : '0deg';
     animations.get(el)?.cancel();
-    const hover=mode==='hover';
-    const final=touch?1:el.matches(':hover')?1.025:1;
-    const frames=hover?
-      [{scale:1,rotate:'0deg'},{scale:1.065,rotate:'-1.2deg',offset:.45},
-       {scale:.99,rotate:'.6deg',offset:.75},{scale:final,rotate:'0deg'}]:
-      [{scale:1,rotate:'0deg'},{scale:.935,rotate:'1.5deg',offset:.24},
-       {scale:1.072,rotate:'-1.1deg',offset:.60},
-       {scale:.985,rotate:'.4deg',offset:.82},{scale:final,rotate:'0deg'}];
-    const motion=el.animate(frames,{duration:hover?440:480,
-      easing:'cubic-bezier(.2,.75,.3,1)',fill:'both'});
+    const hover=mode==='hover', leave=mode==='leave';
+    const final=leave||touch?1:el.matches(':hover')?1.025:1;
+    const initial={scale:startScale,rotate:startRotate};
+    const frames=leave?
+      [initial,{scale:'.988',rotate:'.25deg',offset:.50},{scale:'1',rotate:'0deg'}]:
+      hover?
+      [initial,{scale:'1.063',rotate:'-1deg',offset:.45},
+       {scale:'.99',rotate:'.35deg',offset:.76},{scale:String(final),rotate:'0deg'}]:
+      [initial,{scale:'.94',rotate:'1deg',offset:.24},
+       {scale:'1.07',rotate:'-.8deg',offset:.60},
+       {scale:'.99',rotate:'.2deg',offset:.82},{scale:String(final),rotate:'0deg'}];
+    const motion=el.animate(frames,{
+      duration:leave?290:hover?420:420,
+      easing:'cubic-bezier(.2,.8,.3,1)',fill:'both'
+    });
     animations.set(el,motion);
-    motion.onfinish=()=>{if(animations.get(el)===motion){motion.cancel();animations.delete(el)}};
+    motion.onfinish=()=>{
+      if(animations.get(el)!==motion)return;
+      // Hold the settled hover position; restore neutral on exit.
+      el.style.scale=final===1?'':String(final);
+      motion.cancel();
+      animations.delete(el);
+    };
   }
-  document.addEventListener('pointerenter',e=>{
+  document.addEventListener('pointerover',e=>{
     if(e.pointerType==='touch')return;
     const el=selected(e);
-    // Nested spans/icons can dispatch additional pointerenter events.
-    if(el && e.target===el)bounce(el,'hover');
+    if(el && !el.contains(e.relatedTarget))bounce(el,'hover');
+  },true);
+  document.addEventListener('pointerout',e=>{
+    if(e.pointerType==='touch')return;
+    const el=selected(e);
+    if(el && !el.contains(e.relatedTarget))bounce(el,'leave');
   },true);
   document.addEventListener('pointerdown',e=>{
     const el=selected(e);
