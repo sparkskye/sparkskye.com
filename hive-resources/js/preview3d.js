@@ -264,6 +264,8 @@ export class ModalPreview {
 
   async open(modelUrl) {
     this.close();
+    // Each new item invalidates any unresolved previous model load.
+    const generation = this._openGeneration;
     this.disposed = false;
 
     this.canvas = document.createElement("canvas");
@@ -305,9 +307,12 @@ export class ModalPreview {
     this.controls.dampingFactor = 0.08;
     this.controls.enablePan = false;
 
-    this.root = await loadScene(modelUrl);
-    if (this.disposed) return;
-
+    const loadedRoot = await loadScene(modelUrl);
+    if (this.disposed || generation !== this._openGeneration) {
+      disposeObject3D(loadedRoot);
+      return;
+    }
+    this.root = loadedRoot;
     forceNearestAndUnlit(this.root);
     this.scene.add(this.root);
     centerAndFrame(this.root, this.camera);
@@ -326,6 +331,7 @@ export class ModalPreview {
   }
 
   close() {
+    this._openGeneration = (this._openGeneration || 0) + 1;
     this.disposed = true;
     if (this.raf) cancelAnimationFrame(this.raf);
     this.raf = null;

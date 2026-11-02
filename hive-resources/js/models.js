@@ -632,8 +632,12 @@ async function openModal(it, opts = {}) {
 
   try {
     await modalPreview.open(view);
+    if (state.activePreviewId !== it.modelId ||
+        !els.modal.classList.contains("is-open")) return;
     els.modalLoading.style.display = "none";
   } catch (err) {
+    if (state.activePreviewId !== it.modelId ||
+        !els.modal.classList.contains("is-open")) return;
     console.error(err);
     els.modalLoading.style.display = "flex";
     els.modalLoading.textContent = "FAILED TO LOAD";
