@@ -922,16 +922,8 @@ function handleMapModalKeydown(e) {
     panMap(0, -64);
     return true;
   }
-  if (e.key === "ArrowLeft") {
-    e.preventDefault();
-    panMap(64, 0);
-    return true;
-  }
-  if (e.key === "ArrowRight") {
-    e.preventDefault();
-    panMap(-64, 0);
-    return true;
-  }
+  // Left/right arrows navigate gallery items, matching all other galleries.
+  // Up/down remain available for map panning.
   return false;
 }
 
@@ -1050,6 +1042,14 @@ function maybeOpenPreviewFromUrl() {
   openModal(match, { skipUrlUpdate: true });
 }
 
+// Shares keyboard and outside-content swipe navigation with all galleries.
+window.SparkGalleryMotion?.registerNavigation({
+  modal:els.modal, viewer:els.modalViewer,
+  getItems:()=>state.filtered,
+  getCurrentId:()=>state.activePreviewId,
+  getItemId:it=>it.glbId || it.thumbId,
+  openItem:it=>openModal(it)
+});
 els.modalBackdrop.addEventListener("click", () => closeModal());
 els.modalClose.addEventListener("click", () => closeModal());
 window.addEventListener("keydown", (e) => {

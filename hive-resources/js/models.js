@@ -668,6 +668,14 @@ function maybeOpenPreviewFromUrl() {
   openModal(match, { skipUrlUpdate: true });
 }
 
+// Shares keyboard and outside-content swipe navigation with all galleries.
+window.SparkGalleryMotion?.registerNavigation({
+  modal:els.modal, viewer:els.modalViewer,
+  getItems:()=>state.filtered,
+  getCurrentId:()=>state.activePreviewId,
+  getItemId:it=>it.modelId,
+  openItem:it=>openModal(it)
+});
 els.modalBackdrop.addEventListener("click", () => closeModal());
 els.modalClose.addEventListener("click", () => closeModal());
 window.addEventListener("keydown", (e) => {
