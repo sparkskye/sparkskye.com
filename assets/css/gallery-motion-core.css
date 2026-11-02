@@ -1,0 +1,347 @@
+
+/* One animation vocabulary: both Sparkskye and Hive use the same JS and CSS. */
+body.gallery-motion .lp-motion-target {
+  --lp-x:0px;--lp-y:0px;--lp-rx:0deg;--lp-ry:0deg;
+  transform:perspective(900px) translate3d(var(--lp-x),var(--lp-y),0)
+    rotateX(var(--lp-rx)) rotateY(var(--lp-ry));
+  transform-origin:center center;
+  transition:transform .28s cubic-bezier(.2,1.25,.36,1),
+    scale .32s cubic-bezier(.2,1.25,.36,1);
+}
+body.gallery-motion .card.lp-motion-target {
+  transform:translate3d(var(--lp-x),var(--lp-y),0);
+  transition:transform .28s cubic-bezier(.2,1.25,.36,1),
+    translate .2s ease-out,border-color .2s;
+}
+body.gallery-motion .lp-motion-target:not(.lp-motion-active){scale:1}
+@media(prefers-reduced-motion:no-preference){
+  body.gallery-motion #filtersPanel {
+    animation:gm-gallery-arrive .70s .26s both;
+  }
+  body.gallery-motion #grid {
+    animation:gm-gallery-arrive .70s .67s both;
+  }
+  body.gallery-motion #grid .lp-reveal-card {
+    animation:gm-card-arrive .58s both;
+    animation-delay:calc(45ms + var(--gallery-index,0) * 36ms);
+  }
+}
+@keyframes gm-gallery-arrive {
+  0%{opacity:0;transform:translateY(21px) scale(.965)}
+  58%{opacity:1;transform:translateY(-4px) scale(1.012)}
+  100%{opacity:1;transform:none}
+}
+@keyframes gm-card-arrive {
+  0%{opacity:0;transform:translateY(21px) scale(.965)}
+  58%{opacity:1;transform:translateY(-4px) scale(1.012)}
+  100%{opacity:1;transform:none}
+}
+body.gallery-motion .lp-jump-top {
+  position:fixed;z-index:42;left:50%;top:calc(14px + env(safe-area-inset-top,0px));
+  translate:-50% 0;transform:translateY(-16px);
+  opacity:0;pointer-events:none;
+  border:var(--ui-border);border-radius:9999px;
+  padding:10px 14px;background:#1b1b1b;color:var(--text);
+  font:12px MCFive,Minecraftia,monospace;white-space:nowrap;
+  cursor:pointer;
+  transition:opacity .22s ease,transform .34s cubic-bezier(.2,1.2,.3,1),border-color .2s;
+}
+body.gallery-motion .lp-jump-top.is-visible {
+  opacity:1;pointer-events:auto;transform:translateY(0);
+}
+body.gallery-motion .lp-jump-top:is(:hover,:focus-visible){border-color:var(--accent)}
+body.gallery-motion .lp-jump-top:active{transform:translateY(2px)}
+body.gallery-motion .card__meta {
+  padding-top:9px!important;
+  text-align:center;align-items:center;
+  font-family:MCFive,Minecraftia,monospace;
+}
+body.gallery-motion .card__top {
+  justify-content:center;align-items:center;flex-wrap:wrap;width:100%;
+}
+body.gallery-motion .card__name,
+body.gallery-motion .card__name a,
+body.gallery-motion .card__path,
+body.gallery-motion .card__stats {
+  text-align:center;font-family:MCFive,Minecraftia,monospace;
+}
+body.gallery-motion .card__stats{justify-content:center}
+body.gallery-motion .card__viewer{background:var(--panel2)!important}
+body.gallery-motion .panel__label{text-align:center}
+body.gallery-motion .panel__row--search{justify-content:center}
+body.gallery-motion #countLabel{display:none}
+body.gallery-motion #searchInput.search {
+  flex:0 1 auto!important;
+  width:var(--lp-search-width,190px)!important;
+  min-width:min(150px,100%)!important;max-width:calc(100% - 20px)!important;
+  border-radius:9999px!important;text-align:center;
+  font:12px MCFive,Minecraftia,monospace;
+  transition:width .35s cubic-bezier(.16,1,.3,1),transform .28s ease;
+}
+/* Hive keeps its menu, media handlers and category-specific metadata, but the
+   underlying gallery layout uses the exact same animation and spacing. */
+body.hive-gallery.gallery-motion .panel{border-radius:28px}
+body.hive-gallery.gallery-motion :is(.chip,.btn,.modal__close){border-radius:9999px}
+body.hive-gallery.gallery-motion .modal__card{
+  border-radius:38px;width:min(1120px,calc(100% - 24px));
+}
+body.hive-gallery.gallery-motion .modal__viewer{
+  width:calc(100% - 32px);
+  margin:16px 16px 0;
+  height:min(62dvh,calc(100dvh - 244px),640px);
+  min-height:min(190px,35dvh);
+  border-radius:24px;
+  background:var(--panel2);
+}
+body.hive-gallery.gallery-motion .modal__meta{
+  padding:20px 26px 26px;border-top:0;background:transparent;text-align:center;
+}
+body.hive-gallery.gallery-motion .modal__name{
+  font-family:MCFive,Minecraftia,monospace;margin-bottom:5px;
+}
+body.hive-gallery.gallery-motion .modal__path{margin-bottom:22px;text-align:center}
+body.hive-gallery.gallery-motion .modal__actions{justify-content:center;gap:12px}
+@media(prefers-reduced-motion:no-preference){
+  body.hive-gallery.gallery-motion .modal.is-open:not(.hive-fullscreen):not(.hive-opened):not(.hive-is-closing) .modal__card{
+    animation:lp-preview-open .32s both!important;
+  }
+  body.hive-gallery.gallery-motion .modal.is-open.hive-is-closing .modal__card{
+    animation:lp-preview-close-v13 .37s cubic-bezier(.28,.02,.65,1) both!important;
+    pointer-events:none;
+  }
+  body.hive-gallery.gallery-motion .modal.is-open.hive-is-closing .modal__backdrop{
+    animation:lp-preview-clear .37s both!important;
+  }
+}
+@keyframes lp-preview-open {
+  0%{opacity:0;transform:translate(-50%,-40%) scale(1.08,.12)}
+  55%{opacity:1;transform:translate(-50%,-51%) scale(.98,1.045)}
+  78%{transform:translate(-50%,-50%) scale(1.01,.985)}
+  100%{transform:translate(-50%,-50%) scale(1)}
+}
+@keyframes lp-preview-close-v13 {
+  from{opacity:1;transform:translate(-50%,-50%)}
+  to{opacity:0;transform:translate(-50%,calc(-50% + 76px))}
+}
+@keyframes lp-preview-clear{
+  from{background:rgb(0 0 0 / 65%);backdrop-filter:blur(4px)}
+  to{background:transparent;backdrop-filter:blur(0)}
+}
+/* Hive page title is the only per-letter load animation. */
+body.hive-polished .gm-title-char {
+  display:inline-block;vertical-align:baseline;
+  transform-origin:center bottom;
+  animation:gm-title-once .66s linear both;
+  animation-delay:var(--gm-delay,0ms);
+}
+@keyframes gm-title-once {
+  0%{opacity:0;transform:translateY(11px)}
+  10%{opacity:.32;transform:translateY(5.6px)}
+  20%{opacity:.72;transform:translateY(1.15px)}
+  30%{opacity:1;transform:translateY(-1.95px)}
+  40%{opacity:1;transform:translateY(-2.28px)}
+  50%{opacity:1;transform:translateY(-1.26px)}
+  60%{opacity:1;transform:translateY(-.21px)}
+  70%{opacity:1;transform:translateY(.32px)}
+  80%{opacity:1;transform:translateY(.31px)}
+  90%{opacity:1;transform:translateY(.15px)}
+  100%{opacity:1;transform:none}
+}
+/* All longer text and whole panels use one soft slide/fade. */
+body.hive-polished .gm-reveal {
+  opacity:0;transform:translateY(20px);
+  transition:opacity .58s ease,transform .64s cubic-bezier(.18,1,.28,1);
+  transition-delay:var(--gm-delay,0ms);
+}
+body.hive-polished .gm-reveal.gm-visible{opacity:1;transform:none}
+/* Hover letters animate only on actual links; CSS reversal is interruptible. */
+body.hive-polished .gm-hover-char {
+  display:inline-block;vertical-align:baseline;transform-origin:center bottom;
+  transition:transform .43s cubic-bezier(.2,1.5,.28,1),color .28s ease;
+  transition-delay:0ms;
+}
+body.hive-polished .gm-hover-text:is(:hover,:focus-visible) .gm-hover-char,
+body.hive-polished .contrib:is(:hover,:focus-visible) .gm-hover-char {
+  transform:translateY(-4px);color:#fff;transition-delay:var(--gm-stagger,0ms);
+}
+body.hive-polished .gm-hover-text:not(:hover):not(:focus-visible) .gm-hover-char {
+  transform:none;transition-delay:0ms;
+}
+body.hive-polished .hero {
+  text-align:center;padding:26px 6px 19px;
+}
+body.hive-polished :is(.hero__title,.hero__sub,.hero__quicklinks,.hero__downloads) {
+  text-align:center;justify-content:center;
+}
+@media(max-width:680px){
+  body.hive-gallery.gallery-motion .modal__viewer {
+    width:calc(100% - 24px);margin:12px 12px 0;
+    height:min(55dvh,calc(100dvh - 225px));
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  body.gallery-motion :is(#filtersPanel,#grid,#grid .lp-reveal-card),
+  body.hive-polished .gm-title-char {animation:none!important}
+  body.hive-polished .gm-reveal {opacity:1!important;transform:none!important;transition:none!important}
+  body.gallery-motion .lp-motion-target {transform:none!important;transition:none!important}
+}
+
+/* Nested contributor and updates content should not double its parent's
+   translation. The panel moves as a unit, then its content fades gently. */
+body.hive-polished .panel .gm-reveal {
+  transform:none;
+  transition-property:opacity;
+}
+body.hive-polished .panel .gm-reveal.gm-visible {transform:none}
+/* Unified modal text and action entrance, including Hive variants. */
+@media(prefers-reduced-motion:no-preference) {
+  body.hive-gallery.gallery-motion .modal.is-open .modal__name {
+    animation:gm-detail-appear .38s .08s both;
+  }
+  body.hive-gallery.gallery-motion .modal.is-open .modal__actions {
+    animation:gm-detail-appear .38s .14s both;
+  }
+}
+@keyframes gm-detail-appear {
+  from{opacity:0;transform:translateY(12px)}
+  to{opacity:1;transform:none}
+}
+
+/* Shared Hive parity: social-like text links, separate from pill controls. */
+body.hive-polished .gm-hover-text {
+  color:#fff !important;
+  text-decoration:none !important;
+  white-space:nowrap;
+  display:inline-block;
+}
+body.hive-polished .gm-hover-char {
+  color:inherit;
+  text-decoration:none !important;
+  transform:translateY(0);
+  transition:transform .43s cubic-bezier(.2,1.5,.28,1),color .25s ease;
+  transition-delay:0ms;
+}
+body.hive-polished .gm-hover-text:is(:hover,:focus-visible) .gm-hover-char,
+body.hive-polished .contrib:is(:hover,:focus-visible) .gm-hover-char {
+  color:#00aaff !important;
+  transform:translateY(-4px);
+  transition-delay:var(--gm-stagger,0ms);
+}
+body.hive-polished .gm-hover-text:not(:hover):not(:focus-visible) .gm-hover-char {
+  transform:translateY(0);
+  transition-delay:0ms;
+}
+body.hive-polished :is(.hero__downloads,.hero__quicklinks,.footer) a {
+  text-decoration:none !important;
+}
+body.hive-polished :is(.hero__downloads,.hero__quicklinks,.footer) a:not(.gm-hover-text) {
+  color:white;
+}
+body.hive-polished :is(.hero__downloads,.hero__quicklinks,.footer) a:not(.gm-hover-text):is(:hover,:focus-visible) {
+  color:#00aaff;
+}
+/* Whole-menu buttons behave like gallery filters: no character movement. */
+body.hive-polished :is(.topnav__btn,.topnav__dropitem,.topnav__burger) .gm-hover-char {
+  transform:none !important;
+  transition:none !important;
+}
+body.hive-polished .gm-reveal.gm-fade-only {
+  transform:none;
+  transition-property:opacity;
+}
+body.hive-polished .gm-reveal.gm-fade-only.gm-visible {
+  transform:none;
+}
+body.hive-polished .latest {
+  width:100%;
+  max-width:900px;
+  margin-inline:auto;
+  text-align:center;
+  text-wrap:pretty;
+  white-space:normal;
+  overflow-wrap:break-word;
+  line-height:1.75;
+}
+/* Model-card GPU thumbnail compositing: no rapidly shifted WebGL canvas.
+   Paint and shadows remain bounded to the same rounded card silhouette. */
+body.hive-gallery.gallery-motion .card {
+  position:relative;
+  isolation:isolate;
+  contain:paint;
+  /* No persistent GPU transform layer on the card containing WebGL. */
+  translate:none !important;
+}
+body.hive-gallery.gallery-motion .card.lp-motion-target {
+  --lp-x:0px;--lp-y:0px;--lp-rx:0deg;--lp-ry:0deg;
+  transform:none !important;
+  scale:1 !important;
+}
+body.hive-gallery.gallery-motion .card__viewer {
+  contain:paint;
+  isolation:isolate;
+}
+@media(prefers-reduced-motion:reduce) {
+  body.hive-polished .gm-hover-char {transform:none !important;transition:none !important;}
+}
+
+/* v27 — retain the exact homepage-footer character animation in Hive.
+   The animation itself is shared in the JS: 440ms / 330ms / 27ms stagger. */
+body.hive-polished .gm-social-link {
+  display:inline-block;
+  color:#fff !important;
+  text-decoration:none !important;
+  white-space:nowrap;
+}
+body.hive-polished .gm-social-link .lp-label {display:inline-block}
+body.hive-polished .gm-social-link .lp-letter {
+  display:inline-block;
+  white-space:pre;
+  transform-origin:50% 100%;
+  color:#fff;
+  transition:color 0s !important;
+}
+/* Hive card hover uses its EXISTING border, exactly one outline.
+   Do not add a pseudo-element outline or animate the live 3D canvas. */
+body.hive-gallery.gallery-motion .card:is(:hover,:focus-visible,.gm-card-hover) {
+  border-color:var(--accent, #00aaff);
+}
+body.hive-gallery.gallery-motion .card::after {
+  content:none !important;
+}
+/* Centered fixed shortcut: never let per-control tilt overwrite its anchor.
+   Visibility changes animate opacity and vertical translation only. */
+body.gallery-motion .lp-jump-top {
+  left:50% !important;
+  translate:-50% 0 !important;
+  rotate:none !important;
+  transform:translateY(-16px);
+  opacity:0;
+  transition:opacity .32s ease,transform .37s cubic-bezier(.2,1.12,.3,1),
+    border-color .2s ease;
+}
+body.gallery-motion .lp-jump-top.is-visible,
+body.gallery-motion .lp-jump-top.lp-motion-target.is-visible {
+  transform:translateY(0) !important;
+  opacity:1;
+}
+body.gallery-motion .lp-jump-top.lp-motion-target:not(.is-visible) {
+  transform:translateY(-16px) !important;
+  opacity:0;
+}
+/* Native page-colored scrollbar with the same blue as Sparkskye's homepage.
+   The track stays dark; thumb is visible while the visitor scrolls. */
+html.hive-scroll-active:has(body.hive-polished) {
+  scrollbar-color:#00aaff #141414 !important;
+}
+html.hive-scroll-active:has(body.hive-polished)::-webkit-scrollbar-thumb {
+  background:#00aaff !important;
+}
+
+/* Remove persistent compositor layers after the initial Hive card arrival.
+   The card remains static; only its overlay outline responds to hover. */
+body.hive-gallery.gallery-motion .card.gm-card-settled.lp-reveal-card {
+  animation:none !important;
+  transform:none !important;
+  scale:1 !important;
+  rotate:none !important;
+}

@@ -94,6 +94,13 @@ export function lockBodyScroll() {
   if (document.body.classList.contains("modal-open")) return;
   scrollLockY = window.scrollY || window.pageYOffset || 0;
   document.body.classList.add("modal-open");
+  // Safari's browser toolbar can flicker when the document body becomes fixed.
+  // On liquid gallery pages lock overflow instead, preserving the viewport.
+  if (document.body.classList.contains("liquid-subpage")) {
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    return;
+  }
   document.body.style.position = "fixed";
   document.body.style.top = `-${scrollLockY}px`;
   document.body.style.left = "0";
@@ -104,6 +111,11 @@ export function lockBodyScroll() {
 export function unlockBodyScroll() {
   if (!document.body.classList.contains("modal-open")) return;
   document.body.classList.remove("modal-open");
+  if (document.body.classList.contains("liquid-subpage")) {
+    document.documentElement.style.overflow = "";
+    document.body.style.overflow = "";
+    return;
+  }
   document.body.style.position = "";
   document.body.style.top = "";
   document.body.style.left = "";

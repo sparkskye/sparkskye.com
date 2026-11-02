@@ -6,6 +6,11 @@
   <title>art • sparkskye</title>
   <link rel="icon" href="/public/img/favicon.png" />
   <link rel="stylesheet" href="/assets/css/site.css" />
+  <link rel="stylesheet" href="/assets/css/liquid-home.css" />
+  <link rel="stylesheet" href="/assets/css/gallery-motion-core.css" />
+  <script defer src="/assets/js/liquid-home.js"></script>
+  <script defer src="/assets/js/gallery-motion-core.js"></script>
+  <script defer src="/assets/js/liquid-gallery.js"></script>
 
   <!-- Three.js import map required by the shared Hive Resources 3D preview renderer -->
   <script type="importmap">
@@ -17,33 +22,24 @@
     }
   </script>
 </head>
-<body class="theme-art art-page">
-  <header class="topbar">
-    <a class="brand" href="/"><img class="brand__logo" src="/public/img/favicon.png" alt="Sparkskye" /><span class="brand__name">SPARKSKYE</span></a>
-    <nav class="topnav">
-      <div class="topnav__links">
-        <a class="topnav__btn" style="--item-color:#598ffe" href="/animations/">ANIMATION</a>
-        <a class="topnav__btn" style="--item-color:#f0593a" href="/editing/">EDITING</a>
-        <a class="topnav__btn" style="--item-color:#894bdd" href="/design/">DESIGN</a>
-        <a class="topnav__btn is-active" style="--item-color:#fbbc42" href="/art/">ART</a>
+<body class="theme-art art-page liquid-subpage">
+  <header class="liquid-subnav" aria-label="Site navigation">
+    <section class="island-stage" data-page="art" data-base-color="#fbbc42" aria-label="Explore Sparkskye">
+      <canvas class="liquid-canvas" aria-hidden="true"></canvas>
+      <div class="island-hit">
+        <h1 class="island-heading"><button class="island-toggle" aria-expanded="false" aria-controls="island-links">art</button></h1>
+        <nav id="island-links" aria-label="Explore other pages">
+          <a href="/" data-color="#00aaff">home</a>
+          <a href="/animations/" data-color="#598ffe">animation</a>
+          <a href="/editing/" data-color="#f0593a">editing</a>
+          <a href="/design/" data-color="#894bdd">design</a>
+        </nav>
       </div>
-      <button class="topnav__burger" type="button" aria-label="Open menu" aria-expanded="false" data-mobile-nav-toggle><span class="topnav__burger-icon"><span></span><span></span><span></span></span></button>
-      <div class="topnav__dropdown" data-mobile-nav-menu>
-        <a class="topnav__dropitem" style="--item-color:#598ffe" href="/animations/">ANIMATION</a>
-        <a class="topnav__dropitem" style="--item-color:#f0593a" href="/editing/">EDITING</a>
-        <a class="topnav__dropitem" style="--item-color:#894bdd" href="/design/">DESIGN</a>
-        <a class="topnav__dropitem is-active" style="--item-color:#fbbc42" href="/art/">ART</a>
-      </div>
-    </nav>
+    </section>
   </header>
 
   <main class="page page--wide">
-    <section class="hero">
-      <h1 class="hero__title">ART</h1>
-      <p class="hero__sub">pixel art, texture packs, and other arts</p>
-    </section>
-
-    <section class="panel" aria-label="Art filters">
+    <section class="panel" id="filtersPanel" aria-label="Art filters">
       <div class="panel__row panel__row--center">
         <div class="panel__label">TYPE</div>
         <div class="chips" id="categoryChips"></div>
@@ -75,9 +71,9 @@
     </section>
   </div>
 
-  <footer class="site-footer" aria-label="Site footer">
-    <div class="site-footer__copy"><span class="site-footer__symbol">&copy;</span>2026 sparkskye</div>
-    <div class="site-footer__ai">This website was made with the help of AI tools.</div>
+  <footer class="liquid-footer">
+    <nav aria-label="More Sparkskye"><a href="https://www.youtube.com/@sparkskye" target="_blank" rel="noreferrer">youtube</a><a href="https://x.com/sparkskyemc" target="_blank" rel="noreferrer">x / twitter</a><a href="http://dsc.gg/sparkskye" target="_blank" rel="noreferrer">discord</a><a href="/hive-resources/">hive resources</a></nav>
+    <p>© 2026 sparkskye <span>this website was made with the help of AI tools.</span></p>
   </footer>
 
   <script type="module" src="/assets/js/art.js"></script>

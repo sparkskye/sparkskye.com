@@ -41,6 +41,7 @@ export function createPanZoomImageViewer({
     pointerMoveHandler: null,
     pointerUpHandler: null,
     resizeHandler: null,
+    viewportResizeObserver: null,
   };
 
   function clearNode(node) {
@@ -82,6 +83,12 @@ export function createPanZoomImageViewer({
     return (state.baseScale || 1) * (state.zoom || 1);
   }
 
+  let feedbackTimer = 0;
+  function showFeedback() {
+    if (!container.closest('.liquid-subpage')) return;
+    // Gallery chrome shares one timer for dimensions, scale, and fullscreen.
+    container.dispatchEvent(new Event('lp-preview-interaction', { bubbles: true }));
+  }
   function applyTransform() {
     if (!state.img) return;
     clamp();
@@ -89,6 +96,7 @@ export function createPanZoomImageViewer({
     state.img.style.transform = `translate(-50%, -50%) translate(${state.x}px, ${state.y}px) scale(${s})`;
     if (state.helper) state.helper.textContent = `${Math.round((state.zoom || 1) * 100)}%`;
     if (state.zoomLabel) state.zoomLabel.textContent = `${Math.round((state.zoom || 1) * 100)}%`;
+    if (state.shell?.classList.contains('lp-zoom-initialized')) showFeedback();
   }
 
   function applyFitScale(fitScale) {
@@ -107,10 +115,11 @@ export function createPanZoomImageViewer({
     const vh = state.viewport.clientHeight || 0;
     const iw = state.img.naturalWidth || 0;
     const ih = state.img.naturalHeight || 0;
-    if (vw < 10 || vh < 10 || iw < 2 || ih < 2) return;
+    if (vw < 10 || vh < 10 || iw < 2 || ih < 2) return false;
     const fitScale = Math.min(vw / iw, vh / ih);
-    if (!Number.isFinite(fitScale) || fitScale <= 0) return;
+    if (!Number.isFinite(fitScale) || fitScale <= 0) return false;
     applyFitScale(fitScale);
+    return true;
   }
 
   function scheduleFit(tries = 0) {
@@ -121,7 +130,11 @@ export function createPanZoomImageViewer({
       if (tries < 12) requestAnimationFrame(() => scheduleFit(tries + 1));
       return;
     }
-    fitToView();
+    if (fitToView() && state.img.style.opacity === "0") {
+      requestAnimationFrame(() => {
+        if (state.img?.isConnected) state.img.style.opacity = "1";
+      });
+    }
   }
 
   function zoomTo(nextZoom, clientX = null, clientY = null) {
@@ -161,6 +174,12 @@ export function createPanZoomImageViewer({
   }
 
   function destroy() {
+    clearTimeout(feedbackTimer);
+    if (state.viewport) {
+      state.viewport.removeEventListener('pointerenter', indicateHover);
+      state.viewport.removeEventListener('pointermove', indicateHover);
+      state.viewport.removeEventListener('pointerdown', indicateHover);
+    }
     if (state.viewport && state.wheelHandler) state.viewport.removeEventListener("wheel", state.wheelHandler);
     if (state.viewport && state.pointerDownHandler) state.viewport.removeEventListener("pointerdown", state.pointerDownHandler);
     if (window && state.pointerMoveHandler) window.removeEventListener("pointermove", state.pointerMoveHandler);
@@ -169,6 +188,7 @@ export function createPanZoomImageViewer({
       window.removeEventListener("pointercancel", state.pointerUpHandler);
     }
     if (window && state.resizeHandler) window.removeEventListener("resize", state.resizeHandler);
+    state.viewportResizeObserver?.disconnect();
     clearNode(container);
   }
 
@@ -184,6 +204,10 @@ export function createPanZoomImageViewer({
   img.className = `modal__thumb map-preview__img ${imageClass}`.trim();
   img.alt = alt;
   img.draggable = false;
+  if (container.closest('.liquid-subpage')) {
+    img.style.opacity = '0';
+    img.style.transition = 'opacity 220ms ease-out';
+  }
 
   const resolution = document.createElement("div");
   resolution.className = "map-preview__resolution";
@@ -194,16 +218,22 @@ export function createPanZoomImageViewer({
 
   const zoomGroup = document.createElement("div");
   zoomGroup.className = "map-preview__group";
-  zoomGroup.appendChild(createControl("+", () => zoomBy(1.25)));
-  zoomGroup.appendChild(createControl("-", () => zoomBy(0.8)));
+  if (!container.closest('.liquid-subpage')) {
+    zoomGroup.appendChild(createControl("+", () => zoomBy(1.25)));
+    zoomGroup.appendChild(createControl("-", () => zoomBy(0.8)));
+  }
 
-  const zoomLabel = document.createElement("span");
+  const zoomLabel = document.createElement("button");
+  zoomLabel.type = "button";
+  zoomLabel.title = "Reset zoom and position";
+  zoomLabel.setAttribute("aria-label", "Reset zoom and position");
+  zoomLabel.addEventListener("click", () => scheduleFit());
   zoomLabel.className = "map-preview__zoom";
   zoomLabel.textContent = "100%";
   zoomLabel.setAttribute("aria-live", "polite");
   zoomGroup.appendChild(zoomLabel);
 
-  zoomGroup.appendChild(createControl("HOME", () => scheduleFit()));
+  
   controls.appendChild(zoomGroup);
 
   viewport.appendChild(img);
@@ -323,6 +353,18 @@ export function createPanZoomImageViewer({
 
   state.resizeHandler = () => scheduleFit();
 
+  const indicateHover = () => showFeedback();
+  viewport.addEventListener('pointerenter', indicateHover);
+  viewport.addEventListener('pointermove', indicateHover, { passive: true });
+  viewport.addEventListener('pointerdown', indicateHover, { passive: true });
+  // Responsive gallery previews may resize after the source image loads.
+  // Refit only when the viewport dimensions change; preserve user zoom otherwise.
+  if (container.closest('.liquid-subpage') && typeof ResizeObserver !== 'undefined') {
+    state.viewportResizeObserver = new ResizeObserver(() => {
+      if (state.img?.complete && state.img.naturalWidth > 0) scheduleFit();
+    });
+    state.viewportResizeObserver.observe(viewport);
+  }
   viewport.addEventListener("wheel", state.wheelHandler, { passive: false });
   viewport.addEventListener("pointerdown", state.pointerDownHandler);
   window.addEventListener("pointermove", state.pointerMoveHandler);
@@ -336,6 +378,9 @@ export function createPanZoomImageViewer({
     const h = img.naturalHeight || 0;
     resolution.textContent = w && h ? `${w} x ${h} ${units}` : "";
     scheduleFit();
+    state.shell.classList.add('lp-zoom-initialized');
+    state.shell.classList.remove('lp-zoom-feedback');
+    clearTimeout(feedbackTimer);
     if (typeof onLoad === "function") onLoad({ width: w, height: h, state });
   });
 
