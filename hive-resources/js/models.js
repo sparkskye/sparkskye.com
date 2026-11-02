@@ -673,13 +673,19 @@ function maybeOpenPreviewFromUrl() {
 }
 
 // Shares keyboard and outside-content swipe navigation with all galleries.
-window.SparkGalleryMotion?.registerNavigation({
+const registerHiveNavigation = () => {
+  window.SparkGalleryMotion?.registerNavigation({
   modal:els.modal, viewer:els.modalViewer,
   getItems:()=>state.filtered,
   getCurrentId:()=>state.activePreviewId,
   getItemId:it=>it.modelId,
   openItem:it=>openModal(it)
 });
+};
+// Deferred classics and modules can initialize in different orders.
+// DOMContentLoaded is guaranteed after the deferred shared script is ready.
+if (window.SparkGalleryMotion?.registerNavigation) registerHiveNavigation();
+else window.addEventListener("DOMContentLoaded",registerHiveNavigation,{once:true});
 els.modalBackdrop.addEventListener("click", () => closeModal());
 els.modalClose.addEventListener("click", () => closeModal());
 window.addEventListener("keydown", (e) => {
