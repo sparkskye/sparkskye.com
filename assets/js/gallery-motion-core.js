@@ -127,40 +127,24 @@ window.SparkGalleryMotion.init = function initGalleryMotion(options) {
       '.topnav__btn,.panel__label,.panel__row,.footer > div,.footer__ai,'+
       '.hero__dot,.brand,.topnav__burger'
     );
-    // Explicit Web Animations replay on every document appearance. CSS
-    // transitions can be skipped when the browser restores layout from cache.
+    // One animation owner: CSS gallery-motion-core.css.
+    // The observer chooses when an element enters, then removes itself.
+    // No Web Animations API restart runs on initial page load.
     const pending = [];
-    const revealed = new WeakSet();
-    const entryMotions = new WeakMap();
-    const playEntry = (el, replay=false) => {
-      if(!replay && revealed.has(el))return;
-      revealed.add(el);
-      el.classList.add('gm-visible');
-      entryMotions.get(el)?.cancel();
-      if(reduced.matches)return;
-      const fadeOnly=el.classList.contains('gm-fade-only');
-      // Delay is carried in CSS milliseconds; use the same delay here.
-      const fallbackDelay=parseFloat(el.style.getPropertyValue('--gm-delay'))||0;
-      const motion=el.animate([
-        {opacity:0,transform:fadeOnly?'none':'translateY(20px)',offset:0},
-        {opacity:1,transform:fadeOnly?'none':'translateY(-3px)',offset:.70},
-        {opacity:1,transform:'none',offset:1}
-      ],{duration:fadeOnly?490:630,delay:replay?0:fallbackDelay,
-         easing:'cubic-bezier(.18,.86,.3,1)',fill:'both'});
-      entryMotions.set(el,motion);
-      motion.onfinish=()=>{
-        if(entryMotions.get(el)===motion){motion.cancel();entryMotions.delete(el);}
-      };
-    };
     const io=typeof IntersectionObserver!=='undefined'
       ? new IntersectionObserver(entries=>entries.forEach(entry=>{
-          if(entry.isIntersecting) {playEntry(entry.target);io.unobserve(entry.target);}
+          if(!entry.isIntersecting)return;
+          entry.target.classList.add('gm-visible');
+          io.unobserve(entry.target);
         }),{threshold:.04,rootMargin:'0px 0px 80px 0px'})
       : null;
     targets.forEach((el,i)=>{
       if(el.id === 'filtersPanel')return;
       el.classList.add('gm-reveal');
-      el.style.setProperty('--gm-delay',Math.min(i,5)*55+'ms');
+      // A panel moves as a unit. Children fade without nested bounce.
+      if(el.closest('.panel') && !el.classList.contains('panel'))
+        el.classList.add('gm-fade-only');
+      el.style.setProperty('--gm-delay',(Math.min(i,5)*55)+'ms');
       if(io) pending.push(el); else el.classList.add('gm-visible');
     });
     secondary.forEach((el,i)=>{
@@ -250,40 +234,31 @@ window.SparkGalleryMotion.init = function initGalleryMotion(options) {
       });
     });
 
-    // Browser back/forward cache restores existing classes and finished
-    // animations. Explicitly replay visible entrances on return.
-    // pageshow occurs on reload, normal navigation, and bfcache restoration.
-    // Replaying from WAAPI works even if CSS animations were already completed
-    // or an IntersectionObserver did not deliver a fresh entry.
-    window.addEventListener('pageshow',()=>{
-      requestAnimationFrame(()=>requestAnimationFrame(()=>{
-        pending.forEach(el=>{
+    // Fresh navigations and reloads naturally create a new document and run
+    // the CSS entrance ONCE. Only a back/forward-cache restore needs replay.
+    window.addEventListener('pageshow',event=>{
+      if(!event.persisted)return;
+      const shown=pending.filter(el=>el.classList.contains('gm-visible'));
+      shown.forEach(el=>el.classList.remove('gm-visible'));
+      const restart=[
+        ...document.querySelectorAll('.gm-title-char'),
+        document.getElementById('filtersPanel'),
+        document.getElementById('grid'),
+        ...document.querySelectorAll('.lp-reveal-card')
+      ].filter(Boolean);
+      restart.forEach(el=>el.style.animation='none');
+      // Flush the reset style once; replay after a single frame.
+      void document.body.offsetHeight;
+      requestAnimationFrame(()=>{
+        restart.forEach(el=>el.style.removeProperty('animation'));
+        shown.forEach(el=>{
           const rect=el.getBoundingClientRect();
-          const visible=rect.bottom>0 && rect.top<innerHeight+80;
-          if(visible){io?.unobserve(el);playEntry(el,true);}
+          if(rect.bottom>0 && rect.top<innerHeight+80)
+            el.classList.add('gm-visible');
           else if(io)io.observe(el);
+          else el.classList.add('gm-visible');
         });
-        document.querySelectorAll('.gm-title-char').forEach((letter,i)=>{
-          letter.getAnimations().forEach(anim=>anim.cancel());
-          if(reduced.matches)return;
-          letter.animate([
-            {opacity:0,transform:'translateY(12px) scale(.78)'},
-            {opacity:1,transform:'translateY(-5px) scale(1.08)',offset:.55},
-            {opacity:1,transform:'translateY(2px) scale(.98)',offset:.78},
-            {opacity:1,transform:'none'}
-          ],{duration:650,delay:55+i*26,easing:'cubic-bezier(.18,.83,.3,1)',fill:'backwards'});
-        });
-        // Entrance panels/cards use keyframes. Restart their animations when
-        // returning through history, even if the DOM was restored from cache.
-        const entrance=[
-          document.getElementById('filtersPanel'),
-          document.getElementById('grid'),
-          ...document.querySelectorAll('.lp-reveal-card')
-        ].filter(Boolean);
-        entrance.forEach(el=>{el.style.animation='none';});
-        void document.body.offsetHeight;
-        entrance.forEach(el=>el.style.removeProperty('animation'));
-      }));
+      });
     });
   }
   // Newly rendered cards and empty/loading messages enter as they arrive.

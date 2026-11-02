@@ -147,13 +147,29 @@ body.hive-polished .gm-title-char {
   90%{opacity:1;transform:translateY(.15px)}
   100%{opacity:1;transform:none}
 }
-/* All longer text and whole panels use one soft slide/fade. */
+/* Hive uses the SAME entrance as the main gallery tag and grid panels.
+   CSS alone owns each animation. No JS animation or transition competes. */
 body.hive-polished .gm-reveal {
-  opacity:0;transform:translateY(20px);
-  transition:opacity .58s ease,transform .64s cubic-bezier(.18,1,.28,1);
-  transition-delay:var(--gm-delay,0ms);
+  opacity:0;
+  transform:translateY(20px);
 }
-body.hive-polished .gm-reveal.gm-visible{opacity:1;transform:none}
+body.hive-polished .gm-reveal.gm-visible {
+  opacity:1;
+  transform:none;
+  animation:gm-gallery-arrive .70s var(--gm-delay,0ms) both;
+}
+/* Paragraphs and content inside an animated panel only fade/slide gently. */
+body.hive-polished .gm-reveal.gm-fade-only {
+  transform:none;
+}
+body.hive-polished .gm-reveal.gm-fade-only.gm-visible {
+  transform:none;
+  animation:gm-hive-text-enter .54s var(--gm-delay,0ms) both;
+}
+@keyframes gm-hive-text-enter {
+  from {opacity:0;transform:translateY(9px)}
+  to {opacity:1;transform:none}
+}
 /* Hover letters animate only on actual links; CSS reversal is interruptible. */
 body.hive-polished .gm-hover-char {
   display:inline-block;vertical-align:baseline;transform-origin:center bottom;
@@ -186,13 +202,6 @@ body.hive-polished :is(.hero__title,.hero__sub,.hero__quicklinks,.hero__download
   body.gallery-motion .lp-motion-target {transform:none!important;transition:none!important}
 }
 
-/* Nested contributor and updates content should not double its parent's
-   translation. The panel moves as a unit, then its content fades gently. */
-body.hive-polished .panel .gm-reveal {
-  transform:none;
-  transition-property:opacity;
-}
-body.hive-polished .panel .gm-reveal.gm-visible {transform:none}
 /* Unified modal text and action entrance, including Hive variants. */
 @media(prefers-reduced-motion:no-preference) {
   body.hive-gallery.gallery-motion .modal.is-open .modal__name {
@@ -244,13 +253,6 @@ body.hive-polished :is(.hero__downloads,.hero__quicklinks,.footer) a:not(.gm-hov
 body.hive-polished :is(.topnav__btn,.topnav__dropitem,.topnav__burger) .gm-hover-char {
   transform:none !important;
   transition:none !important;
-}
-body.hive-polished .gm-reveal.gm-fade-only {
-  transform:none;
-  transition-property:opacity;
-}
-body.hive-polished .gm-reveal.gm-fade-only.gm-visible {
-  transform:none;
 }
 body.hive-polished .latest {
   width:100%;
