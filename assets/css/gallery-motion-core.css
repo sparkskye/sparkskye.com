@@ -300,32 +300,13 @@ body.hive-polished .gm-social-link .lp-letter {
   color:#fff;
   transition:color 0s !important;
 }
-/* A static outline pulses instead of rescaling/repainting the live 3D model. */
+/* Hive card hover uses its EXISTING border, exactly one outline.
+   Do not add a pseudo-element outline or animate the live 3D canvas. */
+body.hive-gallery.gallery-motion .card:is(:hover,:focus-visible,.gm-card-hover) {
+  border-color:var(--accent, #00aaff);
+}
 body.hive-gallery.gallery-motion .card::after {
-  content:"";
-  pointer-events:none;
-  position:absolute;
-  inset:0;
-  border-radius:inherit;
-  border:2px solid var(--accent, #00aaff);
-  opacity:0;
-  scale:.988;
-  transform-origin:center;
-  transition:opacity .26s ease,scale .34s cubic-bezier(.2,1.3,.36,1);
-}
-body.hive-gallery.gallery-motion .card.gm-card-hover::after,
-body.hive-gallery.gallery-motion .card:is(:focus-visible,:focus-within)::after {
-  opacity:.9;
-  scale:1;
-}
-body.hive-gallery.gallery-motion .card.gm-card-press::after {
-  animation:gm-safe-card-press .39s cubic-bezier(.2,1,.3,1);
-}
-@keyframes gm-safe-card-press {
-  0%{scale:1}
-  30%{scale:.963}
-  62%{scale:1.015}
-  100%{scale:1}
+  content:none !important;
 }
 /* Centered fixed shortcut: never let per-control tilt overwrite its anchor.
    Visibility changes animate opacity and vertical translation only. */
@@ -346,11 +327,6 @@ body.gallery-motion .lp-jump-top.lp-motion-target.is-visible {
 body.gallery-motion .lp-jump-top.lp-motion-target:not(.is-visible) {
   transform:translateY(-16px) !important;
   opacity:0;
-}
-@media(prefers-reduced-motion:reduce) {
-  body.hive-gallery.gallery-motion .card::after {
-    scale:1;transition:none;animation:none !important;
-  }
 }
 /* Native page-colored scrollbar with the same blue as Sparkskye's homepage.
    The track stays dark; thumb is visible while the visitor scrolls. */
