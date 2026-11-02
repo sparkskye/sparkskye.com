@@ -1,5 +1,77 @@
 /* Shared motion for all Sparkskye creation and Hive galleries. */
 window.SparkGalleryMotion = window.SparkGalleryMotion || {};
+// Shared gallery navigation. Page modules provide only data and openItem.
+// Touch swipes must START outside the viewer; viewer drags/pinches stay native.
+window.SparkGalleryMotion.registerNavigation = function registerNavigation(config) {
+  const {modal, viewer, getItems, getCurrentId, getItemId, openItem} = config;
+  if(!modal || !viewer || modal.dataset.sparkNavigationReady) return;
+  modal.dataset.sparkNavigationReady='1';
+  const reduced=matchMedia('(prefers-reduced-motion: reduce)');
+  let motion=null, swipe=null, gestureTouches=new Set();
+  const cancelMotion=()=>{motion?.cancel();motion=null};
+  const navigate=direction=>{
+    if(!modal.classList.contains('is-open') ||
+       modal.classList.contains('hive-is-closing') ||
+       modal.classList.contains('is-closing')) return;
+    const items=getItems();
+    const current=String(getCurrentId() || '');
+    const index=items.findIndex(it=>String(getItemId(it) || '')===current);
+    if(index<0 || !items[index+direction]) return;
+    const wasAnimating=Boolean(motion);
+    cancelMotion();
+    openItem(items[index+direction]);
+    if(wasAnimating || reduced.matches) return;
+    const distance=direction*78;
+    const frames=[
+      {transform:`translateX(${distance}px)`,opacity:.18,offset:0},
+      {transform:`translateX(${-direction*6}px)`,opacity:1,offset:.8},
+      {transform:'translateX(0px)',opacity:1,offset:1}
+    ];
+    const opts={duration:340,easing:'cubic-bezier(.16,.82,.3,1)',fill:'both'};
+    const viewerAnim=viewer.animate(frames,opts);
+    const meta=modal.querySelector('.modal__meta');
+    const metaAnim=meta?.animate(frames,{...opts,duration:370});
+    const pair={cancel:()=>{viewerAnim.cancel();metaAnim?.cancel()}};
+    motion=pair;
+    const done=()=>{if(motion===pair){cancelMotion()}};
+    (metaAnim||viewerAnim).onfinish=done;
+  };
+  window.addEventListener('keydown',event=>{
+    if(event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey ||
+       !['ArrowLeft','ArrowRight'].includes(event.key) ||
+       event.target.closest?.('input,textarea,select,[contenteditable=true]')) return;
+    if(!modal.classList.contains('is-open')) return;
+    event.preventDefault();
+    navigate(event.key==='ArrowRight'?1:-1);
+  });
+  modal.addEventListener('pointerdown',event=>{
+    if(event.pointerType!=='touch' || !modal.classList.contains('is-open')) return;
+    gestureTouches.add(event.pointerId);
+    if(gestureTouches.size>1){swipe=null;return}
+    if(viewer.contains(event.target) ||
+       event.target.closest('button,a,input,video,iframe')) return;
+    swipe={id:event.pointerId,x:event.clientX,y:event.clientY};
+  },true);
+  modal.addEventListener('pointerup',event=>{
+    if(event.pointerType!=='touch')return;
+    const wasMulti=gestureTouches.size>1;
+    gestureTouches.delete(event.pointerId);
+    if(!swipe || swipe.id!==event.pointerId || wasMulti)return;
+    const dx=event.clientX-swipe.x,dy=event.clientY-swipe.y;
+    swipe=null;
+    if(Math.abs(dx)>64 && Math.abs(dx)>Math.abs(dy)*1.35)
+      navigate(dx<0?1:-1);
+  },true);
+  modal.addEventListener('pointercancel',event=>{
+    gestureTouches.delete(event.pointerId);
+    if(swipe?.id===event.pointerId)swipe=null;
+  },true);
+  modal.addEventListener('pointerdown',event=>{
+    // Starting a new gesture on an item must not inherit the old swipe.
+    if(event.pointerType==='mouse')swipe=null;
+  },true);
+};
+
 window.SparkGalleryMotion.init = function initGalleryMotion(options) {
   'use strict';
   options = options || {};
