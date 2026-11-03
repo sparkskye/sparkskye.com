@@ -380,7 +380,6 @@ window.SparkGalleryMotion.init = function initGalleryMotion(options) {
   const modal = document.getElementById('modal');
   const viewer = document.getElementById('modalViewer');
   if (modal && viewer) {
-    let chromeTimer = 0;
     window.SparkGalleryMotion.bindPreviewChrome(viewer, {modal});
   }
 
