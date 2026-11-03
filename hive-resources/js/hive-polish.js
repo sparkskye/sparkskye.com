@@ -22,6 +22,17 @@
   viewer.addEventListener('pointerdown',showChrome,{passive:true});
   viewer.addEventListener('wheel',showChrome,{passive:true});
   viewer.addEventListener('focusin',showChrome);
+  // Models have an orbit camera; maps supply their own percentage control.
+  // Both expose reset through the shared gallery reset event.
+  const modelReset=document.createElement('button');
+  modelReset.type='button';
+  modelReset.className='map-preview__zoom hive-model-reset';
+  modelReset.textContent='100%';
+  modelReset.title='Reset view angle and scale';
+  modelReset.setAttribute('aria-label','Reset view angle and scale');
+  window.SparkGalleryMotion?.bindResetControl(modelReset,()=>{
+    viewer.dispatchEvent(new CustomEvent('spark-reset-preview'));
+  });
   const fullscreen=document.createElement('button');
   fullscreen.type='button';
   fullscreen.className='hive-fullscreen-toggle';
@@ -65,6 +76,8 @@
     const zoom=shell?.querySelector('.map-preview__controls');
     if(res && res.parentNode!==toolbar) toolbar.insertBefore(res,toolbar.firstChild);
     if(zoom && zoom.parentNode!==toolbar) toolbar.insertBefore(zoom,fullscreen.parentNode===toolbar?fullscreen:null);
+    if(!shell && modelReset.parentNode!==toolbar)toolbar.appendChild(modelReset);
+    if(shell && modelReset.parentNode===toolbar)modelReset.remove();
     if(fullscreen.parentNode!==toolbar)toolbar.appendChild(fullscreen);
   };
   new MutationObserver(reconcile).observe(viewer,{childList:true});
