@@ -319,6 +319,7 @@ export class ModalPreview {
 
     this.controls.target.set(0, 0, 0);
     this.controls.update();
+    this.controls.saveState();
 
     const tick = () => {
       if (this.disposed) return;
@@ -328,6 +329,12 @@ export class ModalPreview {
     };
 
     tick();
+  }
+
+  resetView() {
+    if (!this.controls || !this.camera || !this.root) return;
+    this.controls.reset();
+    this.controls.update();
   }
 
   close() {
