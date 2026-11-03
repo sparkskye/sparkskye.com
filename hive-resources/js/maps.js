@@ -710,7 +710,7 @@ function mountMapPreview(it, thumbSrc) {
   zoomLabel.type = "button";
   zoomLabel.title = "Reset zoom and position";
   zoomLabel.setAttribute("aria-label", "Reset zoom and position");
-  zoomLabel.addEventListener("click", () => scheduleFitMapToView());
+  window.SparkGalleryMotion?.bindResetControl(zoomLabel, () => scheduleFitMapToView());
   zoomLabel.className = "map-preview__zoom";
   zoomLabel.textContent = "100%";
   zoomLabel.setAttribute("aria-live", "polite");
