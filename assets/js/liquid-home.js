@@ -735,37 +735,7 @@
       start: time, power: 25 });
   }
 
-  // A drag that starts outside the island produces visual-only hover ripples.
-  // It never captures the finger or invokes link pulling, droplet tethering,
-  // selection, or navigation. Native page scrolling remains available.
-  let externalTouchId = null;
-  document.addEventListener('pointerdown', e => {
-    if(e.pointerType === 'touch' && externalTouchId === null &&
-       !stage.contains(e.target)) externalTouchId = e.pointerId;
-  }, {passive:true});
-  const endExternalTouch = e => {
-    if(e.pointerId !== externalTouchId) return;
-    externalTouchId = null;
-    lastPointer = null;
-    pointer = null;
-  };
-  window.addEventListener('pointerup', endExternalTouch, {passive:true});
-  window.addEventListener('pointercancel', endExternalTouch, {passive:true});
   function processPointer(e) {
-    if(e.pointerType === 'touch' && e.pointerId === externalTouchId) {
-      if(reduced.matches || !width || !height) return;
-      const r = stage.getBoundingClientRect();
-      if(e.clientX < r.left || e.clientX > r.right ||
-         e.clientY < r.top || e.clientY > r.bottom) return;
-      const x=e.clientX-r.left-width/2, y=e.clientY-r.top-height/2;
-      const g=geometry();
-      if(distanceToIsland(x,y,g) <= 0) {
-        setOpen(true);
-        emitRipple(x,y,0,0,90,e.timeStamp/1000);
-        requestFrame();
-      }
-      return;
-    }
     if (reduced.matches || !width || !height) return;
     const isTouch = e.pointerType === 'touch';
     if (isTouch && e.pointerId !== activeTouchId) return;
