@@ -11,8 +11,7 @@
 
   if (!gallery) return;
   if(!modal || !viewer)return;
-  window.SparkGalleryMotion?.bindPreviewChrome(viewer, {className:'hive-chrome-visible',delay:2100});
-  const showChrome=()=>viewer.classList.add('hive-chrome-visible');
+  const showChrome=window.SparkGalleryMotion?.bindPreviewChrome(viewer, {className:'hive-chrome-visible',delay:2100}) || (()=>{});
   const modelReset=document.createElement('button');
   modelReset.type='button';
   modelReset.className='map-preview__zoom hive-model-reset';
