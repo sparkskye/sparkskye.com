@@ -72,6 +72,15 @@ window.SparkGalleryMotion.registerNavigation = function registerNavigation(confi
   },true);
 };
 
+// One shared reset binding for map and model preview controls.
+window.SparkGalleryMotion.bindResetControl = function bindResetControl(control, reset) {
+  if (!control || typeof reset !== 'function') return;
+  control.addEventListener('click', event => {
+    event.preventDefault();
+    reset();
+  });
+};
+
 window.SparkGalleryMotion.init = function initGalleryMotion(options) {
   'use strict';
   options = options || {};
