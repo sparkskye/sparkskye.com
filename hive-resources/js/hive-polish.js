@@ -11,19 +11,8 @@
 
   if (!gallery) return;
   if(!modal || !viewer)return;
-  let chromeTimer=0;
-  const showChrome=()=>{
-    viewer.classList.add('hive-chrome-visible');
-    clearTimeout(chromeTimer);
-    chromeTimer=setTimeout(()=>viewer.classList.remove('hive-chrome-visible'),2100);
-  };
-  viewer.addEventListener('pointerenter',showChrome,{passive:true});
-  viewer.addEventListener('pointermove',showChrome,{passive:true});
-  viewer.addEventListener('pointerdown',showChrome,{passive:true});
-  viewer.addEventListener('wheel',showChrome,{passive:true});
-  viewer.addEventListener('focusin',showChrome);
-  // Models have an orbit camera; maps supply their own percentage control.
-  // Both expose reset through the shared gallery reset event.
+  window.SparkGalleryMotion?.bindPreviewChrome(viewer, {className:'hive-chrome-visible',delay:2100});
+  const showChrome=()=>viewer.classList.add('hive-chrome-visible');
   const modelReset=document.createElement('button');
   modelReset.type='button';
   modelReset.className='map-preview__zoom hive-model-reset';
