@@ -408,3 +408,7 @@ body.hive-polished .hive-reveal-item.is-visible {
     border-color:#00aaff !important;
   }
 }
+
+/* Reset percentage is an actual button in both Hive preview types. */
+body.hive-polished .hive-preview-toolbar button.map-preview__zoom {cursor:pointer;}
+body.hive-polished .hive-preview-toolbar button.map-preview__zoom:focus-visible {outline:2px solid #00aaff;outline-offset:2px;}
