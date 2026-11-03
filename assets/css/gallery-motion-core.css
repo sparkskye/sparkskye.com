@@ -335,3 +335,10 @@ body.hive-gallery.gallery-motion .card.gm-card-settled.lp-reveal-card {
   scale:1 !important;
   rotate:none !important;
 }
+
+/* Hive quicklinks and portfolio footer links use per-letter motion only.
+   Do not translate the anchor box toward the cursor. */
+body.hive-polished .hero__quicklinks a.gm-social-link:is(:hover,:focus-visible) {
+  translate:none !important;
+  transform:none !important;
+}
