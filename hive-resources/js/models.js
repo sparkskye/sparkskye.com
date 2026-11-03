@@ -49,6 +49,7 @@ const state = {
 };
 
 const modalPreview = new ModalPreview(els.modalViewer);
+els.modalViewer?.addEventListener("spark-reset-preview", () => modalPreview.resetView());
 const liveCardPreviews = new Map();
 const queuedCards = new Set();
 const loadingCards = new Set();
