@@ -125,7 +125,7 @@ window.SparkGalleryMotion.init = function initGalleryMotion(options) {
     // their parent and without making individual gallery tags bounce in.
     const secondary=document.querySelectorAll(
       '.topnav__btn,.panel__label,.panel__row,.footer > div,.footer__ai,'+
-      '.hero__dot,.brand,.topnav__burger'
+      '.brand,.topnav__burger'
     );
     // One animation owner: CSS gallery-motion-core.css.
     // The observer chooses when an element enters, then removes itself.
@@ -147,6 +147,7 @@ window.SparkGalleryMotion.init = function initGalleryMotion(options) {
       el.style.setProperty('--gm-delay',(Math.min(i,5)*55)+'ms');
       if(io) pending.push(el); else el.classList.add('gm-visible');
     });
+    // Separator dots belong to the quicklinks group, not independent staggered elements.
     secondary.forEach((el,i)=>{
       if(el.classList.contains('gm-reveal'))return;
       el.classList.add('gm-reveal','gm-fade-only');
