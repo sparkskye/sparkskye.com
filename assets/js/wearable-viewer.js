@@ -91,7 +91,8 @@ export async function createWearableViewer(host,opts={}) {
     toolbar.appendChild(select);
   }
   if(!opts.card)host.appendChild(toolbar);
-  const joints={head:root.getObjectByName('Head'),rightArm:root.getObjectByName('Right Arm'),leftArm:root.getObjectByName('Left Arm'),rightLeg:root.getObjectByName('Right Leg'),leftLeg:root.getObjectByName('Left Leg')};
+  const pivot=(name)=>{let found=null;root.traverse(o=>{if(o.name===name&&o.children.length&&(!found||o.children.length>found.children.length))found=o});return found};
+  const joints={head:pivot('Head'),rightArm:pivot('Right Arm'),leftArm:pivot('Left Arm'),rightLeg:pivot('Right Leg'),leftLeg:pivot('Left Leg')};
   const movable=Object.values(joints).filter(Boolean);
   movable.forEach(j=>{j.userData.originalRotation=j.rotation.clone()});
   const ray=new THREE.Raycaster(),pointer=new THREE.Vector2();
