@@ -91,6 +91,8 @@ function filenameFor(it, file) {
   return `${base || "art"}.${ext}`;
 }
 function itemKind(it) { return String(it?.kind || (it?.files?.gltf || it?.files?.glb ? "model" : it?.trailer ? "texture-pack" : "image")).toLowerCase(); }
+function isWearable(it) { return itemKind(it)==='skin' || itemKind(it)==='cape'; }
+function isShowcase(it) { return Boolean(it?.showcaseOnly); }
 function isModelItem(it) { return itemKind(it) === "model"; }
 function isTexturePackItem(it) { return itemKind(it) === "texture-pack"; }
 function modelFile(it) { return it.files?.gltf || it.files?.glb || it.formats?.find((f) => ["gltf", "glb"].includes(f.key)); }
@@ -104,6 +106,7 @@ function inlineFileUrl(file) {
   return `/api/file?${params.toString()}`;
 }
 function formatList(it) {
+  if (isWearable(it)) return itemKind(it) === "cape" ? "cape texture" : "skin texture";
   if (isTexturePackItem(it)) {
     const labels = [];
     if (it.trailer) labels.push("trailer");
@@ -139,6 +142,7 @@ function imageUrl(it, opts = {}) {
 }
 function cardThumbUrl(it) {
   if (isModelItem(it)) return "";
+  if (isWearable(it)) return it.thumbnailUrl || it.imagePreviewUrl;
   if (isTexturePackItem(it)) return it.thumbnailUrl || it.trailer?.thumbnail || "/public/img/favicon.png";
   return imageUrl(it);
 }
@@ -437,7 +441,25 @@ function getPreviewlessHref() { const u = new URL(window.location.href); u.searc
 function buildPreviewLink(it) { const url = new URL(`${window.location.origin}/art/`); url.searchParams.set("preview", it.id); return url.toString(); }
 function buildShareLink(it) { return buildPreviewLink(it); }
 
+let wearableSession = null;
+async function showWearablePreview(it) {
+  wearableSession?.destroy?.(); wearableSession = null;
+  panZoomViewer?.destroy?.(); panZoomViewer=null;
+  els.modalViewer.innerHTML='<div class="viewer__loading">LOADING...</div>';
+  const file=imageFile(it);
+  const url=file?.previewUrl || imageUrl(it);
+  try {
+    const mod=await import('/assets/js/wearable-viewer.js');
+    if(currentGalleryItem!==it) return;
+    els.modalViewer.innerHTML='';
+    wearableSession=await mod.createWearableViewer(els.modalViewer,{kind:itemKind(it),textureUrl:url,metadataUrl:it.animationMetadataUrl});
+  } catch(e) {
+    console.warn('Wearable preview failed',e);
+    if(currentGalleryItem===it) showImagePreview(it);
+  }
+}
 function showImagePreview(it) {
+  wearableSession?.destroy?.(); wearableSession=null;
   panZoomViewer?.destroy?.();
   panZoomViewer = null;
   els.modalViewer.innerHTML = "";
@@ -545,7 +567,7 @@ function makeDownloadUrl(it, file) {
   });
 }
 async function downloadFile(it, file, button) {
-  if (!file) return;
+  if (!file || isShowcase(it)) return;
   if (!confirmRestrictedAssetDownload(it)) return;
   await downloadViaFetch(makeDownloadUrl(it, file), filenameFor(it, file), { button, fallbackUrl: driveBrowserDownloadUrl(file.fileId) });
 }
@@ -559,20 +581,20 @@ function makeActionButton(label, onClick, primary = false) {
   return b;
 }
 function addDownloadButton(it, file, label) {
-  if (!file) return null;
+  if (!file || isShowcase(it)) return null;
   const b = makeActionButton(label || `DOWNLOAD .${extFor(file).toUpperCase()}`, () => downloadFile(it, file, b));
   return b;
 }
 function renderImageActions(it) {
-  imagePreviewButton = makeActionButton("DOWNLOAD IMAGE", async () => {
-    if (activePreview === "image") await downloadFile(it, imageFile(it), imagePreviewButton);
+  imagePreviewButton = makeActionButton(isShowcase(it) ? "IMAGE" : "DOWNLOAD IMAGE", async () => {
+    if (activePreview === "image") { if (!isShowcase(it)) await downloadFile(it, imageFile(it), imagePreviewButton); }
     else { activePreview = "image"; showImagePreview(it); updatePreviewButtons(); }
   }, true);
 
   const shown = new Set(["image"]);
   if (it.files?.timelapse) {
     timelapsePreviewButton = makeActionButton("TIMELAPSE", async () => {
-      if (activePreview === "timelapse") await downloadFile(it, it.files.timelapse, timelapsePreviewButton);
+      if (activePreview === "timelapse") { if (!isShowcase(it)) await downloadFile(it, it.files.timelapse, timelapsePreviewButton); }
       else { activePreview = "timelapse"; showVideoFilePreview(it, it.files.timelapse); updatePreviewButtons(); }
     });
     shown.add("timelapse");
@@ -599,7 +621,7 @@ function updatePreviewButtons() {
 }
 function renderModelActions(it) {
   const main = modelFile(it);
-  if (main) {
+  if (main && !isShowcase(it)) {
     const b = makeActionButton(`DOWNLOAD .${extFor(main).toUpperCase()}`, () => downloadFile(it, main, b), true);
   }
   for (const f of it.formats || []) {
@@ -689,7 +711,11 @@ function openModal(it, opts = {}) {
   variantLabelEl = null;
   activeVariationIndex = 0;
 
-  if (!isModelItem(it) && !isTexturePackItem(it)) {
+  if (isWearable(it)) {
+    activePreview = "wearable";
+    showWearablePreview(it);
+    if (!isShowcase(it)) addDownloadButton(it, imageFile(it), "DOWNLOAD PNG");
+  } else if (!isModelItem(it) && !isTexturePackItem(it)) {
     variantLabelEl = document.createElement("div");
     variantLabelEl.className = "modal__variant";
     els.modalName.insertAdjacentElement("afterend", variantLabelEl);
