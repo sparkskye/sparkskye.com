@@ -47,7 +47,7 @@ export async function createWearableViewer(host,opts={}) {
   const radius=Math.max(size.x,size.y,size.z,1);
   const camera=new THREE.PerspectiveCamera(38,1,.01,200);
   camera.position.copy(center).add(new THREE.Vector3(radius*.95,radius*.35,radius*1.8));
-  const renderer=new THREE.WebGLRenderer({alpha:true,antialias:true});
+  const renderer=new THREE.WebGLRenderer({alpha:true,antialias:!opts.card,preserveDrawingBuffer:!!opts.card});
   renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
   renderer.domElement.className='wearable-canvas';host.appendChild(renderer.domElement);
   const controls=new OrbitControls(camera,renderer.domElement);
@@ -140,5 +140,5 @@ export async function createWearableViewer(host,opts={}) {
   };
   if(!opts.card)render();
   else {controls.update();renderer.render(scene,camera)}
-  return {snapshot(){controls.update();renderer.render(scene,camera);return renderer.domElement.toDataURL('image/png')},destroy(){disposed=true;cancelAnimationFrame(raf);ro.disconnect();controls.dispose();mixer.stopAllAction();root.traverse(o=>o.geometry?.dispose?.());material.dispose();texture.dispose();renderer.dispose();renderer.domElement.remove();toolbar.remove()}};
+  return {snapshot(){controls.update();renderer.render(scene,camera);return renderer.domElement.toDataURL('image/png')},destroy(){disposed=true;cancelAnimationFrame(raf);ro.disconnect();controls.dispose();mixer.stopAllAction();material.dispose();texture.dispose();renderer.dispose();renderer.domElement.remove();toolbar.remove()}};
 }
