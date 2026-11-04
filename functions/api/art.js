@@ -2,6 +2,8 @@ const ART_ROOT_FOLDER_ID = "1g4qjb4Z3POnoqT4Kf4Twq8ya2z3CZBIa";
 const TEXTURE_PACK_PLAYLIST_ID = "PLR9C_il07LK1xfpblj5aqs4dJ2shxGGko";
 
 const MANUAL_CATEGORIES = [
+  { key: "skins", label: "SKINS", name: "Skins", folderId: "1po3dwHryoVuYa50K22uYIGmEsarqFVXS" },
+  { key: "capes", label: "CAPES", name: "Capes", folderId: "1FFXUMizwvoIGTxyNwuTJLBp4s2LQQLr5" },
   { key: "models", label: "MODELS", name: "Models", folderId: "1W2r2hjuuCNDd8Sqv7ocx-vo0IROIZZML" },
   { key: "texture-packs", label: "TEXTURE PACKS", name: "Texture Packs", folderId: "1a1Z6OQcNVJPY1TziXXN8MgzpUumj4AmA" },
 ];
@@ -121,9 +123,31 @@ async function listCategories_(apiKey, debug) {
 
 async function buildCategory_(category, apiKey, debug) {
   const key = canonicalCategoryKey_(category.key || category.name || category.label || "");
+  if (key === "skins" || key === "capes") return await buildWearableCategory_(category, apiKey, debug);
   if (key === "models" || key === "model") return await buildModelCategory_(category, apiKey, debug);
   if (key === "texture-pack" || key === "texture-packs" || key === "texturepacks") return await buildTexturePackCategory_(category, apiKey, debug);
   return await buildImageCategory_(category, apiKey, debug);
+}
+
+// Each PNG is an independent wearable artwork. Matching JSON is metadata only.
+async function buildWearableCategory_(category, apiKey, debug) {
+  const entries = await listDriveFolderEntries_(category.folderId, apiKey, debug, 'wearables:' + category.key);
+  const jsonByName = new Map((entries.files || []).filter(f => /\\.json$/i.test(f.name)).map(f => [stripExtension_(f.name).toLowerCase(), f]));
+  const items = [];
+  for (const file of entries.files || []) {
+    if (!/\\.png$/i.test(file.name)) continue;
+    const raw = stripExtension_(file.name);
+    const showcaseOnly = /^\\s*\\?/.test(raw);
+    const clean = raw.replace(/^\\s*[!?]+\\s*/, '');
+    const fileId = file.fileId || file.id;
+    const info = buildFileInfo_({file,fileId,label:'PNG',canonicalKey:'image',ext:'png',baseName:clean});
+    const metadata = jsonByName.get(raw.toLowerCase()) || jsonByName.get(clean.toLowerCase());
+    items.push({id:category.key+'-'+fileId,kind:category.key==='skins'?'skin':'cape',name:prettyName_(clean),categoryKey:category.key,categoryLabel:category.label,
+      showcaseOnly,files:{image:info},formats:[info],variations:[info],thumbnailUrl:info.thumbnailUrl,imagePreviewUrl:info.previewUrl,
+      imageCreatedTime:info.createdTime,createdTime:info.createdTime,
+      animationMetadataUrl:metadata ? inlineFileUrl_(metadata.fileId || metadata.id,metadata.name,'json') : ''});
+  }
+  return {items};
 }
 
 function collectManualAndChildFormatFolders_(category, entries, debug) {
@@ -180,6 +204,7 @@ async function buildImageCategory_(category, apiKey, debug) {
       const fileId = file.fileId || file.id;
       if (!fileId) continue;
       collected.push({
+        showcaseOnly: /^\\s*\\?/.test(rawBaseName),
         baseKey,
         baseName,
         formatKey: canonicalKey,
@@ -204,6 +229,7 @@ async function buildImageCategory_(category, apiKey, debug) {
       byBase.set(entry.baseKey, makeBaseItem_(entry, category, "image"));
     }
     const item = byBase.get(entry.baseKey);
+    if (entry.showcaseOnly) item.showcaseOnly = true;
     attachImageVariant_(item, entry.file);
     if (!item.files.image) attachFormat_(item, entry.file);
   }
@@ -212,6 +238,7 @@ async function buildImageCategory_(category, apiKey, debug) {
   for (const entry of collected.filter((x) => x.formatKey !== "image")) {
     const item = byBase.get(entry.baseKey) || findLooseItemMatch_(byBase, entry.baseKey);
     if (!item) { unmatchedFormats.push(entry); continue; }
+    if (entry.showcaseOnly) item.showcaseOnly = true;
     attachFormat_(item, entry.file);
   }
   if (byBase.size === 1 && unmatchedFormats.length) {
