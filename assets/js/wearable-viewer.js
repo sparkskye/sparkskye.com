@@ -46,7 +46,7 @@ export async function createWearableViewer(host,opts={}) {
   const center=bounds.getCenter(new THREE.Vector3()),size=bounds.getSize(new THREE.Vector3());
   const radius=Math.max(size.x,size.y,size.z,1);
   const camera=new THREE.PerspectiveCamera(38,1,.01,200);
-  camera.position.copy(center).add(new THREE.Vector3(radius*.95,radius*.35,radius*1.8));
+  camera.position.copy(center).add(new THREE.Vector3(isCape?radius*.95:-radius*.95,radius*.35,isCape?radius*1.8:-radius*1.8));
   const renderer=new THREE.WebGLRenderer({alpha:true,antialias:!opts.card,preserveDrawingBuffer:!!opts.card});
   renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
   renderer.domElement.className='wearable-canvas';host.appendChild(renderer.domElement);
@@ -116,7 +116,6 @@ export async function createWearableViewer(host,opts={}) {
   const mixer=new THREE.AnimationMixer(root);
   const clips=(await modelCache.get(modelKind)).animations||[];
   let action=null,manualMode='still';
-  const toolbar=document.createElement('div');toolbar.className='wearable-controls';
   const pivot=(name)=>{let found=null;root.traverse(o=>{if(o.name===name&&o.children.length&&(!found||o.children.length>found.children.length))found=o});return found};
   const joints={head:pivot('Head'),rightArm:pivot('Right Arm'),leftArm:pivot('Left Arm'),rightLeg:pivot('Right Leg'),leftLeg:pivot('Left Leg')};
   const movable=Object.values(joints).filter(Boolean);
@@ -143,6 +142,8 @@ export async function createWearableViewer(host,opts={}) {
   const release=()=>{grabbed=null;controls.enabled=true};
   renderer.domElement.addEventListener('pointerup',release);
   renderer.domElement.addEventListener('pointercancel',release);
+  const resetHandler=()=>{controls.reset();movable.forEach(j=>j.rotation.copy(j.userData.originalRotation))};
+  host.addEventListener('spark-reset-preview',resetHandler);
   const ro=new ResizeObserver(()=>resize(host,camera,renderer));ro.observe(host);resize(host,camera,renderer);
   const clock=new THREE.Clock();let elapsed=0,previous=-1,raf=0,disposed=false;
   const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -167,5 +168,5 @@ export async function createWearableViewer(host,opts={}) {
   };
   if(!opts.card)render();
   else {controls.update();renderer.render(scene,camera)}
-  return {snapshot(){controls.update();renderer.render(scene,camera);return renderer.domElement.toDataURL('image/png')},destroy(){disposed=true;cancelAnimationFrame(raf);ro.disconnect();controls.dispose();mixer.stopAllAction();material.dispose();texture.dispose();renderer.dispose();renderer.domElement.remove();toolbar.remove()}};
+  return {snapshot(){controls.update();renderer.render(scene,camera);return renderer.domElement.toDataURL('image/png')},destroy(){disposed=true;cancelAnimationFrame(raf);ro.disconnect();host.removeEventListener('spark-reset-preview',resetHandler);controls.dispose();mixer.stopAllAction();material.dispose();texture.dispose();renderer.dispose();renderer.domElement.remove();}};
 }
