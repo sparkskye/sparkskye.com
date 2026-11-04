@@ -21,6 +21,9 @@
   window.SparkGalleryMotion?.bindResetControl(modelReset,()=>{
     viewer.dispatchEvent(new CustomEvent('spark-reset-preview'));
   });
+  viewer.addEventListener('spark-model-zoom',event=>{
+    modelReset.textContent=String(event.detail.percent)+'%';
+  });
   const fullscreen=document.createElement('button');
   fullscreen.type='button';
   fullscreen.className='hive-fullscreen-toggle';
