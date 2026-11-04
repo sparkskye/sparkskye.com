@@ -82,6 +82,11 @@ function modelPreviewUrl(file) {
 }
 
 function clearNode(node) { while (node?.firstChild) node.removeChild(node.firstChild); }
+function showcaseOnly(it) {
+  if(it?.showcaseOnly) return true;
+  const files=[...Object.values(it?.files||{}),...(it?.formats||[]),...(it?.variations||[])];
+  return files.some(f=>/^\\s*\\?/.test(String(f?.name||'')));
+}
 function slugify(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""); }
 function extFor(file) { return String(file?.ext || file?.key || "file").replace(/^\./, "").toLowerCase(); }
 function dateValue(v) { const t = new Date(v || 0).getTime(); return Number.isFinite(t) ? t : 0; }
@@ -92,7 +97,7 @@ function filenameFor(it, file) {
 }
 function itemKind(it) { return String(it?.kind || (it?.files?.gltf || it?.files?.glb ? "model" : it?.trailer ? "texture-pack" : "image")).toLowerCase(); }
 function isWearable(it) { return itemKind(it)==='skin' || itemKind(it)==='cape'; }
-function isShowcase(it) { return Boolean(it?.showcaseOnly); }
+function isShowcase(it) { return showcaseOnly(it); }
 function isModelItem(it) { return itemKind(it) === "model"; }
 function isTexturePackItem(it) { return itemKind(it) === "texture-pack"; }
 function modelFile(it) { return it.files?.gltf || it.files?.glb || it.formats?.find((f) => ["gltf", "glb"].includes(f.key)); }
