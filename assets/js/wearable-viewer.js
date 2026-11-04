@@ -70,27 +70,53 @@ export async function createWearableViewer(host,opts={}) {
   const material=new THREE.MeshBasicMaterial({map:texture,transparent:true,alphaTest:.04,side:THREE.DoubleSide});
   const meshes=[];
   root.traverse(obj=>{if(obj.isMesh){obj.material=material;meshes.push(obj)}});
+  // Supplied Blockbench files contain only the outer clothing/hat meshes.
+  // Add the missing inner skin cubes inside those existing rig pivots.
+  if(!isCape){
+    const atlas={
+      'Hat Layer':[0,0,8,8,8],
+      'Body Layer':[16,16,8,12,4],
+      'Right Arm Layer':[40,16,slim?3:4,12,4],
+      'Left Arm Layer':[32,48,slim?3:4,12,4],
+      'Right Leg Layer':[0,16,4,12,4],
+      'Left Leg Layer':[16,48,4,12,4]
+    };
+    function innerGeometry(source,info){
+      source.computeBoundingBox();
+      const box=source.boundingBox;
+      const dimensions=new THREE.Vector3();box.getSize(dimensions);
+      const center=new THREE.Vector3();box.getCenter(center);
+      const [u,v,w,h,d]=info;
+      const geometry=new THREE.BoxGeometry(dimensions.x*(w/(w+.5)),dimensions.y*(h/(h+.5)),dimensions.z*(d/(d+.5)));
+      const uv=geometry.attributes.uv;
+      const faces=[
+        [u+d+w,v+d,d,h],[u,v+d,d,h],
+        [u+d,v,w,d],[u+d+w,v,w,d],
+        [u+d,v+d,w,h],[u+2*d+w,v+d,w,h]
+      ];
+      for(let face=0;face<6;face++){
+        const [x,y,fw,fh]=faces[face];
+        const corners=[[x+fw,y],[x,y],[x+fw,y+fh],[x,y+fh]];
+        for(let j=0;j<4;j++)uv.setXY(face*4+j,corners[j][0]/64,1-corners[j][1]/64);
+      }
+      uv.needsUpdate=true;
+      geometry.translate(center.x,center.y,center.z);
+      return geometry;
+    }
+    const outerMeshes=[...meshes];
+    for(const outer of outerMeshes){
+      const info=atlas[outer.name];if(!info)continue;
+      const inner=new THREE.Mesh(innerGeometry(outer.geometry,info),material);
+      inner.name=outer.name.replace(' Layer',' Base');
+      inner.renderOrder=-1;
+      outer.parent.add(inner);meshes.push(inner);
+    }
+  }
   // Keep the original Blockbench hierarchy and animation targets intact.
   const mixer=new THREE.AnimationMixer(root);
   const clips=(await modelCache.get(modelKind)).animations||[];
   let action=null,manualMode='still';
   const toolbar=document.createElement('div');toolbar.className='wearable-controls';
-  const reset=button('100%','Reset view and pose',()=>{controls.reset();root.traverse(o=>{if(o.userData.originalRotation)o.rotation.copy(o.userData.originalRotation)})});
-  toolbar.appendChild(reset);
-  const names=['still','idle','walk','run','pose',...clips.map(c=>c.name)];
-  if(!isCape){
-    const select=document.createElement('select');select.className='wearable-control';select.setAttribute('aria-label','Character animation');
-    for(const name of [...new Set(names)]){const opt=document.createElement('option');opt.value=name;opt.textContent=name.toUpperCase();select.appendChild(opt)}
-    select.onchange=()=>{
-      manualMode=select.value;
-      action?.stop();action=null;
-      const clip=clips.find(c=>c.name===manualMode);
-      if(clip){action=mixer.clipAction(clip);action.reset().play()}
-      else root.traverse(o=>{if(o.userData.originalRotation)o.rotation.copy(o.userData.originalRotation)});
-    };
-    toolbar.appendChild(select);
-  }
-  if(!opts.card)host.appendChild(toolbar);
   const pivot=(name)=>{let found=null;root.traverse(o=>{if(o.name===name&&o.children.length&&(!found||o.children.length>found.children.length))found=o});return found};
   const joints={head:pivot('Head'),rightArm:pivot('Right Arm'),leftArm:pivot('Left Arm'),rightLeg:pivot('Right Leg'),leftLeg:pivot('Left Leg')};
   const movable=Object.values(joints).filter(Boolean);
