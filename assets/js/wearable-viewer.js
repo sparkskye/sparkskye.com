@@ -148,5 +148,5 @@ export async function createWearableViewer(host,opts={}) {
   };
   if(!opts.card)render();
   else {controls.update();renderer.render(scene,camera)}
-  return {snapshot(){controls.update();renderer.render(scene,camera);return renderer.domElement.toDataURL('image/png')},destroy(){disposed=true;cancelAnimationFrame(raf);ro.disconnect();host.removeEventListener('spark-reset-preview',resetHandler);controls.dispose();mixer.stopAllAction();material.dispose();texture.dispose();renderer.dispose();renderer.domElement.remove();zoomControls.remove();}};
+  return {frames,fps,hold,snapshotFrame(index){paint(index%frames);controls.update();renderer.render(scene,camera);return renderer.domElement.toDataURL('image/png')},snapshot(){controls.update();renderer.render(scene,camera);return renderer.domElement.toDataURL('image/png')},destroy(){disposed=true;cancelAnimationFrame(raf);ro.disconnect();host.removeEventListener('spark-reset-preview',resetHandler);controls.dispose();mixer.stopAllAction();material.dispose();texture.dispose();renderer.dispose();renderer.domElement.remove();zoomControls.remove();}};
 }
