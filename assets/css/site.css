@@ -1924,3 +1924,14 @@ body.theme-art .topnav__dropitem.is-active{
 .art-page .card--cape .wearable-card-stage{inset:12px;background:transparent}
 .art-page .card--skin .card__viewer canvas,
 .art-page .card--cape .card__viewer canvas{background:transparent}
+
+/* Shared gallery-style unobtrusive model zoom indicator. */
+.wearable-zoom-readout{
+  position:absolute;z-index:3;top:12px;left:50%;transform:translateX(-50%);
+  background:transparent;border:0;padding:5px 9px;
+  color:rgba(255,255,255,.5);font:11px MCFive,Minecraftia,sans-serif;
+  cursor:pointer;letter-spacing:.04em;
+}
+.wearable-zoom-readout:hover,.wearable-zoom-readout:focus-visible{
+  color:var(--text);outline:none;
+}
