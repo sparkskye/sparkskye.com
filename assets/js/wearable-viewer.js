@@ -23,7 +23,15 @@ function slimFromTexture(image) {
   try {
     const s=image.width/64;
     const alpha=(x,y)=>ctx.getImageData(Math.floor(x*s),Math.floor(y*s),1,1).data[3];
-    return [[54,20],[54,24],[54,28],[54,31],[46,52],[46,56],[46,60],[46,63]].every(([x,y])=>alpha(x,y)<8);
+    // Check the unused fourth column of each slim arm's side face.
+    // A single opaque pixel must not force the entire skin to wide.
+    const strips=[[54,20,32],[46,52,64]];
+    let transparent=0,total=0;
+    for(const [x,y0,y1] of strips)for(let y=y0;y<y1;y++){
+      total++;
+      if(alpha(x,y)<8)transparent++;
+    }
+    return transparent/total>=.65;
   }catch{return false}
 }
 function resize(host,camera,renderer) {
