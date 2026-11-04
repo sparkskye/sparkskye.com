@@ -54,6 +54,11 @@ let activeVariationIndex = 0;
 let variantLabelEl = null;
 
 function clearNode(node) { while (node?.firstChild) node.removeChild(node.firstChild); }
+function showcaseOnly(it) {
+  if(it?.showcaseOnly) return true;
+  const files=[...Object.values(it?.files||{}),...(it?.formats||[]),...(it?.variations||[])];
+  return files.some(f=>/^\\s*\\?/.test(String(f?.name||'')));
+}
 function slugify(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""); }
 function extFor(file) { return String(file?.ext || file?.key || "file").replace(/^\./, "").toLowerCase(); }
 function filenameFor(it, file) {
@@ -381,7 +386,7 @@ function makeDownloadUrl(it, file) {
 }
 
 async function downloadFile(it, file, button) {
-  if (!file) return;
+  if (!file || showcaseOnly(it)) return;
   if (!confirmRestrictedAssetDownload(it)) return;
   await downloadViaFetch(makeDownloadUrl(it, file), filenameFor(it, file), {
     button,
@@ -393,12 +398,12 @@ function updatePreviewButtons() {
   if (imagePreviewButton) {
     const selected = activePreview === "image";
     imagePreviewButton.classList.toggle("is-selected", selected);
-    imagePreviewButton.textContent = selected ? "DOWNLOAD IMAGE" : "IMAGE";
+    imagePreviewButton.textContent = selected && !showcaseOnly(currentGalleryItem) ? "DOWNLOAD IMAGE" : "IMAGE";
   }
   if (timelapsePreviewButton) {
     const selected = activePreview === "timelapse";
     timelapsePreviewButton.classList.toggle("is-selected", selected);
-    timelapsePreviewButton.textContent = selected ? "DOWNLOAD TIMELAPSE" : "TIMELAPSE";
+    timelapsePreviewButton.textContent = selected && !showcaseOnly(currentGalleryItem) ? "DOWNLOAD TIMELAPSE" : "TIMELAPSE";
   }
 }
 
@@ -430,6 +435,7 @@ function addPreviewButton(it, key) {
 }
 
 function addDownloadButton(it, file, label) {
+  if (showcaseOnly(it)) return null;
   const b = document.createElement("button");
   b.className = "btn";
   b.type = "button";
