@@ -8,7 +8,7 @@ export async function onRequest(context) {
   const fileUrl = new URL(context.request.url);
   fileUrl.pathname = "/api/file";
   const proxiedRequest = new Request(fileUrl.toString(), context.request);
-  const response = await fileHandler({ request: proxiedRequest });
+  const response = await fileHandler({ request: proxiedRequest, env: context.env });
 
   // Download counting should never block the file stream. On the free plan,
   // Workers KV write limits are easy to hit, so this runs in the background
