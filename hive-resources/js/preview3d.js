@@ -320,6 +320,14 @@ export class ModalPreview {
     this.controls.target.set(0, 0, 0);
     this.controls.update();
     this.controls.saveState();
+    const initialDistance=this.camera.position.distanceTo(this.controls.target);
+    const emitZoom=()=>{
+      if(this.disposed)return;
+      const percent=Math.round(100*initialDistance/Math.max(.001,this.camera.position.distanceTo(this.controls.target)));
+      this.container.dispatchEvent(new CustomEvent('spark-model-zoom',{detail:{percent}}));
+    };
+    this.controls.addEventListener('change',emitZoom);
+    emitZoom();
 
     const tick = () => {
       if (this.disposed) return;
