@@ -77,7 +77,7 @@ export async function createWearableViewer(host, options) {
     return pivot;
   };
   // Standard 64x64 skin layout. Slim arms use the three-pixel UV region.
-  const slim=false; // Classic is the initial arm layout.
+  let slim=false; // Visitors can switch between classic and slim arm UV layouts.
   const head=addPart('Head',8,8,8,0,0,0,32,0,[32,0]);
   addPart('Body',8,12,4,16,16,0,24,0,[16,32]);
   const rightArm=addPart('Right Arm',slim?3:4,12,4,40,16,-6,24,0,[40,32]);
@@ -98,6 +98,19 @@ export async function createWearableViewer(host, options) {
   reset.onclick=()=>{controls.reset();joints.forEach(j=>j.pivot.rotation.set(0,0,0));};
   toolbar.appendChild(reset);
   if(!isCape){
+    const arms=document.createElement('button');arms.type='button';arms.textContent='CLASSIC';arms.title='Switch between classic and slim arms';
+    arms.onclick=()=>{
+      slim=!slim;arms.textContent=slim?'SLIM':'CLASSIC';
+      for(const [pivot,u,v,layerU,layerV,sign] of [[rightArm,40,16,40,32,-1],[leftArm,32,48,48,48,1]]){
+        const width=slim?3:4;
+        pivot.position.x=sign*(slim?5.5:6)/16;
+        for(const [index,x,y,w,h,d] of [[0,u,v,width,12,4],[1,layerU,layerV,width+.5,12.5,4.5]]){
+          const mesh=pivot.children[index];if(!mesh)continue;
+          mesh.geometry.dispose();mesh.geometry=makeBox(w,h,d,x,y).geometry;
+        }
+      }
+    };
+    toolbar.appendChild(arms);
     const select=document.createElement('select');select.setAttribute('aria-label','Character animation');
     for(const [label,value] of [['Still','still'],['Idle','idle'],['Walk','walk'],['Run','run'],['Pose','pose']]){
       const opt=document.createElement('option');opt.value=value;opt.textContent=label;select.appendChild(opt);
