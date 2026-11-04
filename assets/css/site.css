@@ -1908,3 +1908,19 @@ body.theme-art .topnav__dropitem.is-active{
 .wearable-canvas{width:100%;height:100%;display:block;touch-action:none}
 .wearable-card-stage{position:absolute;inset:0;pointer-events:none}
 .card--skin .card__thumb,.card--cape .card__thumb{object-fit:contain}
+
+/* Wearable models use fixed square cards, never flipbook texture proportions. */
+.art-page .card--skin .card__viewer,
+.art-page .card--cape .card__viewer{
+  width:100%;aspect-ratio:1 / 1;height:auto;min-height:0;
+  padding:12px;background:transparent;box-sizing:border-box;
+}
+.art-page .card--skin .card__viewer img.card__thumb,
+.art-page .card--cape .card__viewer img.card__thumb{
+  width:100%;height:100%;aspect-ratio:1 / 1;object-fit:contain;
+  background:transparent;border-radius:14px;
+}
+.art-page .card--skin .wearable-card-stage,
+.art-page .card--cape .wearable-card-stage{inset:12px;background:transparent}
+.art-page .card--skin .card__viewer canvas,
+.art-page .card--cape .card__viewer canvas{background:transparent}
