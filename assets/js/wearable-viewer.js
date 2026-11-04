@@ -90,7 +90,7 @@ export async function createWearableViewer(host,opts={}) {
     };
     toolbar.appendChild(select);
   }
-  host.appendChild(toolbar);
+  if(!opts.card)host.appendChild(toolbar);
   const joints={head:root.getObjectByName('Head'),rightArm:root.getObjectByName('Right Arm'),leftArm:root.getObjectByName('Left Arm'),rightLeg:root.getObjectByName('Right Leg'),leftLeg:root.getObjectByName('Left Leg')};
   const movable=Object.values(joints).filter(Boolean);
   movable.forEach(j=>{j.userData.originalRotation=j.rotation.clone()});
@@ -138,6 +138,7 @@ export async function createWearableViewer(host,opts={}) {
     }
     controls.update();renderer.render(scene,camera);raf=requestAnimationFrame(render);
   };
-  render();
-  return {destroy(){disposed=true;cancelAnimationFrame(raf);ro.disconnect();controls.dispose();mixer.stopAllAction();root.traverse(o=>o.geometry?.dispose?.());material.dispose();texture.dispose();renderer.dispose();renderer.domElement.remove();toolbar.remove()}};
+  if(!opts.card)render();
+  else {controls.update();renderer.render(scene,camera)}
+  return {snapshot(){controls.update();renderer.render(scene,camera);return renderer.domElement.toDataURL('image/png')},destroy(){disposed=true;cancelAnimationFrame(raf);ro.disconnect();controls.dispose();mixer.stopAllAction();root.traverse(o=>o.geometry?.dispose?.());material.dispose();texture.dispose();renderer.dispose();renderer.domElement.remove();toolbar.remove()}};
 }
