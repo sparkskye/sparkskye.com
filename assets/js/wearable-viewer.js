@@ -105,9 +105,9 @@ export async function createWearableViewer(host,opts={}) {
     }
     const outerMeshes=[...meshes];
     for(const outer of outerMeshes){
-      const info=atlas[outer.name];if(!info)continue;
+      const meshName=outer.name.replace(/_/g,' ');const info=atlas[meshName];if(!info)continue;
       const inner=new THREE.Mesh(innerGeometry(outer.geometry,info),material);
-      inner.name=outer.name.replace(' Layer',' Base');
+      inner.name=meshName.replace(' Layer',' Base');
       inner.renderOrder=-1;
       outer.parent.add(inner);meshes.push(inner);
     }
@@ -144,12 +144,15 @@ export async function createWearableViewer(host,opts={}) {
   renderer.domElement.addEventListener('pointercancel',release);
   const resetHandler=()=>{controls.reset();movable.forEach(j=>j.rotation.copy(j.userData.originalRotation))};
   host.addEventListener('spark-reset-preview',resetHandler);
+  const zoomControls=document.createElement('div');zoomControls.className='map-preview__controls';
+  const zoomGroup=document.createElement('div');zoomGroup.className='map-preview__group';
   const zoomLabel=document.createElement('button');
-  zoomLabel.type='button';zoomLabel.className='wearable-zoom-readout';
+  zoomLabel.type='button';zoomLabel.className='map-preview__zoom';
   zoomLabel.title='Reset model view';zoomLabel.setAttribute('aria-label','Reset model view');
   zoomLabel.textContent='100%';
   zoomLabel.addEventListener('click',resetHandler);
-  if(!opts.card)host.appendChild(zoomLabel);
+  zoomGroup.appendChild(zoomLabel);zoomControls.appendChild(zoomGroup);
+  if(!opts.card)host.appendChild(zoomControls);
   const initialDistance=camera.position.distanceTo(controls.target);
   controls.addEventListener('change',()=>{
     const zoom=Math.round(initialDistance/Math.max(.01,camera.position.distanceTo(controls.target))*100);
@@ -179,5 +182,5 @@ export async function createWearableViewer(host,opts={}) {
   };
   if(!opts.card)render();
   else {controls.update();renderer.render(scene,camera)}
-  return {snapshot(){controls.update();renderer.render(scene,camera);return renderer.domElement.toDataURL('image/png')},destroy(){disposed=true;cancelAnimationFrame(raf);ro.disconnect();host.removeEventListener('spark-reset-preview',resetHandler);controls.dispose();mixer.stopAllAction();material.dispose();texture.dispose();renderer.dispose();renderer.domElement.remove();zoomLabel.remove();}};
+  return {snapshot(){controls.update();renderer.render(scene,camera);return renderer.domElement.toDataURL('image/png')},destroy(){disposed=true;cancelAnimationFrame(raf);ro.disconnect();host.removeEventListener('spark-reset-preview',resetHandler);controls.dispose();mixer.stopAllAction();material.dispose();texture.dispose();renderer.dispose();renderer.domElement.remove();zoomControls.remove();}};
 }
