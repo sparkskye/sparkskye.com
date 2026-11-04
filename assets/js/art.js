@@ -703,7 +703,7 @@ function exitTheater() { els.modal.classList.remove('lp-theater'); }
     // controls into the stable toolbar without recreating the handlers.
     const panzoom = viewer.querySelector('.shared-panzoom-preview');
     const dimensions = panzoom?.querySelector('.map-preview__resolution');
-    const zoom = panzoom?.querySelector('.map-preview__controls');
+    const zoom = panzoom?.querySelector('.map-preview__controls') || viewer.querySelector(':scope > .map-preview__controls');
     if (dimensions && dimensions.parentNode !== toolbar) {
       toolbar.insertBefore(dimensions, toolbar.firstChild);
     }
