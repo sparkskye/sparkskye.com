@@ -144,6 +144,17 @@ export async function createWearableViewer(host,opts={}) {
   renderer.domElement.addEventListener('pointercancel',release);
   const resetHandler=()=>{controls.reset();movable.forEach(j=>j.rotation.copy(j.userData.originalRotation))};
   host.addEventListener('spark-reset-preview',resetHandler);
+  const zoomLabel=document.createElement('button');
+  zoomLabel.type='button';zoomLabel.className='wearable-zoom-readout';
+  zoomLabel.title='Reset model view';zoomLabel.setAttribute('aria-label','Reset model view');
+  zoomLabel.textContent='100%';
+  zoomLabel.addEventListener('click',resetHandler);
+  if(!opts.card)host.appendChild(zoomLabel);
+  const initialDistance=camera.position.distanceTo(controls.target);
+  controls.addEventListener('change',()=>{
+    const zoom=Math.round(initialDistance/Math.max(.01,camera.position.distanceTo(controls.target))*100);
+    zoomLabel.textContent=zoom+'%';
+  });
   const ro=new ResizeObserver(()=>resize(host,camera,renderer));ro.observe(host);resize(host,camera,renderer);
   const clock=new THREE.Clock();let elapsed=0,previous=-1,raf=0,disposed=false;
   const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -168,5 +179,5 @@ export async function createWearableViewer(host,opts={}) {
   };
   if(!opts.card)render();
   else {controls.update();renderer.render(scene,camera)}
-  return {snapshot(){controls.update();renderer.render(scene,camera);return renderer.domElement.toDataURL('image/png')},destroy(){disposed=true;cancelAnimationFrame(raf);ro.disconnect();host.removeEventListener('spark-reset-preview',resetHandler);controls.dispose();mixer.stopAllAction();material.dispose();texture.dispose();renderer.dispose();renderer.domElement.remove();}};
+  return {snapshot(){controls.update();renderer.render(scene,camera);return renderer.domElement.toDataURL('image/png')},destroy(){disposed=true;cancelAnimationFrame(raf);ro.disconnect();host.removeEventListener('spark-reset-preview',resetHandler);controls.dispose();mixer.stopAllAction();material.dispose();texture.dispose();renderer.dispose();renderer.domElement.remove();zoomLabel.remove();}};
 }
