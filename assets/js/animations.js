@@ -48,6 +48,10 @@ let activePreview = "video";
 let videoPreviewButton = null;
 
 function clearNode(node) { while (node?.firstChild) node.removeChild(node.firstChild); }
+function showcaseOnly(it) {
+  if (it?.showcaseOnly) return true;
+  return [...Object.values(it?.files||{}),...(it?.formats||[])].some(f => String(f?.name||'').trim().startsWith('?'));
+}
 function slugify(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""); }
 function extFor(file) { return String(file?.ext || file?.key || "file").replace(/^\./, "").toLowerCase(); }
 function filenameFor(it, file) {
@@ -262,7 +266,7 @@ function makeDownloadUrl(it, file) {
   });
 }
 async function downloadFile(it, file, button) {
-  if (!file) return;
+  if (!file || showcaseOnly(it)) return;
   if (!confirmRestrictedAssetDownload(it)) return;
   await downloadViaFetch(makeDownloadUrl(it, file), filenameFor(it, file), {
     button,
@@ -273,7 +277,7 @@ function updatePreviewButtons() {
   if (videoPreviewButton) {
     const selected = activePreview === "video";
     videoPreviewButton.classList.toggle("is-selected", selected);
-    videoPreviewButton.textContent = selected ? "DOWNLOAD VIDEO" : "VIDEO";
+    videoPreviewButton.textContent = selected && !showcaseOnly(currentGalleryItem) ? "DOWNLOAD VIDEO" : "VIDEO";
   }
 }
 function addVideoPreviewButton(it) {
@@ -296,6 +300,7 @@ function addVideoPreviewButton(it) {
   return b;
 }
 function addDownloadButton(it, file, label) {
+  if (showcaseOnly(it)) return null;
   const b = document.createElement("button");
   b.className = "btn";
   b.type = "button";
