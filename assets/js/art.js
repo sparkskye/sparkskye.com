@@ -392,7 +392,7 @@ const wearableCardObserver = new IntersectionObserver((entries)=>{
         if(!card.isConnected)return;
         const img=document.createElement('img');img.className='card__thumb';img.alt=it.name||'3D preview';img.src=session.snapshot();
         viewer.replaceChildren(img);
-      }catch(err){console.warn('Wearable card preview failed',err)}
+      }catch(err){console.warn('Wearable card preview failed',err);if(card.isConnected)viewer.replaceChildren(Object.assign(document.createElement('div'),{className:'card__placeholder',textContent:'PREVIEW FAILED'}))}
       finally{session?.destroy?.()}
     });
   }
@@ -420,7 +420,7 @@ function renderGrid(items) {
     const viewer = document.createElement("div");
     viewer.className = "card__viewer";
 
-    if (isModelItem(it)) {
+    if (isModelItem(it) || isWearable(it)) {
       const ph = document.createElement("div");
       ph.className = "card__placeholder";
       ph.textContent = "";
