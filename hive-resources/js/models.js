@@ -700,16 +700,21 @@ els.search.addEventListener("input", debounce(() => {
   applyFiltersAndRenderGrid();
 }, 120));
 
+let modelLoadSeq=0;
 async function loadDataAndRender() {
+  const mySeq=++modelLoadSeq;
+  const requestedGame=state.game;
   showGridLoading(true);
 
   try {
-    const json = await fetchModels(state.game);
+    const json = await fetchModels(requestedGame);
+    if(mySeq!==modelLoadSeq)return;
     state.data = json;
 
     if (json?.game?.key) state.game = json.game.key;
 
     await loadGameListIfNeeded();
+    if(mySeq!==modelLoadSeq)return;
     renderGameChips();
 
     const groups = json.groups || [];
@@ -737,7 +742,7 @@ async function loadDataAndRender() {
     applyFiltersAndRenderGrid();
     maybeOpenPreviewFromUrl();
   } finally {
-    showGridLoading(false);
+    if(mySeq===modelLoadSeq)showGridLoading(false);
   }
 }
 
