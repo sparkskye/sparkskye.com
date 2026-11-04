@@ -541,6 +541,29 @@ async function showModelPreview(it) {
     const { ModalPreview } = await getPreview3dModule();
     activeModelModalPreview = new ModalPreview(els.modalViewer);
     await activeModelModalPreview.open(url);
+    // Use the same zoom control and stable preview toolbar as image previews.
+    const session=activeModelModalPreview;
+    const controls=session.controls;
+    const camera=session.camera;
+    if(controls && camera){
+      const zoomControls=document.createElement('div');
+      zoomControls.className='map-preview__controls';
+      const zoomGroup=document.createElement('div');
+      zoomGroup.className='map-preview__group';
+      const zoom=document.createElement('button');
+      zoom.type='button';
+      zoom.className='map-preview__zoom';
+      zoom.title='Reset model view';
+      zoom.setAttribute('aria-label','Reset model view');
+      const initialDistance=camera.position.distanceTo(controls.target);
+      const updateZoom=()=>{zoom.textContent=Math.round(100*initialDistance/Math.max(.001,camera.position.distanceTo(controls.target)))+'%';};
+      zoom.addEventListener('click',()=>{session.resetView();updateZoom();});
+      controls.addEventListener('change',updateZoom);
+      updateZoom();
+      zoomGroup.appendChild(zoom);
+      zoomControls.appendChild(zoomGroup);
+      els.modalViewer.appendChild(zoomControls);
+    }
   } catch (err) {
     console.warn("Art model modal preview failed", it?.name || file?.name || file?.fileId, err);
     try { activeModelModalPreview?.close?.(); } catch {}
