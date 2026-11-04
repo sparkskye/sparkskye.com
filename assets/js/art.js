@@ -375,6 +375,11 @@ function scheduleModelCardPreview(card, it) {
 }
 
 let wearableCardPending=Promise.resolve();
+const capeCardAnimations=new Map();
+function stopCapeCardAnimations(){
+  for(const timer of capeCardAnimations.values())clearInterval(timer);
+  capeCardAnimations.clear();
+}
 const wearableCardObserver = new IntersectionObserver((entries)=>{
   for(const entry of entries){
     if(!entry.isIntersecting)continue;
@@ -399,6 +404,7 @@ const wearableCardObserver = new IntersectionObserver((entries)=>{
 },{rootMargin:'250px'});
 
 function renderGrid(items) {
+  stopCapeCardAnimations();
   disposeCardPreviews();
   for(const card of els.grid.querySelectorAll(".card--skin, .card--cape"))wearableCardObserver.unobserve(card);
   els.grid.innerHTML = "";
@@ -853,13 +859,17 @@ async function loadCategories() {
   state.categories = Array.isArray(res?.categories) ? res.categories : [];
   renderCategoryChips();
 }
+let artLoadSeq=0;
 async function loadDataAndRender() {
+  const mySeq=++artLoadSeq;
   showLoading();
   renderSortChips();
-  const res = await fetchArtItems(state.category).catch(() => ({ items: [], groups: [] }));
+  const requestedCategory=state.category;
+  const res = await fetchArtItems(requestedCategory).catch(() => ({ items: [], groups: [] }));
+  if(mySeq!==artLoadSeq)return;
   const direct = Array.isArray(res?.items) ? res.items : [];
   const groups = Array.isArray(res?.groups) ? res.groups : [];
-  const activeCategory = String(state.category || "all").toLowerCase();
+  const activeCategory = String(requestedCategory || "all").toLowerCase();
 
   let fromGroups = [];
   if (activeCategory === "all") {
