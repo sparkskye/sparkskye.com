@@ -95,7 +95,7 @@ async function listCategories_(apiKey, debug) {
   const add = (c) => {
     const rawKey = c?.key || c?.name || c?.label || "";
     const canonical = canonicalCategoryKey_(rawKey);
-    if (!canonical) return;
+    if (!canonical || canonical === "skins" || canonical === "capes") return;
     const label = String(c?.label || c?.name || canonical || "").trim().toUpperCase();
     const current = merged.get(canonical) || {};
     merged.set(canonical, {
