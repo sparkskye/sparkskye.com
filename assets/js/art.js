@@ -765,6 +765,7 @@ function closeModal(opts = {}) {
   els.modal.classList.remove("is-open");
   els.modal.classList.remove('lp-theater-used');
   els.modal.setAttribute("aria-hidden", "true");
+  wearableSession?.destroy?.(); wearableSession=null;
   panZoomViewer?.destroy?.();
   panZoomViewer = null;
   try { activeModelModalPreview?.close?.(); } catch {}
