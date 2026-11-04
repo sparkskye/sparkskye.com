@@ -132,13 +132,13 @@ async function buildCategory_(category, apiKey, debug) {
 // Each PNG is an independent wearable artwork. Matching JSON is metadata only.
 async function buildWearableCategory_(category, apiKey, debug) {
   const entries = await listDriveFolderEntries_(category.folderId, apiKey, debug, 'wearables:' + category.key);
-  const jsonByName = new Map((entries.files || []).filter(f => /\\.json$/i.test(f.name)).map(f => [stripExtension_(f.name).toLowerCase(), f]));
+  const jsonByName = new Map((entries.files || []).filter(f => /\.json$/i.test(f.name)).map(f => [stripExtension_(f.name).toLowerCase(), f]));
   const items = [];
   for (const file of entries.files || []) {
-    if (!/\\.png$/i.test(file.name)) continue;
+    if (!/\.png$/i.test(file.name)) continue;
     const raw = stripExtension_(file.name);
-    const showcaseOnly = /^\\s*\\?/.test(raw);
-    const clean = raw.replace(/^\\s*[!?]+\\s*/, '');
+    const showcaseOnly = /^\s*\?/.test(raw);
+    const clean = raw.replace(/^\s*[!?]+\s*/, '');
     const fileId = file.fileId || file.id;
     const info = buildFileInfo_({file,fileId,label:'PNG',canonicalKey:'image',ext:'png',baseName:clean});
     const metadata = jsonByName.get(raw.toLowerCase()) || jsonByName.get(clean.toLowerCase());
