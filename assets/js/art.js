@@ -374,8 +374,32 @@ function scheduleModelCardPreview(card, it) {
   }
 }
 
+const wearableCardObserver = new IntersectionObserver((entries)=>{
+  for(const entry of entries){
+    if(!entry.isIntersecting)continue;
+    wearableCardObserver.unobserve(entry.target);
+    const card=entry.target,it=card.__wearableItem;
+    if(!it)continue;
+    const viewer=card.querySelector('.card__viewer');
+    (async()=>{
+      let session=null;
+      try{
+        const mod=await import('/assets/js/wearable-viewer.js');
+        if(!card.isConnected)return;
+        const stage=document.createElement('div');stage.className='wearable-card-stage';viewer.appendChild(stage);
+        session=await mod.createWearableViewer(stage,{kind:itemKind(it),textureUrl:imageFile(it)?.previewUrl||imageUrl(it),metadataUrl:it.animationMetadataUrl,card:true});
+        if(!card.isConnected)return;
+        const img=document.createElement('img');img.className='card__thumb';img.alt=it.name||'3D preview';img.src=session.snapshot();
+        viewer.replaceChildren(img);
+      }catch(err){console.warn('Wearable card preview failed',err)}
+      finally{session?.destroy?.()}
+    })();
+  }
+},{rootMargin:'250px'});
+
 function renderGrid(items) {
   disposeCardPreviews();
+  for(const card of els.grid.querySelectorAll(".card--skin, .card--cape"))wearableCardObserver.unobserve(card);
   els.grid.innerHTML = "";
   if (!items.length) {
     const q = String(state.q || "").trim();
@@ -439,6 +463,7 @@ function renderGrid(items) {
     });
     els.grid.appendChild(card);
     if (isModelItem(it)) scheduleModelCardPreview(card, it);
+    if (isWearable(it)) { card.__wearableItem=it;wearableCardObserver.observe(card); }
   }
 }
 
