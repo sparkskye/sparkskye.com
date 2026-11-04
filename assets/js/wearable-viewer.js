@@ -48,6 +48,7 @@ export async function createWearableViewer(host, options) {
   };
   drawFrame(0);
   const material=new THREE.MeshBasicMaterial({map:texture,transparent:true,alphaTest:.01,side:THREE.DoubleSide});
+  const neutralMaterial=new THREE.MeshBasicMaterial({color:0x747b88});
   // UVs use top-left atlas coordinates; Three.js UVs use a bottom-left origin.
   function makeBox(w,h,d,u,v,outer=false){
     const geometry=new THREE.BoxGeometry(w/16,h/16,d/16);
@@ -66,15 +67,17 @@ export async function createWearableViewer(host, options) {
   const addPart=(name,w,h,d,u,v,x,y,z,outerAtlas=null)=>{
     const pivot=new THREE.Group();pivot.name=name;pivot.position.set(x/16,y/16,z/16);root.add(pivot);
     const mesh=makeBox(w,h,d,u,v);mesh.position.y=-h/32;pivot.add(mesh);
+    if(isCape)mesh.material=neutralMaterial;
     if(outerAtlas){
       const layer=makeBox(w+.5,h+.5,d+.5,outerAtlas[0],outerAtlas[1],true);
       layer.position.y=-h/32;pivot.add(layer);
+      if(isCape)layer.visible=false;
     }
     joints.push({name,pivot});
     return pivot;
   };
   // Standard 64x64 skin layout. Slim arms use the three-pixel UV region.
-  const slim=false;
+  const slim=false; // Classic is the initial arm layout.
   const head=addPart('Head',8,8,8,0,0,0,32,0,[32,0]);
   addPart('Body',8,12,4,16,16,0,24,0,[16,32]);
   const rightArm=addPart('Right Arm',slim?3:4,12,4,40,16,-6,24,0,[40,32]);
@@ -86,8 +89,7 @@ export async function createWearableViewer(host, options) {
     const cape=makeBox(10,16,1,0,0);
     cape.position.set(0,17/16,-3.7/16);
     root.add(cape);
-    // The cape texture must not be applied to the player's skin.
-    for(const part of joints)part.pivot.visible=false;
+    // The neutral mannequin stays visible behind the cape.
   }
   // Animation clips from future rigged GLTF assets can be connected here.
   const toolbar=document.createElement('div');
@@ -164,6 +166,6 @@ export async function createWearableViewer(host, options) {
   raf=requestAnimationFrame(tick);
   return {destroy(){
     disposed=true;cancelAnimationFrame(raf);observer.disconnect();controls.dispose();
-    root.traverse(o=>o.geometry?.dispose?.());material.dispose();texture.dispose();renderer.dispose();renderer.domElement.remove();toolbar.remove();
+    root.traverse(o=>o.geometry?.dispose?.());material.dispose();neutralMaterial.dispose();texture.dispose();renderer.dispose();renderer.domElement.remove();toolbar.remove();
   }};
 }
