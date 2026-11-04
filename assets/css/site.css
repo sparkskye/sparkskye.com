@@ -1891,3 +1891,20 @@ body.theme-art .topnav__dropitem.is-active{
 .design-page .card--design .card__meta {
   padding-top: 6px !important;
 }
+
+/* Wearable preview controls use the same gallery button language. */
+.wearable-controls{
+  position:absolute;bottom:12px;left:50%;transform:translateX(-50%);
+  display:flex;align-items:center;justify-content:center;gap:8px;z-index:4;
+}
+.wearable-control{
+  font-family:MCFive,Minecraftia,sans-serif;font-size:11px;
+  color:var(--text);background:#1b1b1b;border:var(--ui-border);
+  border-radius:14px;padding:10px 12px;cursor:pointer;
+  text-transform:uppercase;line-height:1.2;
+}
+.wearable-control:hover,.wearable-control:focus-visible{border:var(--ui-border-accent);outline:none}
+.wearable-control option{background:#1b1b1b;color:var(--text)}
+.wearable-canvas{width:100%;height:100%;display:block;touch-action:none}
+.wearable-card-stage{position:absolute;inset:0;pointer-events:none}
+.card--skin .card__thumb,.card--cape .card__thumb{object-fit:contain}
