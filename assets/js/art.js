@@ -374,6 +374,7 @@ function scheduleModelCardPreview(card, it) {
   }
 }
 
+let wearableCardPending=Promise.resolve();
 const wearableCardObserver = new IntersectionObserver((entries)=>{
   for(const entry of entries){
     if(!entry.isIntersecting)continue;
@@ -381,7 +382,7 @@ const wearableCardObserver = new IntersectionObserver((entries)=>{
     const card=entry.target,it=card.__wearableItem;
     if(!it)continue;
     const viewer=card.querySelector('.card__viewer');
-    (async()=>{
+    wearableCardPending=wearableCardPending.catch(()=>{}).then(async()=>{
       let session=null;
       try{
         const mod=await import('/assets/js/wearable-viewer.js');
@@ -393,7 +394,7 @@ const wearableCardObserver = new IntersectionObserver((entries)=>{
         viewer.replaceChildren(img);
       }catch(err){console.warn('Wearable card preview failed',err)}
       finally{session?.destroy?.()}
-    })();
+    });
   }
 },{rootMargin:'250px'});
 
