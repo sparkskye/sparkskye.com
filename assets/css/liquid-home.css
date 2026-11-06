@@ -1,0 +1,1242 @@
+/* Shared 4px liquid-pixel navigation for home and creation galleries. */
+.liquid-home, .liquid-subpage {
+  min-height: 100svh;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  background: #141414;
+  font-family: MCFive, monospace;
+}
+.liquid-main {
+  flex: 1;
+  min-height: 690px;
+  padding: 56px 20px 35px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.portrait-zone {
+  position: relative;
+  width: 114px;
+  height: 114px;
+  display: grid;
+  place-items: center;
+}
+.portrait {
+  display: block;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  object-fit: cover;
+  image-rendering: auto;
+  pointer-events: none;
+  will-change: transform;
+}
+.hello {
+  margin: 14px 0 7px;
+  color: #b4b4b4;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.island-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: min(980px, 100%);
+  height: 290px;
+  isolation: isolate;
+}
+.liquid-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  image-rendering: pixelated;
+}
+.island-hit {
+  position: relative;
+  width: 280px;
+  height: 90px;
+  display: grid;
+  place-items: center;
+  transition: none;
+}
+.island-heading { margin: 0; position: absolute; z-index: 2; }
+.island-toggle {
+  display: block;
+  transform: translateY(-5px);
+  border: 0;
+  background: none;
+  color: #10141c;
+  padding: 16px 13px;
+  font-family: MCTen, MCFive, monospace;
+  font-size: 38px;
+  line-height: 1;
+  cursor: pointer;
+}
+#island-links {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(15px, 3vw, 28px);
+  padding: 0 23px;
+  width: 100%;
+  visibility: hidden;
+}
+#island-links a {
+  flex: 0 0 auto;
+  color: #10141c;
+  padding: 32px 0;
+  font-family: MCFive, monospace;
+  font-size: 18px;
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+  transform: translateY(10px);
+  transition: transform .55s cubic-bezier(.2,1.3,.3,1);
+}
+#island-links a:hover, #island-links a:focus-visible { transform: translateY(-4px); }
+#island-links a:focus-visible, .island-toggle:focus-visible {
+  outline: 3px solid #10141c;
+  outline-offset: 4px;
+}
+.island-stage[data-open="true"] .island-hit { width: calc(100% - 220px); height: 124px; }
+/* Staggered title departure and arrival; title stays hidden until menu exits. */
+.lp-heading-word, .lp-heading-letter { display: inline-block; transform-origin: center bottom; }
+.island-heading { opacity: 1; transition: none; }
+.island-stage[data-heading="hidden"] .lp-heading-letter,
+.island-stage[data-heading="leaving"] .lp-heading-letter { opacity: 0; }
+.island-stage[data-heading="hidden"] .island-heading,
+.island-stage[data-heading="leaving"] .island-heading { pointer-events: none; }
+.island-stage[data-heading="leaving"] .lp-heading-letter {
+  animation: lp-heading-away .18s both;
+  animation-delay: calc(var(--lp-char) * 9ms);
+}
+.island-stage[data-heading="entering"] .lp-heading-letter {
+  animation: lp-heading-letter-enter .52s cubic-bezier(.21,1,.37,1) both;
+  animation-delay: calc(var(--lp-char) * 38ms);
+}
+.island-stage[data-heading="visible"] .lp-heading-letter { opacity: 1; transform: none; }
+@keyframes lp-heading-away {
+  0% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(-8px) scale(.86); }
+}
+@keyframes lp-heading-letter-enter {
+  0% { opacity: 0; transform: translateY(11px) scale(.75); }
+  55% { opacity: 1; transform: translateY(-5px) scale(1.10); }
+  75% { opacity: 1; transform: translateY(2px) scale(.97); }
+  100% { opacity: 1; transform: none; }
+}
+#island-links { opacity: 0; transition: opacity .17s ease-out, transform .2s ease-out; }
+.island-stage[data-ready="true"] #island-links { visibility: visible; opacity: 1; }
+.island-stage[data-retracting="true"] #island-links {
+  opacity: 0; transform: translateY(-9px) scale(.965); pointer-events: none;
+}
+.island-stage[data-retracting="true"] #island-links .lp-letter {
+  animation: lp-menu-disperse .17s both;
+  animation-delay: calc(var(--lp-char) * 8ms);
+}
+@keyframes lp-menu-disperse {
+  to { opacity: 0; transform: translateY(-7px) scale(.84); }
+}
+.island-stage[data-ready="true"] #island-links a { transform: translateY(0); }
+.island-stage[data-ready="true"] #island-links a:hover,
+.island-stage[data-ready="true"] #island-links a:focus-visible { transform: translateY(-4px); }
+.island-hint {
+  margin: -11px 0 10px;
+  min-height: 15px;
+  color: #6e6e6e;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.island-detail {
+  margin: 0 0 26px;
+  min-height: 23px;
+  max-width: 650px;
+  color: #d1d1d1;
+  font-size: 12px;
+  line-height: 1.65;
+  opacity: 0;
+  transition: opacity .29s ease, transform .29s ease;
+  pointer-events: none;
+}
+.island-detail.is-visible { opacity: 1; }
+.intro {
+  margin: 0;
+  max-width: 670px;
+  color: #b7b7b7;
+  font-size: 13px;
+  line-height: 2.15;
+}
+.liquid-footer {
+  width: min(1120px, 100%);
+  margin: auto;
+  padding: 20px 24px 25px;
+  text-align: center;
+  font-family: MCFive, monospace;
+}
+.liquid-footer nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 17px 28px;
+  font-size: 12px;
+}
+.liquid-footer a { color: #fff; }
+.liquid-footer a:hover { color: #00aaff; }
+.liquid-footer a:focus-visible { outline: 2px solid #00aaff; outline-offset: 5px; }
+.liquid-footer p {
+  margin: 29px 0 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  color: #aaa;
+  font-size: 11px;
+  line-height: 1.8;
+}
+.liquid-footer p span { font-size: 10px; color: #858585; }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+@media(max-width:600px) {
+  .liquid-main { min-height: 640px; padding: 34px 16px 20px; }
+  .island-stage { height: 300px; }
+  .island-stage[data-open="true"] .island-hit { width: calc(100% - 22px); height: 170px; }
+  #island-links {
+    display: grid;
+    grid-template-columns: max-content max-content;
+    justify-content: space-evenly;
+    gap: 0 18px;
+    padding: 0 6px;
+  }
+  #island-links a { padding: 26px 0; font-size: 16px; }
+  .island-toggle { font-size: 34px; }
+  .island-hint { font-size: 10px; }
+  .island-detail { max-width: 330px; font-size: 10px; min-height: 34px; margin-bottom: 12px; }
+  .hello { font-size: 11px; }
+  .intro { max-width: 350px; font-size: 12px; }
+  .liquid-footer nav { gap: 14px 20px; font-size: 11px; }
+  .liquid-footer p { font-size: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #island-links a, .island-detail { transition: none; }
+  .portrait { will-change: auto; }
+}
+/* Without JavaScript the four destinations are still available as links. */
+html:not(.liquid-enhanced) .liquid-canvas,
+html:not(.liquid-enhanced) .island-heading { display: none; }
+html:not(.liquid-enhanced) .island-hit { width: min(100%, 700px); height: auto; padding: 18px; background: #00aaff; }
+html:not(.liquid-enhanced) #island-links { visibility: visible; flex-wrap: wrap; justify-content: center; }
+
+/* V5: character motion is separate from the preserved V4 liquid engine. */
+.lp-label {
+  display: inline-block;
+  white-space: nowrap;
+  transform-origin: 50% 85%;
+}
+.lp-letter {
+  display: inline-block;
+  white-space: pre;
+  transform-origin: 50% 100%;
+  color: inherit;
+}
+/* A springy entrance for each button, then a staggered entrance for letters. */
+.island-stage[data-entering="true"] #island-links .lp-label {
+  animation: lp-button-arrive .60s both;
+  animation-delay: calc(var(--lp-link-order) * 67ms);
+}
+.island-stage[data-entering="true"] #island-links .lp-letter {
+  animation: lp-character-arrive .53s both;
+  animation-delay: calc(var(--lp-link-order) * 67ms + var(--lp-char) * 27ms);
+}
+/* JavaScript drives entry and return from the actual live pose. */
+@keyframes lp-button-arrive {
+  0% { opacity: 0; transform: translateY(19px) scale(.86); }
+  51% { opacity: 1; transform: translateY(-8px) scale(1.085); }
+  73% { transform: translateY(3px) scale(.97); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes lp-character-arrive {
+  0% { opacity: 0; transform: translateY(9px) scale(.9); }
+  56% { opacity: 1; transform: translateY(-4px) scale(1.07); }
+  77% { transform: translateY(2px) scale(.985); }
+  100% { opacity: 1; transform: none; }
+}
+/* Social links use the same smooth, reversible letter springs. */
+.liquid-footer nav a .lp-letter,
+#island-links a .lp-letter { transition: color 0s; }
+.liquid-footer nav a { display: inline-block; }
+/* Let the heading pop in just after the liquid enters. */
+@media (prefers-reduced-motion: reduce) {
+  .liquid-enhanced .island-heading,
+  .island-stage[data-entering="true"] #island-links .lp-label,
+  .island-stage[data-entering="true"] #island-links .lp-letter,
+  #island-links a:is(:hover, :focus-visible) .lp-letter,
+  .liquid-footer nav a:is(:hover, :focus-visible) .lp-label,
+  .liquid-footer nav a:is(:hover, :focus-visible) .lp-letter {
+    animation: none !important;
+  }
+  #island-links a:is(:hover, :focus-visible) .lp-letter { color: #fff; }
+}
+
+/* v6 — homepage: read top-to-bottom; PFP springs into view. */
+@media (prefers-reduced-motion: no-preference) {
+  .liquid-home .portrait-zone { animation: lp-portrait-appear .82s .06s both; }
+  .liquid-home .hello { animation: lp-copy-appear .57s .20s both; }
+  .liquid-home .island-hint { animation: lp-copy-appear .57s .40s both; }
+  .liquid-home .intro { animation: lp-copy-appear .68s .57s both; }
+  .liquid-home .liquid-footer nav { animation: lp-copy-appear .68s .72s both; }
+  .liquid-home .liquid-footer p { animation: lp-copy-appear .68s .85s both; }
+  .liquid-subpage .liquid-footer nav { animation: lp-copy-appear .65s .58s both; }
+  .liquid-subpage .liquid-footer p { animation: lp-copy-appear .65s .72s both; }
+}
+@keyframes lp-copy-appear {
+  0% { opacity: 0; transform: translateY(12px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes lp-portrait-appear {
+  0% { opacity: 0; transform: translateY(32px) scale(.58) rotate(-9deg); }
+  53% { opacity: 1; transform: translateY(-11px) scale(1.13) rotate(4deg); }
+  73% { transform: translateY(4px) scale(.95) rotate(-2deg); }
+  100% { opacity: 1; transform: none; }
+}
+
+/* v6 — animation gallery uses the same island instead of the old topbar. */
+.liquid-subpage { --accent: #598ffe; }
+.liquid-subnav {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 18px 0;
+  text-align: center;
+}
+.liquid-subnav .island-stage { height: 230px; }
+.liquid-subnav .island-hint { margin-top: -20px; }
+.liquid-subnav .island-detail { margin-bottom: 0; }
+.liquid-subpage .island-toggle { font-size: 33px; }
+.liquid-subpage .page { width: 100%; padding-top: 10px; }
+.liquid-subpage .liquid-footer { margin-top: auto; }
+/* A brief traveling, springy splash from the gallery into the top island. */
+@media (prefers-reduced-motion: no-preference) {
+  .liquid-subnav .island-stage { animation: lp-island-land .82s both; }
+  .liquid-enhanced .liquid-subnav .island-stage:not([data-landed="true"]) .island-hit { pointer-events: none; }
+  .liquid-subpage #filtersPanel { animation: lp-gallery-arrive .72s .30s both; }
+  .liquid-subpage #grid .lp-reveal-card {
+    animation: lp-gallery-arrive .62s both;
+    animation-delay: calc(0.38s + var(--gallery-index) * 55ms);
+  }
+}
+@keyframes lp-island-land {
+  0% { opacity: .25; transform: translateY(134px) scale(1.28); }
+  40% { opacity: 1; transform: translateY(-13px) scale(.91); }
+  65% { transform: translateY(7px) scale(1.045); }
+  82% { transform: translateY(-4px) scale(.985); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes lp-gallery-arrive {
+  0% { opacity: 0; transform: translateY(29px) scale(.976); }
+  60% { opacity: 1; transform: translateY(-5px) scale(1.008); }
+  100% { opacity: 1; transform: none; }
+}
+@media (max-width:600px) {
+  .liquid-subnav { padding: 6px 12px 0; }
+  .liquid-subnav .island-stage { height: 270px; }
+  .liquid-subnav .island-hint { margin-top: -17px; }
+  .liquid-subpage .island-toggle { font-size: 30px; }
+  .liquid-subpage .page { padding-top: 5px; }
+}
+
+/* v7: all creation galleries have compact, text-free navigation. */
+.liquid-subnav { padding: 0 18px; }
+.liquid-subnav .island-stage { height: 195px; }
+.liquid-subpage .page { padding-top: 0; }
+.liquid-subpage .island-hint, .liquid-subpage .island-detail { display: none; }
+
+/* Panel enters first. Results container and empty state follow separately. */
+@media (prefers-reduced-motion: no-preference) {
+  .liquid-subpage #filtersPanel,
+  .liquid-subpage .panel[aria-label="Art filters"] {
+    animation: lp-gallery-arrive .70s .26s both;
+  }
+  .liquid-subpage #grid {
+    animation: lp-gallery-arrive .70s .67s both;
+  }
+  .liquid-subpage #grid .lp-reveal-card {
+    animation: lp-gallery-item-arrive .58s both;
+    animation-delay: calc(45ms + var(--gallery-index, 0) * 36ms);
+  }
+}
+@keyframes lp-gallery-item-arrive {
+  0% { opacity: 0; transform: translateY(21px) scale(.965); }
+  58% { opacity: 1; transform: translateY(-4px) scale(1.012); }
+  100% { opacity: 1; transform: none; }
+}
+/* Keep the same colors, borders, and card design; only move the elements. */
+.liquid-subpage .lp-motion-target {
+  --lp-x: 0px;
+  --lp-y: 0px;
+  --lp-rx: 0deg;
+  --lp-ry: 0deg;
+  transform: perspective(900px) translate3d(var(--lp-x),var(--lp-y),0)
+    rotateX(var(--lp-rx)) rotateY(var(--lp-ry));
+  transition: transform .28s cubic-bezier(.2,1.25,.36,1),
+    scale .32s cubic-bezier(.2,1.25,.36,1);
+  transform-origin: center center;
+  will-change: transform;
+}
+.liquid-subpage .lp-motion-target:not(.lp-motion-active) { scale: 1; }
+/* Avoid moving the gallery while typing or showing a modal. */
+.liquid-subpage .modal__card { transform: translate(-50%, -50%); }
+@media (max-width:600px) {
+  .liquid-subnav { padding: 0 12px; }
+  .liquid-subnav .island-stage { height: 225px; }
+  .liquid-subpage .page { padding-top: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .liquid-subpage .lp-motion-target { transition: none; transform: none; }
+  .island-stage[data-heading="hidden"] .lp-heading-letter { opacity: 1; }
+}
+
+/* v8 — The canvas is a document-width, transparent visual layer. It is NOT
+   a touch target. Give the actual island its own higher interactive layer. */
+html, body { overflow-x: clip; }
+.island-stage { z-index: 3; }
+.liquid-canvas { z-index: 1; }
+.island-hit { z-index: 2; touch-action: none; }
+/* Preserve easy touch scrolling outside the island. */
+@media (pointer: coarse) { .island-hit { -webkit-tap-highlight-color: transparent; } }
+/* Identical soft springs for island headings and button text: translation
+   ONLY, no ugly letter scaling or final abrupt snap. */
+.island-stage[data-heading="entering"] .lp-heading-letter {
+  animation: lp-heading-enter-v8 .66s linear both;
+  animation-delay: calc(var(--lp-char) * 34ms);
+}
+@keyframes lp-heading-enter-v8 {
+  0% {opacity:0; transform:translateY(11px)}
+  10% {opacity:.32; transform:translateY(5.6px)}
+  20% {opacity:.72; transform:translateY(1.15px)}
+  30% {opacity:1; transform:translateY(-1.95px)}
+  40% {opacity:1; transform:translateY(-2.28px)}
+  50% {opacity:1; transform:translateY(-1.26px)}
+  60% {opacity:1; transform:translateY(-.21px)}
+  70% {opacity:1; transform:translateY(.32px)}
+  80% {opacity:1; transform:translateY(.31px)}
+  90% {opacity:1; transform:translateY(.15px)}
+  100% {opacity:1; transform:translateY(0)}
+}
+@media (prefers-reduced-motion: reduce) {
+  .island-stage[data-heading="entering"] .lp-heading-letter {animation:none; opacity:1;transform:none;}
+}
+
+/* v9 responsive liquid navigation and preview motion */
+.liquid-home .portrait { width:110px; height:110px; }
+.liquid-home .portrait-zone { width:128px; height:128px; }
+#island-links { justify-content:center; gap:clamp(12px,2vw,22px); padding:0 28px; box-sizing:border-box; }
+#island-links a { font-size:clamp(14px,1.8vw,18px); user-select:none; }
+@media(max-width:820px) {
+ .island-stage[data-open="true"] .island-hit {width:calc(100% - 22px);height:170px;}
+ #island-links {display:grid;grid-template-columns:max-content max-content;gap:0 20px;justify-content:center;padding:0 16px;}
+ #island-links a {font-size:clamp(12px,3vw,16px);padding:24px 0;}
+}
+.liquid-subpage .card.lp-motion-target {transform:translate3d(var(--lp-x),var(--lp-y),0);animation-fill-mode:backwards !important;}
+.liquid-subpage .modal__viewer {margin:14px 14px 0;width:calc(100% - 28px);height:auto;aspect-ratio:16/9;border:0;border-radius:18px;overflow:hidden;}
+.liquid-subpage .modal__viewer img {border-radius:14px;}
+.liquid-subpage .map-preview {height:100%;}
+.liquid-subpage .map-preview__group,.liquid-subpage .map-preview__resolution,.liquid-subpage .map-preview__helper,.liquid-subpage .map-preview__group .btn,.liquid-subpage .map-preview__zoom {border:0;background:rgb(20 20 20 / 50%);box-shadow:none;}
+.liquid-subpage .map-preview__zoom {color:inherit;font:inherit;cursor:pointer;}
+@media(prefers-reduced-motion:no-preference) {
+ .liquid-subpage .modal.is-open .modal__card {animation:lp-preview-open .58s both;transform-origin:center center;}
+ .liquid-subpage .modal.is-open .modal__backdrop {animation:lp-preview-dim .65s both;}
+}
+@keyframes lp-preview-open {
+ 0% {opacity:0;transform:translate(-50%,-40%) scale(1.08,.12);}
+ 55% {opacity:1;transform:translate(-50%,-51%) scale(.98,1.045);}
+ 78% {transform:translate(-50%,-50%) scale(1.01,.985);}
+ 100% {transform:translate(-50%,-50%) scale(1);}
+}
+@keyframes lp-preview-dim {from {background:transparent;backdrop-filter:blur(0);} to {background:rgb(0 0 0 / 65%);backdrop-filter:blur(4px);}}
+
+/* v10 refinements */
+#island-links {justify-content:space-between;gap:20px;padding:0 22px;}
+@media(max-width:820px){#island-links{justify-content:space-evenly;gap:0 20px;}}
+.liquid-subpage .card {transition:translate .2s ease-out;}
+.liquid-subpage .design-variant-arrow.lp-motion-target {transform:translateY(-50%);}
+.liquid-subpage .modal__meta {border-top:0;}
+.liquid-subpage .modal__card {border-radius:28px;}
+.liquid-subpage .modal__viewer {border-radius:14px;flex-shrink:0;}
+.liquid-subpage .modal__viewer img {border-radius:14px;}
+.liquid-subpage .map-preview__group {background:transparent;border:0;}
+.liquid-subpage .modal.is-open .modal__card {animation-duration:.32s;}
+
+/* v11 balanced spacing and preview transitions */
+@media(min-width:821px){#island-links{justify-content:space-between;padding:0 clamp(38px,5vw,64px);gap:24px;}#island-links a{font-size:clamp(14px,1.65vw,18px);}}
+.liquid-subpage .modal__meta {background:transparent;}
+.liquid-subpage .modal__card {border-radius:38px;}
+.liquid-subpage .modal__viewer,.liquid-subpage .modal__viewer img {border-radius:24px;}
+.liquid-subpage .modal__viewer {background:transparent;}
+@keyframes lp-preview-close {from{opacity:1;transform:translate(-50%,-50%) scale(1);}35%{transform:translate(-50%,-48%) scale(1.02,.95);}to{opacity:0;transform:translate(-50%,-25%) scale(.96,.5);}}
+@keyframes lp-preview-clear {from{background:rgb(0 0 0 / 65%);backdrop-filter:blur(4px);}to{background:transparent;backdrop-filter:blur(0);}}
+.liquid-subpage .modal.is-closing .modal__card {animation:lp-preview-close .24s both;pointer-events:none;}
+.liquid-subpage .modal.is-closing .modal__backdrop {animation:lp-preview-clear .24s both;}
+@media(prefers-reduced-motion:reduce){.liquid-subpage .modal.is-closing .modal__card,.liquid-subpage .modal.is-closing .modal__backdrop{animation:none;}}
+
+.liquid-subpage .modal__meta {touch-action:pan-y;}
+
+
+@media (max-width:600px) {
+ .liquid-subpage .island-toggle { font-size: clamp(35px, 9vw, 45px); }
+ .liquid-home .island-toggle { font-size: clamp(37px, 9vw, 47px); }
+}
+
+
+/* v13 — gallery preview layout: fluid sizing, rounded media and pill controls. */
+.liquid-subpage .modal__path{display:none!important}
+.liquid-subpage .modal__card{border-radius:38px}
+.liquid-subpage .modal__viewer,.liquid-subpage .modal__viewer--media{
+ position:relative;width:calc(100% - 40px)!important;
+ height:min(62dvh,calc(100dvh - 246px),620px)!important;min-height:min(220px,42dvh);
+ max-height:none!important;aspect-ratio:auto!important;
+ margin:20px 20px 0!important;border-radius:40px!important;overflow:hidden;flex-shrink:0;background:#121212
+}
+.liquid-subpage .modal__viewer img,.liquid-subpage .modal__viewer video,
+.liquid-subpage .modal__viewer iframe{border-radius:40px!important}
+.liquid-subpage .shared-panzoom-preview,.liquid-subpage .shared-panzoom-preview .map-preview__viewport{border-radius:40px!important}
+.liquid-subpage .shared-panzoom-preview .map-preview__img{border-radius:48px!important}
+.liquid-subpage .modal__meta{padding:21px 28px 28px!important}
+.liquid-subpage .modal__name{margin-bottom:22px!important}
+.liquid-subpage .modal__variant{margin-bottom:16px}
+.liquid-subpage .modal__actions{gap:12px}
+.liquid-subpage .modal__actions .btn,.liquid-subpage .modal__actions a,
+.liquid-subpage .map-preview__zoom,.liquid-subpage .map-preview__resolution,
+.liquid-subpage .map-preview__helper,.liquid-subpage .lp-theater-enter,
+.liquid-subpage .lp-theater-exit{border-radius:9999px!important}
+.liquid-subpage .map-preview__controls{left:auto!important;right:14px!important;bottom:14px!important;width:auto!important;align-items:flex-end}
+.liquid-subpage .map-preview__group{justify-content:flex-end!important}
+.liquid-subpage .shared-panzoom-preview .map-preview__resolution,
+.liquid-subpage .shared-panzoom-preview .map-preview__controls,
+.liquid-subpage .shared-panzoom-preview .map-preview__helper{
+ opacity:0;pointer-events:none;transition:opacity .38s ease
+}
+.liquid-subpage .shared-panzoom-preview.lp-zoom-feedback .map-preview__resolution,
+.liquid-subpage .shared-panzoom-preview.lp-zoom-feedback .map-preview__controls,
+.liquid-subpage .shared-panzoom-preview.lp-zoom-feedback .map-preview__helper,
+.liquid-subpage .modal__viewer.lp-preview-active .map-preview__resolution,
+.liquid-subpage .modal__viewer.lp-preview-active .map-preview__controls,
+.liquid-subpage .modal__viewer.lp-preview-active .map-preview__helper,
+.liquid-subpage .modal__viewer:focus-within .map-preview__controls{
+ opacity:1;pointer-events:auto
+}
+.liquid-subpage .lp-theater-enter,.liquid-subpage .lp-theater-exit{
+ position:absolute;top:14px;right:14px;z-index:15;
+ background:rgb(20 20 20 / 72%);border:0;color:white;
+ width:44px;height:40px;padding:9px;display:grid;place-items:center;cursor:pointer;
+ opacity:0;pointer-events:none;transform:translateY(-3px);
+ transition:opacity .38s ease,transform .38s ease,background .2s ease
+}
+.liquid-subpage .lp-theater-enter svg{width:20px;height:20px;display:block}
+.liquid-subpage .modal__viewer.lp-preview-active .lp-theater-enter,
+.liquid-subpage .modal__viewer .lp-theater-enter:focus-visible{
+ opacity:1;pointer-events:auto;transform:none
+}
+.liquid-subpage .lp-theater-exit{display:none;width:auto;padding:11px 17px;font:11px MCFive,monospace}
+.liquid-subpage .modal.lp-theater{z-index:10000}
+.liquid-subpage .modal.lp-theater .modal__card{
+ position:fixed;inset:0;left:0;top:0;transform:none!important;animation:none!important;
+ width:100%;height:100%;max-height:100%;background:#101010;border:none;border-radius:0;
+ display:flex;align-items:center;justify-content:center
+}
+.liquid-subpage .modal.lp-theater .modal__backdrop{background:#101010}
+.liquid-subpage .modal.lp-theater .modal__meta,
+.liquid-subpage .modal.lp-theater .lp-theater-enter{display:none!important}
+.liquid-subpage .modal.lp-theater .lp-theater-exit{
+ position:fixed;display:grid;place-items:center;
+ top:max(16px,env(safe-area-inset-top));right:max(16px,env(safe-area-inset-right))
+}
+.liquid-subpage .modal.lp-theater.lp-preview-active .lp-theater-exit,
+.liquid-subpage .modal.lp-theater .lp-theater-exit:focus-visible{opacity:1;pointer-events:auto;transform:none}
+.liquid-subpage .modal.lp-theater .modal__viewer{
+ width:100vw!important;height:100dvh!important;max-height:none!important;
+ min-height:0!important;margin:0!important;border-radius:0!important
+}
+.liquid-subpage .modal.lp-theater .modal__viewer video,
+.liquid-subpage .modal.lp-theater .modal__viewer iframe{border-radius:0!important}
+.liquid-subpage .modal.is-closing .modal__card{
+ animation:lp-preview-close-v13 .37s cubic-bezier(.28,.02,.65,1) both!important;pointer-events:none
+}
+.liquid-subpage .modal.is-closing .modal__backdrop{animation:lp-preview-clear .37s both!important}
+@keyframes lp-preview-close-v13{
+ from{opacity:1;transform:translate(-50%,-50%)}
+ to{opacity:0;transform:translate(-50%,calc(-50% + 76px))}
+}
+@keyframes lp-preview-content-appear{from{opacity:0}to{opacity:1}}
+.liquid-subpage .modal__viewer>iframe,.liquid-subpage .modal__viewer>video,
+.liquid-subpage .modal__viewer>.timelapse-preview{animation:lp-preview-content-appear .22s ease-out both}
+.liquid-subpage input.search.lp-motion-target{transform:translate3d(var(--lp-x),var(--lp-y),0)}
+@media(max-width:680px){
+ .liquid-subpage .modal__card{max-height:calc(100dvh - 12px)}
+ .liquid-subpage .modal__viewer,.liquid-subpage .modal__viewer--media{
+  width:calc(100% - 28px)!important;
+  height:min(54dvh,calc(100dvh - 232px))!important;
+  margin:14px 14px 0!important
+ }
+ .liquid-subpage .modal__meta{padding:17px 22px 24px!important}
+ .liquid-subpage .modal__name{margin-bottom:19px!important}
+ .liquid-subpage .modal__actions{gap:10px}
+ .liquid-subpage .modal.lp-theater .modal__viewer{
+  width:100vw!important;height:100dvh!important;margin:0!important
+ }
+}
+@media(prefers-reduced-motion:reduce){
+ .liquid-subpage .modal.is-closing .modal__card,
+ .liquid-subpage .modal__viewer>iframe,.liquid-subpage .modal__viewer>video{animation:none!important}
+}
+
+/* Gallery-only: every remaining preview control uses the same pill outline. */
+.liquid-subpage .modal button,.liquid-subpage .modal .btn,
+.liquid-subpage .modal .design-variant-arrow { border-radius:9999px!important; }
+
+
+/* v15: keep the original preview-window contour; round only image content. */
+.liquid-subpage .modal__viewer,
+.liquid-subpage .modal__viewer--media {
+  border-radius: 24px !important;
+  background: var(--panel2) !important;
+  padding: 0 !important;
+}
+.liquid-subpage .modal__viewer > .map-preview,
+.liquid-subpage .modal__viewer > .timelapse-preview {
+  width: 100%;
+  height: 100%;
+}
+.liquid-subpage .modal__viewer .map-preview,
+.liquid-subpage .modal__viewer .map-preview__viewport,
+.liquid-subpage .modal__viewer > .timelapse-preview {
+  border-radius: 24px !important;
+  overflow: hidden;
+}
+/* Percentage radii follow the image's aspect ratio, not its pixel resolution. */
+.liquid-subpage .modal__viewer img,
+.liquid-subpage .modal__viewer video,
+.liquid-subpage .modal__viewer iframe,
+.liquid-subpage .modal__viewer .map-preview__img {
+  border-radius: 5% / 8% !important;
+}
+.liquid-subpage .modal.lp-theater .modal__viewer {
+  padding: 0 !important;
+  border-radius: 0 !important;
+}
+.liquid-subpage .modal.lp-theater .map-preview,
+.liquid-subpage .modal.lp-theater .map-preview__viewport,
+.liquid-subpage .modal.lp-theater .modal__viewer > .timelapse-preview {
+  border-radius: 0 !important;
+}
+/* File versions are attached to the name, followed by a deliberate gap to actions. */
+.liquid-subpage .modal__name:has(+ .modal__variant:not([hidden])) {
+  margin-bottom: 4px !important;
+}
+.liquid-subpage .modal__variant:not([hidden]) {
+  margin-top: 0;
+  margin-bottom: 22px !important;
+}
+
+/* Fullscreen uses exactly the same surface and opacity timing as image metadata. */
+.liquid-subpage .lp-theater-enter {
+  background: rgb(20 20 20 / 50%) !important;
+  box-shadow: none !important;
+  border: 0 !important;
+  color: white;
+  font-family: MCFive, monospace;
+}
+.liquid-subpage .lp-theater-enter:hover,
+.liquid-subpage .lp-theater-enter:focus-visible {
+  background: rgb(20 20 20 / 60%) !important;
+}
+.liquid-subpage .modal__viewer .map-preview__resolution,
+.liquid-subpage .modal__viewer .map-preview__zoom,
+.liquid-subpage .modal__viewer .lp-theater-enter {
+  background: rgb(20 20 20 / 50%) !important;
+  border-radius: 9999px !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.liquid-subpage .modal__viewer .lp-theater-enter {
+  transition: opacity .38s ease, transform .28s cubic-bezier(.2,1.25,.36,1),
+    scale .32s cubic-bezier(.2,1.25,.36,1), background .2s ease;
+}
+/* One preview-active state drives all overlays. */
+.liquid-subpage .modal__viewer.lp-preview-active .map-preview__resolution,
+.liquid-subpage .modal__viewer.lp-preview-active .map-preview__controls,
+.liquid-subpage .modal__viewer.lp-preview-active .lp-theater-enter {
+  opacity: 1;
+  pointer-events: auto;
+}
+.liquid-subpage .modal__viewer:not(.lp-preview-active) .lp-theater-enter {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* v15: one top-center toolbar for dimensions, zoom, and fullscreen. */
+.liquid-subpage .modal__viewer > .lp-preview-toolbar {
+  position: absolute !important;
+  z-index: 20;
+  top: 14px;
+  left: 50%;
+  right: auto;
+  bottom: auto;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  max-width: calc(100% - 22px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .38s ease;
+}
+.liquid-subpage .modal__viewer.lp-preview-active > .lp-preview-toolbar,
+.liquid-subpage .modal__viewer > .lp-preview-toolbar:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
+.liquid-subpage .lp-preview-toolbar > .map-preview__resolution,
+.liquid-subpage .lp-preview-toolbar > .map-preview__controls,
+.liquid-subpage .lp-preview-toolbar > .lp-theater-enter {
+  position: static !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  width: auto;
+  margin: 0 !important;
+  flex: 0 0 auto;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  translate: none;
+}
+.liquid-subpage .lp-preview-toolbar > .lp-theater-enter {
+  display: grid;
+  width: 44px !important;
+  height: 40px;
+  transform: none !important;
+  background: rgb(20 20 20 / 50%) !important;
+}
+.liquid-subpage .lp-preview-toolbar > .map-preview__resolution,
+.liquid-subpage .lp-preview-toolbar .map-preview__zoom,
+.liquid-subpage .lp-preview-toolbar > .lp-theater-enter {
+  background: rgb(20 20 20 / 50%) !important;
+  border: none !important;
+  border-radius: 9999px !important;
+  box-shadow: none !important;
+  color: #fff;
+  white-space: nowrap;
+}
+.liquid-subpage .lp-preview-toolbar > .map-preview__controls {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+.liquid-subpage .lp-preview-toolbar .map-preview__group {
+  display: flex;
+  justify-content: center !important;
+  flex-wrap: nowrap;
+}
+.liquid-subpage .modal__meta {
+  text-align: center !important;
+}
+.liquid-subpage .modal__meta .modal__name,
+.liquid-subpage .modal__meta .modal__variant,
+.liquid-subpage .modal__meta .modal__stats,
+.liquid-subpage .modal__meta .modal__path {
+  text-align: center;
+}
+.liquid-subpage .modal__meta .modal__stats,
+.liquid-subpage .modal__actions {
+  justify-content: center !important;
+  align-items: center;
+}
+@media(max-width: 460px) {
+  .liquid-subpage .modal__viewer > .lp-preview-toolbar { gap: 6px; top: 10px; }
+  .liquid-subpage .lp-preview-toolbar > .map-preview__resolution {
+    font-size: 8px;
+    padding: 9px 9px;
+  }
+  .liquid-subpage .lp-preview-toolbar .map-preview__zoom {
+    min-width: 48px;
+    padding: 8px 7px;
+    font-size: 9px;
+  }
+  .liquid-subpage .lp-preview-toolbar > .lp-theater-enter {
+    width: 39px !important;
+    height: 36px;
+  }
+}
+
+/* Lift the visible hero group into the vertical center before scrolling.
+   On the first scroll, it settles into its previous higher placement. */
+.liquid-home .home-hero-core {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translateY(clamp(48px, 10svh, 110px));
+  transition: transform .78s cubic-bezier(.19,1,.22,1);
+}
+.liquid-home.lp-scrolled .home-hero-core {
+  transform: translateY(0);
+}
+@media (max-width: 600px) {
+  .liquid-home .home-hero-core {
+    transform: translateY(clamp(35px, 7svh, 68px));
+  }
+  .liquid-home.lp-scrolled .home-hero-core { transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .liquid-home .home-hero-core { transition: none; }
+}
+
+/* v16 — gallery image corners use displayed aspect ratio, never source resolution. */
+.liquid-subpage .modal__viewer img,
+.liquid-subpage .modal__viewer video,
+.liquid-subpage .modal__viewer iframe,
+.liquid-subpage .modal__viewer .map-preview__img {
+  border-radius: var(--lp-radius-x, 2.25%) / var(--lp-radius-y, 4%) !important;
+}
+.liquid-subpage .modal__viewer,
+.liquid-subpage .modal__viewer > .map-preview,
+.liquid-subpage .modal__viewer .map-preview__viewport {
+  border-radius: 24px !important;
+}
+/* Shared height for dimensions, zoom and fullscreen controls. */
+.liquid-subpage .lp-preview-toolbar > .map-preview__resolution,
+.liquid-subpage .lp-preview-toolbar .map-preview__zoom,
+.liquid-subpage .lp-preview-toolbar > .lp-theater-enter,
+.liquid-subpage .lp-preview-toolbar > .lp-theater-exit {
+  height: 36px !important;
+  min-height: 36px !important;
+  padding: 0 12px !important;
+  margin: 0 !important;
+  line-height: 1 !important;
+  font: 11px MCFive, monospace !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: white !important;
+  background: rgb(20 20 20 / 50%) !important;
+  border: 0 !important;
+  border-radius: 9999px !important;
+}
+.liquid-subpage .lp-preview-toolbar > .lp-theater-enter,
+.liquid-subpage .lp-preview-toolbar > .lp-theater-exit {
+  width: 36px !important;
+  min-width: 36px !important;
+  padding: 8px !important;
+  transition: opacity .38s ease, background .2s ease, scale .3s cubic-bezier(.2,1.25,.36,1);
+}
+.liquid-subpage .lp-preview-toolbar > .lp-theater-enter svg,
+.liquid-subpage .lp-preview-toolbar > .lp-theater-exit svg {
+  width: 18px; height: 18px; display: block;
+}
+.liquid-subpage .lp-preview-toolbar .map-preview__zoom { min-width: 56px !important; }
+.liquid-subpage .lp-preview-toolbar > .lp-theater-exit { display: none !important; }
+.liquid-subpage .modal.lp-theater .lp-preview-toolbar > .lp-theater-enter { display: none !important; }
+.liquid-subpage .modal.lp-theater .lp-preview-toolbar > .lp-theater-exit {
+  display: inline-flex !important;
+  position: static !important;
+  inset: auto !important;
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  opacity: 1 !important;
+  transform: none !important;
+  pointer-events: auto !important;
+}
+.liquid-subpage .lp-preview-toolbar > .lp-theater-enter:hover,
+.liquid-subpage .lp-preview-toolbar > .lp-theater-exit:hover,
+.liquid-subpage .lp-preview-toolbar .map-preview__zoom:hover { background: rgb(20 20 20 / 64%) !important; }
+/* Consistent card typography and centered metadata. */
+.liquid-subpage .card__meta,
+.liquid-subpage .card__name,
+.liquid-subpage .card__name a,
+.liquid-subpage .card__path,
+.liquid-subpage .card__stats,
+.liquid-subpage .card__stat {
+  font-family: MCFive, monospace !important;
+  text-align: center !important;
+}
+.liquid-subpage .card__meta { align-items: center !important; }
+.liquid-subpage .card__top { width:100%; justify-content:center !important; align-items:center !important; flex-wrap:wrap; }
+.liquid-subpage .card__stats { justify-content: center !important; }
+.liquid-subpage .card__name { width:100%; line-height:1.45 !important; }
+/* Grow the search pill to accommodate text, keep the count available to scripts. */
+.liquid-subpage .panel__row--search { justify-content: center !important; }
+.liquid-subpage #countLabel { display: none !important; }
+.liquid-subpage #searchInput.search {
+  flex: 0 1 auto !important;
+  width: var(--lp-search-width, 190px) !important;
+  min-width: min(150px, 100%) !important;
+  max-width: calc(100% - 20px) !important;
+  border-radius: 9999px !important;
+  text-align: center !important;
+  font-family: MCFive, monospace !important;
+  font-size: 12px !important;
+  transition: width .35s cubic-bezier(.16,1,.3,1), transform .28s ease;
+}
+.island-heading, .lp-heading-word, .island-toggle { white-space: nowrap !important; }
+@media (max-width: 820px) {
+  .island-stage:not([data-open="true"]) .island-hit {
+    width: min(336px, calc(100% - 20px));
+  }
+  #island-links a {
+    font-size: clamp(18px, 4.7vw, 22px) !important;
+    line-height: 1.1;
+  }
+  .island-hit #island-links {
+    grid-template-columns: repeat(2, max-content);
+    gap: 0 clamp(16px, 5vw, 34px);
+    padding: 0 8px;
+    justify-content: center;
+  }
+  .island-toggle { font-size: clamp(38px, 10vw, 46px); }
+}
+@media(max-width:460px) {
+  .liquid-subpage .lp-preview-toolbar > .map-preview__resolution,
+  .liquid-subpage .lp-preview-toolbar .map-preview__zoom,
+  .liquid-subpage .lp-preview-toolbar > .lp-theater-enter,
+  .liquid-subpage .lp-preview-toolbar > .lp-theater-exit {
+    height: 34px !important; min-height:34px !important; font-size: 9px !important;
+  }
+  .liquid-subpage .lp-preview-toolbar > .lp-theater-enter,
+  .liquid-subpage .lp-preview-toolbar > .lp-theater-exit,
+  .liquid-subpage .modal.lp-theater .lp-preview-toolbar > .lp-theater-exit {
+    width:34px !important; min-width:34px !important; height:34px !important;
+  }
+  #island-links a { font-size: clamp(17px, 5vw, 20px) !important; }
+}
+
+/* v17: let the single liquid engine own entrance scaling.
+   Scaling the entire gallery stage scaled its viewport-sized canvas too,
+   clipping the island on one side before landing. Translate only. */
+@media (prefers-reduced-motion: no-preference) {
+  .liquid-subnav .island-stage {
+    animation-name: lp-island-land-v17;
+    animation-duration: .78s;
+    animation-timing-function: cubic-bezier(.2,.8,.22,1);
+  }
+}
+@keyframes lp-island-land-v17 {
+  0%   { opacity: .35; transform: translateY(74px); }
+  48%  { opacity: 1; transform: translateY(-9px); }
+  73%  { transform: translateY(3px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@media (max-width:820px) {
+  .liquid-subnav .island-stage[data-open="true"] .island-hit {
+    width: calc(100% - 28px);
+  }
+}
+
+/* v17: on sufficiently spacious desktop screens, let the content's aspect
+   ratio determine the preview height. If it cannot fit, default sizing wins. */
+@media(min-width:960px) and (min-height:700px) {
+  .liquid-subpage .modal:not(.lp-theater) .modal__viewer[data-fluid-fit="true"] {
+    height: var(--lp-fluid-viewer-height) !important;
+    min-height: 0 !important;
+  }
+}
+
+
+/* v18: the compact island never exposes links before its menu is ready. */
+.island-stage:not([data-ready="true"]) #island-links {
+  pointer-events: none !important;
+}
+/* Reuse the natural document center position when returning from fullscreen.
+   The first open animation has already finished at this point. */
+.liquid-subpage .modal.lp-theater-used.is-open:not(.lp-theater):not(.is-closing) .modal__card {
+  animation: none !important;
+  transform: translate(-50%, -50%) !important;
+}
+/* Enter fullscreen with content and controls fading into place. */
+@keyframes lp-fullscreen-arrive {
+  from { opacity: 0; filter: brightness(.86); }
+  to { opacity: 1; filter: brightness(1); }
+}
+.liquid-subpage .modal.lp-theater .modal__viewer > .shared-panzoom-preview,
+.liquid-subpage .modal.lp-theater .modal__viewer > .map-preview,
+.liquid-subpage .modal.lp-theater .modal__viewer > .timelapse-preview,
+.liquid-subpage .modal.lp-theater .modal__viewer > video,
+.liquid-subpage .modal.lp-theater .modal__viewer > iframe {
+  animation: lp-fullscreen-arrive .36s cubic-bezier(.2,.75,.3,1) both !important;
+}
+.liquid-subpage .modal.lp-theater .lp-preview-toolbar {
+  animation: lp-fullscreen-arrive .36s .10s ease both;
+}
+/* Fixed, accessible gallery jump shortcut (only while scrolling upward). */
+.liquid-subpage .lp-jump-top {
+  position: fixed;
+  z-index: 42;
+  left: 50%;
+  top: calc(14px + env(safe-area-inset-top, 0px));
+  transform: translate(-50%, -16px) scale(.93);
+  opacity: 0;
+  pointer-events: none;
+  border: 1px solid #555;
+  border-radius: 9999px;
+  padding: 13px 23px;
+  color: white;
+  background: rgb(29 29 29 / 90%);
+  backdrop-filter: blur(10px);
+  font: 12px MCFive,monospace;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform .34s cubic-bezier(.2,1.2,.3,1), opacity .22s ease;
+}
+.liquid-subpage .lp-jump-top.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%,0) scale(1);
+}
+.liquid-subpage .lp-jump-top:hover,
+.liquid-subpage .lp-jump-top:focus-visible {
+  background: #363636;
+  transform: translate(-50%,-3px) scale(1.04);
+}
+.liquid-subpage .lp-jump-top:active {
+  transform: translate(-50%,2px) scale(.98);
+}
+@media(prefers-reduced-motion:reduce) {
+  .liquid-subpage .modal.lp-theater .modal__viewer > *,
+  .liquid-subpage .modal.lp-theater .lp-preview-toolbar {
+    animation: none !important;
+  }
+  .liquid-subpage .lp-jump-top { transition: none !important; }
+}
+
+
+/* v19: page-colored native scrollbars, with no contrasting track or arrows.
+   Color is assigned to the root scroll container so all page themes work. */
+html:has(body.liquid-home),
+html:has(body.liquid-subpage) {
+  --lp-scroll-thumb: #00aaff;
+  scrollbar-width: thin;
+  scrollbar-color: var(--lp-scroll-thumb) #141414;
+}
+html:has(body.theme-animations) { --lp-scroll-thumb: #598ffe; }
+html:has(body.theme-editing) { --lp-scroll-thumb: #f0593a; }
+html:has(body.theme-design) { --lp-scroll-thumb: #894bdd; }
+html:has(body.theme-art) { --lp-scroll-thumb: #fbbc42; }
+html:has(body.liquid-home)::-webkit-scrollbar,
+html:has(body.liquid-subpage)::-webkit-scrollbar { width: 9px; height: 9px; }
+html:has(body.liquid-home)::-webkit-scrollbar-track,
+html:has(body.liquid-subpage)::-webkit-scrollbar-track,
+html:has(body.liquid-home)::-webkit-scrollbar-corner,
+html:has(body.liquid-subpage)::-webkit-scrollbar-corner {
+  background: #141414;
+}
+html:has(body.liquid-home)::-webkit-scrollbar-thumb,
+html:has(body.liquid-subpage)::-webkit-scrollbar-thumb {
+  background: var(--lp-scroll-thumb);
+  border: 2px solid #141414;
+  border-radius: 999px;
+}
+html:has(body.liquid-home)::-webkit-scrollbar-button,
+html:has(body.liquid-subpage)::-webkit-scrollbar-button {
+  display: none; width: 0; height: 0;
+}
+
+/* Match gallery chips exactly; independent translation preserves centering. */
+.liquid-subpage .lp-jump-top {
+  border: var(--ui-border) !important;
+  background: #1b1b1b !important;
+  color: var(--text) !important;
+  padding: 10px 14px !important;
+  font: 12px MCFive, Minecraftia, sans-serif !important;
+  line-height: normal;
+  box-shadow: none !important;
+  backdrop-filter: none;
+  border-radius: 9999px !important;
+}
+.liquid-subpage .lp-jump-top:hover,
+.liquid-subpage .lp-jump-top:focus-visible {
+  border-color: var(--accent) !important;
+  background: #1b1b1b !important;
+}
+
+/* All fullscreen surfaces are truly black, including the pan/zoom viewport. */
+.liquid-subpage .modal.lp-theater .modal__backdrop,
+.liquid-subpage .modal.lp-theater .modal__card,
+.liquid-subpage .modal.lp-theater .modal__viewer,
+.liquid-subpage .modal.lp-theater .map-preview,
+.liquid-subpage .modal.lp-theater .map-preview__viewport,
+.liquid-subpage .modal.lp-theater .shared-panzoom-preview {
+  background: #000 !important;
+}
+
+
+/* v20 — native gallery scrollbar with reserved width and auto-hiding thumb.
+   The scrollbar remains functional; its TRACK is the site background. */
+html:has(body.liquid-subpage) {
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: transparent #141414;
+}
+html.lp-scroll-active:has(body.liquid-subpage) {
+  scrollbar-color: var(--lp-scroll-thumb) #141414;
+}
+html:has(body.liquid-subpage)::-webkit-scrollbar-thumb {
+  background: transparent;
+  border: 2px solid #141414;
+  border-radius: 999px;
+}
+html.lp-scroll-active:has(body.liquid-subpage)::-webkit-scrollbar-thumb {
+  background: var(--lp-scroll-thumb);
+}
+html:has(body.liquid-subpage)::-webkit-scrollbar-track {
+  background: #141414;
+}
+
+/* The homepage intentionally has NO visible scrollbar but still scrolls. */
+html:has(body.liquid-home) {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+html:has(body.liquid-home)::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* Match chip-sized corner, border and spring feedback for the TOP control. */
+.liquid-subpage .lp-jump-top {
+  border-width: 2px !important;
+  border-style: solid !important;
+  border-color: var(--stroke2) !important;
+}
+.liquid-subpage .lp-jump-top:is(:hover,:focus-visible) {
+  border-color: var(--accent) !important;
+}
+
+/* Gallery islands have a little more space at the top in both layouts. */
+.liquid-subpage .liquid-subnav {
+  padding-top: 18px !important;
+}
+@media (max-width: 820px) {
+  .liquid-subpage .liquid-subnav { padding-top: 23px !important; }
+}
+
+
+
+/* v22 — the island and its supporting copy form ONE moving layout group.
+   Copy can fade independently, but never drifts toward or across the island. */
+.liquid-home .home-hero-core {
+  transform: translateY(var(--lp-home-hero-offset, clamp(48px, 10svh, 110px))) !important;
+  transition: none !important;
+}
+@media (max-width: 600px) {
+  .liquid-home .home-hero-core {
+    transform: translateY(var(--lp-home-hero-offset, clamp(35px, 7svh, 68px))) !important;
+  }
+}
+.liquid-home .home-copy {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(12px);
+  pointer-events: none;
+  transition: opacity .55s ease, transform .60s cubic-bezier(.18,.8,.28,1),
+              visibility 0s linear .60s;
+}
+.liquid-home.lp-scrolled .home-copy {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  pointer-events: auto;
+  transition: opacity .55s ease, transform .60s cubic-bezier(.18,.8,.28,1),
+              visibility 0s;
+}
+/* Do NOT override .island-detail animations: the original JS spring plays
+   on the colored text, and handles quick hover-out fades. */
+.liquid-home .home-copy .island-hint,
+.liquid-home .home-copy .intro {
+  animation: none !important;
+}
+.liquid-home .liquid-footer {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(12px);
+  pointer-events: none;
+  transition: opacity .55s ease, transform .60s ease,
+              visibility 0s linear .60s;
+}
+.liquid-home.lp-scrolled .liquid-footer {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  pointer-events: auto;
+  transition: opacity .55s ease, transform .60s ease, visibility 0s;
+}
+.liquid-home .liquid-footer nav,
+.liquid-home .liquid-footer p { animation: none !important; }
+/* Enough natural scroll range to reveal copy even on tall phone screens.
+   This is after the footer, so it never changes island-to-copy spacing. */
+.liquid-home::after {
+  content: '';
+  display: block;
+  flex: 0 0 clamp(120px, 18svh, 175px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .liquid-home .home-copy,
+  .liquid-home .liquid-footer { transition: none; }
+}
+
+/* v24: reserve actual document space between the translated island/copy
+   and the footer. The footer is never overlaid on the intro while scrolling. */
+body.liquid-home .liquid-footer {
+  margin: clamp(148px, 17svh, 215px) auto 0 !important;
+  flex-shrink: 0;
+}
+@media(max-width:600px) {
+  body.liquid-home .liquid-footer {
+    margin-top: 155px !important;
+  }
+}
+
+/* v25: the footer belongs to the same moving/revealing block as the intro.
+   No independent scroll-time transform or different relative speed. */
+body.liquid-home .home-copy > .liquid-footer {
+  position: relative;
+  width: min(1120px,100%);
+  margin: clamp(52px, 7svh, 88px) auto 0 !important;
+  padding: 10px 20px 24px;
+  flex: none;
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: none !important;
+  transition: none !important;
+  pointer-events: auto;
+}
+body.liquid-home .home-copy > .liquid-footer nav,
+body.liquid-home .home-copy > .liquid-footer p {
+  animation: none !important;
+  transform: none !important;
+}
+@media(max-width:600px){
+  body.liquid-home .home-copy > .liquid-footer {
+    margin-top: 54px !important;
+    padding: 10px 10px 28px;
+  }
+}

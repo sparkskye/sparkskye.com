@@ -245,14 +245,74 @@ function renderModalStats(it) {
   }
 }
 
+let currentGalleryItem = null, galleryNavigationBusy = false, modalCloseTimer = 0;
+let itemMotion = null;
+function stopItemMotion() { itemMotion?.cancel(); itemMotion = null; }
+function exitTheater() { els.modal.classList.remove('lp-theater'); }
+(function addTheaterControl(){
+  const card = els.modal.querySelector('.modal__card');
+  const viewer = els.modalViewer;
+  const enter = document.createElement('button');
+  enter.className = 'lp-theater-enter';
+  enter.type = 'button';
+  enter.title = 'Fullscreen';
+  enter.setAttribute('aria-label', 'Fullscreen');
+  enter.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M21 16v5h-5M3 16v5h5"/></svg>';
+  enter.addEventListener('click', e => {
+    e.stopPropagation();
+    els.modal.classList.add('lp-theater', 'lp-preview-active', 'lp-theater-used');
+  });
+  // File and item changes recreate the viewer. Reattach the overlay afterward.
+  const exit = document.createElement('button');
+  exit.className = 'lp-theater-exit';
+  exit.type = 'button';
+  exit.title = 'Exit fullscreen';
+  exit.setAttribute('aria-label', 'Exit fullscreen');
+  exit.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9h6V3M21 9h-6V3M21 15h-6v6M3 15h6v6"/></svg>';
+  exit.addEventListener('click', e => { e.stopPropagation(); exitTheater(); });
+  const keepInsideViewer = () => {
+    let toolbar = viewer.querySelector(':scope > .lp-preview-toolbar');
+    if (!toolbar) {
+      toolbar = document.createElement('div');
+      toolbar.className = 'lp-preview-toolbar';
+      toolbar.setAttribute('role', 'group');
+      toolbar.setAttribute('aria-label', 'Preview controls');
+      viewer.appendChild(toolbar);
+    }
+    // The pan/zoom viewer is rebuilt for each image. Move its accessible
+    // controls into the stable toolbar without recreating the handlers.
+    const panzoom = viewer.querySelector('.shared-panzoom-preview');
+    const dimensions = panzoom?.querySelector('.map-preview__resolution');
+    const zoom = panzoom?.querySelector('.map-preview__controls');
+    if (dimensions && dimensions.parentNode !== toolbar) {
+      toolbar.insertBefore(dimensions, toolbar.firstChild);
+    }
+    if (zoom && zoom.parentNode !== toolbar) {
+      toolbar.insertBefore(zoom, enter.parentNode === toolbar ? enter : null);
+    }
+    if (enter.parentNode !== toolbar) toolbar.appendChild(enter);
+    if (exit.parentNode !== toolbar) toolbar.appendChild(exit);
+  };
+  keepInsideViewer();
+  new MutationObserver(keepInsideViewer).observe(viewer, { childList: true });
+  // Exit fullscreen reuses the centered toolbar control slot.
+})();
+window.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && els.modal.classList.contains('lp-theater')) {
+    e.preventDefault(); e.stopImmediatePropagation(); exitTheater();
+  }
+}, true);
 function openModal(it, opts = {}) {
+  clearTimeout(modalCloseTimer);
+  els.modal.classList.remove('is-closing');
+  currentGalleryItem=it;
   const wasOpen = els.modal.classList.contains("is-open");
   if (!wasOpen) state.lastNonPreviewUrl = getPreviewlessHref();
   const previewLink = buildPreviewLink(it);
 
   els.modal.classList.add("is-open");
   els.modal.setAttribute("aria-hidden", "false");
-  state.lastFocus = document.activeElement;
+  if (!wasOpen) state.lastFocus = document.activeElement;
   try { els.modalClose?.focus?.(); } catch {}
   lockBodyScroll();
   if (!opts.skipUrlUpdate) history.replaceState({}, "", previewLink);
@@ -283,8 +343,18 @@ function openModal(it, opts = {}) {
 }
 
 function closeModal(opts = {}) {
+  stopItemMotion();
+  if (els.modal.classList.contains('lp-theater')) { exitTheater(); return; }
+  if (!opts.afterAnimation && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    if (els.modal.classList.contains('is-closing')) return;
+    els.modal.classList.add('is-closing');
+    modalCloseTimer=setTimeout(()=>closeModal({...opts,afterAnimation:true}),360);
+    return;
+  }
+  els.modal.classList.remove('is-closing');
   try { state.lastFocus?.focus?.(); } catch {}
   els.modal.classList.remove("is-open");
+  els.modal.classList.remove('lp-theater-used');
   els.modal.setAttribute("aria-hidden", "true");
   els.modalViewer.innerHTML = '<div class="viewer__loading" id="modalLoading">Loading...</div>';
   unlockBodyScroll();
@@ -352,3 +422,59 @@ window.addEventListener("popstate", async () => {
 
 initMobileNav();
 loadDataAndRender();
+
+// Navigate the currently filtered gallery; variations remain on their own buttons.
+function navigateGalleryItem(direction) {
+  if (!els.modal.classList.contains('is-open') || els.modal.classList.contains('is-closing')) return;
+  const index = state.filtered.findIndex(it => it.id === currentGalleryItem?.id);
+  const next = state.filtered[index + direction];
+  if (index < 0 || !next) return;
+  const rapid = Boolean(itemMotion);
+  stopItemMotion();
+  openModal(next);
+  if (rapid || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  // Move the preview content, not the modal window. Fast input cancels motion.
+  const distance = direction * 78;
+  const frames = [
+    { transform: `translateX(${distance}px)`, opacity: .18, offset: 0 },
+    { transform: `translateX(${-direction * 6}px)`, opacity: 1, offset: .8 },
+    { transform: 'translateX(0px)', opacity: 1, offset: 1 }
+  ];
+  const settings = { duration: 340, easing: 'cubic-bezier(.16,.82,.3,1)', fill: 'both' };
+  const viewerMotion = els.modalViewer.animate(frames, settings);
+  const metaMotion = els.modal.querySelector('.modal__meta').animate(frames, {...settings,duration:370});
+  const pair = { cancel: () => { viewerMotion.cancel(); metaMotion.cancel(); } };
+  itemMotion = pair;
+  metaMotion.onfinish = () => {
+    if (itemMotion === pair) {
+      pair.cancel();
+      itemMotion = null;
+    }
+  };
+}
+
+window.addEventListener('keydown',e=>{
+  if(e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.target.closest?.('input,textarea,select,[contenteditable=true]')) return;
+  if(els.modal.classList.contains('is-open') && ['ArrowLeft','ArrowRight'].includes(e.key)) {
+    e.preventDefault(); navigateGalleryItem(e.key==='ArrowRight'?1:-1);
+  }
+});
+// Gallery swipes start only OUTSIDE the content viewer. Inside the viewer,
+// one-finger panning and two-finger pinching always belong to the media.
+let gallerySwipe = null;
+els.modal.addEventListener('pointerdown', e => {
+  if (e.pointerType !== 'touch' || !els.modal.classList.contains('is-open')) return;
+  if (els.modalViewer.contains(e.target) || e.target.closest('button,a,input,video,iframe')) return;
+  gallerySwipe = {id:e.pointerId,x:e.clientX,y:e.clientY};
+}, true);
+els.modal.addEventListener('pointerup', e => {
+  if (!gallerySwipe || gallerySwipe.id !== e.pointerId) return;
+  const dx=e.clientX-gallerySwipe.x, dy=e.clientY-gallerySwipe.y;
+  gallerySwipe=null;
+  if (Math.abs(dx)>64 && Math.abs(dx)>Math.abs(dy)*1.35)
+    navigateGalleryItem(dx<0?1:-1);
+}, true);
+els.modal.addEventListener('pointercancel', e => {
+  if (gallerySwipe?.id===e.pointerId) gallerySwipe=null;
+}, true);

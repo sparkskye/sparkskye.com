@@ -264,6 +264,8 @@ export class ModalPreview {
 
   async open(modelUrl) {
     this.close();
+    // Each new item invalidates any unresolved previous model load.
+    const generation = this._openGeneration;
     this.disposed = false;
 
     this.canvas = document.createElement("canvas");
@@ -305,15 +307,27 @@ export class ModalPreview {
     this.controls.dampingFactor = 0.08;
     this.controls.enablePan = false;
 
-    this.root = await loadScene(modelUrl);
-    if (this.disposed) return;
-
+    const loadedRoot = await loadScene(modelUrl);
+    if (this.disposed || generation !== this._openGeneration) {
+      disposeObject3D(loadedRoot);
+      return;
+    }
+    this.root = loadedRoot;
     forceNearestAndUnlit(this.root);
     this.scene.add(this.root);
     centerAndFrame(this.root, this.camera);
 
     this.controls.target.set(0, 0, 0);
     this.controls.update();
+    this.controls.saveState();
+    const initialDistance=this.camera.position.distanceTo(this.controls.target);
+    const emitZoom=()=>{
+      if(this.disposed)return;
+      const percent=Math.round(100*initialDistance/Math.max(.001,this.camera.position.distanceTo(this.controls.target)));
+      this.container.dispatchEvent(new CustomEvent('spark-model-zoom',{detail:{percent}}));
+    };
+    this.controls.addEventListener('change',emitZoom);
+    emitZoom();
 
     const tick = () => {
       if (this.disposed) return;
@@ -325,7 +339,14 @@ export class ModalPreview {
     tick();
   }
 
+  resetView() {
+    if (!this.controls || !this.camera || !this.root) return;
+    this.controls.reset();
+    this.controls.update();
+  }
+
   close() {
+    this._openGeneration = (this._openGeneration || 0) + 1;
     this.disposed = true;
     if (this.raf) cancelAnimationFrame(this.raf);
     this.raf = null;

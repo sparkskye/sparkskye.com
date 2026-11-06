@@ -706,7 +706,11 @@ function mountMapPreview(it, thumbSrc) {
 
   const zoomGroup = document.createElement("div");
   zoomGroup.className = "map-preview__group";
-  const zoomLabel = document.createElement("span");
+  const zoomLabel = document.createElement("button");
+  zoomLabel.type = "button";
+  zoomLabel.title = "Reset zoom and position";
+  zoomLabel.setAttribute("aria-label", "Reset zoom and position");
+  window.SparkGalleryMotion?.bindResetControl(zoomLabel, () => scheduleFitMapToView());
   zoomLabel.className = "map-preview__zoom";
   zoomLabel.textContent = "100%";
   zoomLabel.setAttribute("aria-live", "polite");
@@ -922,16 +926,8 @@ function handleMapModalKeydown(e) {
     panMap(0, -64);
     return true;
   }
-  if (e.key === "ArrowLeft") {
-    e.preventDefault();
-    panMap(64, 0);
-    return true;
-  }
-  if (e.key === "ArrowRight") {
-    e.preventDefault();
-    panMap(-64, 0);
-    return true;
-  }
+  // Left/right arrows navigate gallery items, matching all other galleries.
+  // Up/down remain available for map panning.
   return false;
 }
 
@@ -1050,6 +1046,20 @@ function maybeOpenPreviewFromUrl() {
   openModal(match, { skipUrlUpdate: true });
 }
 
+// Shares keyboard and outside-content swipe navigation with all galleries.
+const registerHiveNavigation = () => {
+  window.SparkGalleryMotion?.registerNavigation({
+  modal:els.modal, viewer:els.modalViewer,
+  getItems:()=>state.filtered,
+  getCurrentId:()=>state.activePreviewId,
+  getItemId:it=>it.glbId || it.thumbId,
+  openItem:it=>openModal(it)
+});
+};
+// Deferred classics and modules can initialize in different orders.
+// DOMContentLoaded is guaranteed after the deferred shared script is ready.
+if (window.SparkGalleryMotion?.registerNavigation) registerHiveNavigation();
+else window.addEventListener("DOMContentLoaded",registerHiveNavigation,{once:true});
 els.modalBackdrop.addEventListener("click", () => closeModal());
 els.modalClose.addEventListener("click", () => closeModal());
 window.addEventListener("keydown", (e) => {
