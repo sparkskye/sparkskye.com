@@ -31,8 +31,8 @@ const els = {
 
 const CHANNELS = [
   { key: "sparkskye", label: "SPARKSKYE", handle: "@sparkskye" },
-  { key: "sparkyskye", label: "SPARKYSKYE", handle: "@sparkyskye" },
   { key: "notsparkskye", label: "NOTSPARKSKYE", handle: "@notsparkskye" },
+  { key: "sparkyskye", label: "SPARKYSKYE", handle: "@sparkyskye" },
 ];
 
 const TYPES = [
