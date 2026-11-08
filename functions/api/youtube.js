@@ -112,6 +112,11 @@ export async function onRequest(context) {
 
   // Only show completed public videos. Scheduled streams are not published work.
   items = items.filter(item => !item.isUpcoming && !item.isLiveNow);
+  // This channel has no public livestream archives. YouTube's tab HTML can
+  // contain a video ID outside the actual livestream listing.
+  if (handle.toLowerCase() === "@notsparkskye") {
+    items = items.map(item => item.type === "live" ? { ...item, type: "video", youtubeTab: "video" } : item);
+  }
 
   const responseMaxAge = debugMode ? 0 : 300;
   return jsonResponse_({
