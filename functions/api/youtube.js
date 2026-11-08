@@ -343,19 +343,35 @@ async function fetchChannelTabIds_(url, kind, debug) {
 function extractIdsFromChannelTab_(html, kind) {
   const text = String(html || "");
   const ids = new Set();
-
-  // Shorts are safest to identify from /shorts/<id> URLs.
-  if (kind === "short") {
-    addMatches_(ids, text, /\/(?:shorts)\/([a-zA-Z0-9_-]{11})/g);
-    addMatches_(ids, text, /%2Fshorts%2F([a-zA-Z0-9_-]{11})/g);
-    if (ids.size) return ids;
-  }
-
-  // Videos and livestream archives usually appear as videoId fields and watch URLs.
-  addMatches_(ids, text, /"videoId"\s*:\s*"([a-zA-Z0-9_-]{11})"/g);
-  addMatches_(ids, text, /watch\?v=([a-zA-Z0-9_-]{11})/g);
-  addMatches_(ids, text, /watch%3Fv%3D([a-zA-Z0-9_-]{11})/g);
-  addMatches_(ids, text, /%2Fwatch%3Fv%3D([a-zA-Z0-9_-]{11})/g);
+  // Read only the selected tab's initial video grid. Broad matching of every
+  // videoId in the HTML also captures recommendations and unrelated metadata.
+  const marker = 'var ytInitialData = ';
+  const start = text.indexOf(marker);
+  if (start < 0) return ids;
+  const jsonStart = text.indexOf('{', start + marker.length);
+  if (jsonStart < 0) return ids;
+  let data;
+  try {
+    const end = text.indexOf(';</script>', jsonStart);
+    data = JSON.parse(text.slice(jsonStart, end < 0 ? undefined : end));
+  } catch { return ids; }
+  const tabs = data?.contents?.twoColumnBrowseResultsRenderer?.tabs || [];
+  const selected = tabs.find(tab => tab.tabRenderer?.selected)?.tabRenderer;
+  if (!selected?.content) return ids;
+  const visit = (node) => {
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node)) { node.forEach(visit); return; }
+    const renderer = node.richItemRenderer?.content || node;
+    const id = kind === 'short'
+      ? renderer.reelItemRenderer?.videoId || renderer.shortsLockupViewModel?.onTap?.innertubeCommand?.reelWatchEndpoint?.videoId
+      : renderer.videoRenderer?.videoId || renderer.gridVideoRenderer?.videoId;
+    if (typeof id === 'string' && /^[a-zA-Z0-9_-]{11}$/.test(id)) ids.add(id);
+    for (const [key,value] of Object.entries(node)) {
+      if (key === 'metadata' || key === 'trackingParams') continue;
+      visit(value);
+    }
+  };
+  visit(selected.content);
   return ids;
 }
 
