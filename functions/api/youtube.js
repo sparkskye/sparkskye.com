@@ -110,6 +110,9 @@ export async function onRequest(context) {
     }
   }
 
+  // Only show completed public videos. Scheduled streams are not published work.
+  items = items.filter(item => !item.isUpcoming && !item.isLiveNow);
+
   const responseMaxAge = debugMode ? 0 : 300;
   return jsonResponse_({
     source: "youtube",
@@ -270,6 +273,8 @@ async function fetchVideoDetails_(ids, apiKey, debug, stepPrefix = "video-detail
         url: `https://www.youtube.com/watch?v=${item.id}`,
         embedUrl: `https://www.youtube.com/embed/${item.id}`,
         statsReady: true,
+        isUpcoming: snip.liveBroadcastContent === "upcoming" || Boolean(item.liveStreamingDetails?.scheduledStartTime && !item.liveStreamingDetails?.actualStartTime),
+        isLiveNow: snip.liveBroadcastContent === "live" || Boolean(item.liveStreamingDetails?.actualStartTime && !item.liveStreamingDetails?.actualEndTime),
       });
     }
   }
@@ -298,16 +303,15 @@ async function fetchJson_(url, ttl, step, debug) {
 async function fetchChannelTabTypes_(handle, debug) {
   const base = `https://www.youtube.com/${encodeURIComponent(handle)}`;
   const tabs = [
-    { kind: "video", path: "/videos" },
     { kind: "live", path: "/streams" },
+    { kind: "video", path: "/videos" },
     { kind: "short", path: "/shorts" },
   ];
 
   const map = new Map();
   const counts = { video: 0, short: 0, live: 0 };
 
-  // Intentional order: VIDEOS first, then LIVESTREAMS, then SHORTS.
-  // If YouTube repeats an ID in more than one page, the more specific tabs win.
+  // Prefer Shorts, then Videos, then Streams when an ID appears on multiple tabs.
   for (const tab of tabs) {
     const ids = await fetchChannelTabIds_(`${base}${tab.path}`, tab.kind, debug);
     counts[tab.kind] = ids.size;
