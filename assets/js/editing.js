@@ -11,6 +11,7 @@ import {
 } from "./ui.js";
 
 const els = {
+  channelChips: qs("#channelChips"),
   typeChips: qs("#typeChips"),
   sortChips: qs("#sortChips"),
   search: qs("#searchInput"),
@@ -28,6 +29,12 @@ const els = {
   modalCopy: qs("#modalCopy"),
 };
 
+const CHANNELS = [
+  { key: "sparkskye", label: "SPARKSKYE", handle: "@sparkskye" },
+  { key: "sparkyskye", label: "SPARKYSKYE", handle: "@sparkyskye" },
+  { key: "notsparkskye", label: "NOTSPARKSKYE", handle: "@notsparkskye" },
+];
+
 const TYPES = [
   { key: "videos", label: "VIDEOS", matches: ["video"] },
   { key: "shorts", label: "SHORTS", matches: ["short"] },
@@ -41,6 +48,7 @@ const SORTS = [
 ];
 
 const state = {
+  channel: getUrlParam("channel", "sparkskye"),
   type: getUrlParam("type", "videos"),
   sort: getUrlParam("sort", "date"),
   q: getUrlParam("q", ""),
@@ -99,6 +107,23 @@ function makeChip({ label, active, onClick }) {
   b.textContent = label;
   b.addEventListener("click", onClick);
   return b;
+}
+
+function renderChannelChips() {
+  clearNode(els.channelChips);
+  for (const channel of CHANNELS) {
+    els.channelChips.appendChild(makeChip({
+      label: channel.label,
+      active: state.channel === channel.key,
+      onClick: () => {
+        if (state.channel === channel.key) return;
+        state.channel = channel.key;
+        setUrlParam("channel", state.channel);
+        renderChannelChips();
+        loadDataAndRender();
+      },
+    }));
+  }
 }
 
 function renderTypeChips() {
@@ -390,11 +415,16 @@ function stopLoading() {
   gridLoadingStop = null;
 }
 
+let editingLoadSeq = 0;
 async function loadDataAndRender() {
+  const seq = ++editingLoadSeq;
+  const channel = CHANNELS.find(c => c.key === state.channel) || CHANNELS[0];
   showLoading();
+  renderChannelChips();
   renderTypeChips();
   renderSortChips();
-  const json = await fetchEditingVideos(state.sort).catch((err) => ({ items: [], error: err.message }));
+  const json = await fetchEditingVideos(state.sort, channel.handle).catch((err) => ({ items: [], error: err.message }));
+  if (seq !== editingLoadSeq) return;
   state.items = Array.isArray(json?.items) ? json.items : [];
   stopLoading();
   applyFiltersAndRenderGrid();
@@ -412,6 +442,7 @@ els.search.addEventListener("input", debounce(() => {
 }, 120));
 
 window.addEventListener("popstate", async () => {
+  state.channel = getUrlParam("channel", "sparkskye");
   state.type = getUrlParam("type", "videos");
   state.sort = getUrlParam("sort", "date");
   state.q = getUrlParam("q", "");
