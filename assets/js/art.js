@@ -82,6 +82,11 @@ function modelPreviewUrl(file) {
 }
 
 function clearNode(node) { while (node?.firstChild) node.removeChild(node.firstChild); }
+function showcaseOnly(it) {
+  if(it?.showcaseOnly) return true;
+  const files=[...Object.values(it?.files||{}),...(it?.formats||[]),...(it?.variations||[])];
+  return files.some(f=>/^\\s*\\?/.test(String(f?.name||'')));
+}
 function slugify(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""); }
 function extFor(file) { return String(file?.ext || file?.key || "file").replace(/^\./, "").toLowerCase(); }
 function dateValue(v) { const t = new Date(v || 0).getTime(); return Number.isFinite(t) ? t : 0; }
@@ -91,6 +96,8 @@ function filenameFor(it, file) {
   return `${base || "art"}.${ext}`;
 }
 function itemKind(it) { return String(it?.kind || (it?.files?.gltf || it?.files?.glb ? "model" : it?.trailer ? "texture-pack" : "image")).toLowerCase(); }
+function isWearable(it) { return itemKind(it)==='skin' || itemKind(it)==='cape'; }
+function isShowcase(it) { return showcaseOnly(it); }
 function isModelItem(it) { return itemKind(it) === "model"; }
 function isTexturePackItem(it) { return itemKind(it) === "texture-pack"; }
 function modelFile(it) { return it.files?.gltf || it.files?.glb || it.formats?.find((f) => ["gltf", "glb"].includes(f.key)); }
@@ -104,6 +111,7 @@ function inlineFileUrl(file) {
   return `/api/file?${params.toString()}`;
 }
 function formatList(it) {
+  if (isWearable(it)) return itemKind(it) === "cape" ? "cape texture" : "skin texture";
   if (isTexturePackItem(it)) {
     const labels = [];
     if (it.trailer) labels.push("trailer");
@@ -139,6 +147,7 @@ function imageUrl(it, opts = {}) {
 }
 function cardThumbUrl(it) {
   if (isModelItem(it)) return "";
+  if (isWearable(it)) return it.thumbnailUrl || it.imagePreviewUrl;
   if (isTexturePackItem(it)) return it.thumbnailUrl || it.trailer?.thumbnail || "/public/img/favicon.png";
   return imageUrl(it);
 }
@@ -365,8 +374,39 @@ function scheduleModelCardPreview(card, it) {
   }
 }
 
+let wearableCardPending=Promise.resolve();
+const capeCardAnimations=new Map();
+function stopCapeCardAnimations(){
+  for(const timer of capeCardAnimations.values())clearInterval(timer);
+  capeCardAnimations.clear();
+}
+const wearableCardObserver = new IntersectionObserver((entries)=>{
+  for(const entry of entries){
+    if(!entry.isIntersecting)continue;
+    wearableCardObserver.unobserve(entry.target);
+    const card=entry.target,it=card.__wearableItem;
+    if(!it)continue;
+    const viewer=card.querySelector('.card__viewer');
+    wearableCardPending=wearableCardPending.catch(()=>{}).then(async()=>{
+      let session=null;
+      try{
+        const mod=await import('/assets/js/wearable-viewer.js');
+        if(!card.isConnected)return;
+        const stage=document.createElement('div');stage.className='wearable-card-stage';viewer.appendChild(stage);
+        session=await mod.createWearableViewer(stage,{kind:itemKind(it),textureUrl:imageFile(it)?.previewUrl||imageUrl(it),metadataUrl:it.animationMetadataUrl,card:true});
+        if(!card.isConnected)return;
+        const img=document.createElement('img');img.className='card__thumb';img.alt=it.name||'3D preview';img.src=session.snapshot();
+        viewer.replaceChildren(img);
+      }catch(err){console.warn('Wearable card preview failed',err);if(card.isConnected)viewer.replaceChildren(Object.assign(document.createElement('div'),{className:'card__placeholder',textContent:'PREVIEW FAILED'}))}
+      finally{session?.destroy?.()}
+    });
+  }
+},{rootMargin:'250px'});
+
 function renderGrid(items) {
+  stopCapeCardAnimations();
   disposeCardPreviews();
+  for(const card of els.grid.querySelectorAll(".card--skin, .card--cape"))wearableCardObserver.unobserve(card);
   els.grid.innerHTML = "";
   if (!items.length) {
     const q = String(state.q || "").trim();
@@ -386,7 +426,7 @@ function renderGrid(items) {
     const viewer = document.createElement("div");
     viewer.className = "card__viewer";
 
-    if (isModelItem(it)) {
+    if (isModelItem(it) || isWearable(it)) {
       const ph = document.createElement("div");
       ph.className = "card__placeholder";
       ph.textContent = "";
@@ -430,6 +470,7 @@ function renderGrid(items) {
     });
     els.grid.appendChild(card);
     if (isModelItem(it)) scheduleModelCardPreview(card, it);
+    if (isWearable(it)) { card.__wearableItem=it;wearableCardObserver.observe(card); }
   }
 }
 
@@ -437,7 +478,25 @@ function getPreviewlessHref() { const u = new URL(window.location.href); u.searc
 function buildPreviewLink(it) { const url = new URL(`${window.location.origin}/art/`); url.searchParams.set("preview", it.id); return url.toString(); }
 function buildShareLink(it) { return buildPreviewLink(it); }
 
+let wearableSession = null;
+async function showWearablePreview(it) {
+  wearableSession?.destroy?.(); wearableSession = null;
+  panZoomViewer?.destroy?.(); panZoomViewer=null;
+  els.modalViewer.innerHTML='<div class="viewer__loading">LOADING...</div>';
+  const file=imageFile(it);
+  const url=file?.previewUrl || imageUrl(it);
+  try {
+    const mod=await import('/assets/js/wearable-viewer.js');
+    if(currentGalleryItem!==it) return;
+    els.modalViewer.innerHTML='';
+    wearableSession=await mod.createWearableViewer(els.modalViewer,{kind:itemKind(it),textureUrl:url,metadataUrl:it.animationMetadataUrl});
+  } catch(e) {
+    console.warn('Wearable preview failed',e);
+    if(currentGalleryItem===it) showImagePreview(it);
+  }
+}
 function showImagePreview(it) {
+  wearableSession?.destroy?.(); wearableSession=null;
   panZoomViewer?.destroy?.();
   panZoomViewer = null;
   els.modalViewer.innerHTML = "";
@@ -488,6 +547,29 @@ async function showModelPreview(it) {
     const { ModalPreview } = await getPreview3dModule();
     activeModelModalPreview = new ModalPreview(els.modalViewer);
     await activeModelModalPreview.open(url);
+    // Use the same zoom control and stable preview toolbar as image previews.
+    const session=activeModelModalPreview;
+    const controls=session.controls;
+    const camera=session.camera;
+    if(controls && camera){
+      const zoomControls=document.createElement('div');
+      zoomControls.className='map-preview__controls';
+      const zoomGroup=document.createElement('div');
+      zoomGroup.className='map-preview__group';
+      const zoom=document.createElement('button');
+      zoom.type='button';
+      zoom.className='map-preview__zoom';
+      zoom.title='Reset model view';
+      zoom.setAttribute('aria-label','Reset model view');
+      const initialDistance=camera.position.distanceTo(controls.target);
+      const updateZoom=()=>{zoom.textContent=Math.round(100*initialDistance/Math.max(.001,camera.position.distanceTo(controls.target)))+'%';};
+      zoom.addEventListener('click',()=>{session.resetView();updateZoom();});
+      controls.addEventListener('change',updateZoom);
+      updateZoom();
+      zoomGroup.appendChild(zoom);
+      zoomControls.appendChild(zoomGroup);
+      els.modalViewer.appendChild(zoomControls);
+    }
   } catch (err) {
     console.warn("Art model modal preview failed", it?.name || file?.name || file?.fileId, err);
     try { activeModelModalPreview?.close?.(); } catch {}
@@ -545,7 +627,7 @@ function makeDownloadUrl(it, file) {
   });
 }
 async function downloadFile(it, file, button) {
-  if (!file) return;
+  if (!file || isShowcase(it)) return;
   if (!confirmRestrictedAssetDownload(it)) return;
   await downloadViaFetch(makeDownloadUrl(it, file), filenameFor(it, file), { button, fallbackUrl: driveBrowserDownloadUrl(file.fileId) });
 }
@@ -559,20 +641,20 @@ function makeActionButton(label, onClick, primary = false) {
   return b;
 }
 function addDownloadButton(it, file, label) {
-  if (!file) return null;
+  if (!file || isShowcase(it)) return null;
   const b = makeActionButton(label || `DOWNLOAD .${extFor(file).toUpperCase()}`, () => downloadFile(it, file, b));
   return b;
 }
 function renderImageActions(it) {
-  imagePreviewButton = makeActionButton("DOWNLOAD IMAGE", async () => {
-    if (activePreview === "image") await downloadFile(it, imageFile(it), imagePreviewButton);
+  imagePreviewButton = makeActionButton(isShowcase(it) ? "IMAGE" : "DOWNLOAD IMAGE", async () => {
+    if (activePreview === "image") { if (!isShowcase(it)) await downloadFile(it, imageFile(it), imagePreviewButton); }
     else { activePreview = "image"; showImagePreview(it); updatePreviewButtons(); }
   }, true);
 
   const shown = new Set(["image"]);
   if (it.files?.timelapse) {
     timelapsePreviewButton = makeActionButton("TIMELAPSE", async () => {
-      if (activePreview === "timelapse") await downloadFile(it, it.files.timelapse, timelapsePreviewButton);
+      if (activePreview === "timelapse") { if (!isShowcase(it)) await downloadFile(it, it.files.timelapse, timelapsePreviewButton); }
       else { activePreview = "timelapse"; showVideoFilePreview(it, it.files.timelapse); updatePreviewButtons(); }
     });
     shown.add("timelapse");
@@ -599,7 +681,7 @@ function updatePreviewButtons() {
 }
 function renderModelActions(it) {
   const main = modelFile(it);
-  if (main) {
+  if (main && !isShowcase(it)) {
     const b = makeActionButton(`DOWNLOAD .${extFor(main).toUpperCase()}`, () => downloadFile(it, main, b), true);
   }
   for (const f of it.formats || []) {
@@ -612,13 +694,73 @@ function renderTextureActions(it) {
   for (const f of it.formats || []) addDownloadButton(it, f, `DOWNLOAD .${extFor(f).toUpperCase()}`);
 }
 
+let currentGalleryItem = null, galleryNavigationBusy = false, modalCloseTimer = 0;
+let itemMotion = null;
+function stopItemMotion() { itemMotion?.cancel(); itemMotion = null; }
+function exitTheater() { els.modal.classList.remove('lp-theater'); }
+(function addTheaterControl(){
+  const card = els.modal.querySelector('.modal__card');
+  const viewer = els.modalViewer;
+  const enter = document.createElement('button');
+  enter.className = 'lp-theater-enter';
+  enter.type = 'button';
+  enter.title = 'Fullscreen';
+  enter.setAttribute('aria-label', 'Fullscreen');
+  enter.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M21 16v5h-5M3 16v5h5"/></svg>';
+  enter.addEventListener('click', e => {
+    e.stopPropagation();
+    els.modal.classList.add('lp-theater', 'lp-preview-active', 'lp-theater-used');
+  });
+  // File and item changes recreate the viewer. Reattach the overlay afterward.
+  const exit = document.createElement('button');
+  exit.className = 'lp-theater-exit';
+  exit.type = 'button';
+  exit.title = 'Exit fullscreen';
+  exit.setAttribute('aria-label', 'Exit fullscreen');
+  exit.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9h6V3M21 9h-6V3M21 15h-6v6M3 15h6v6"/></svg>';
+  exit.addEventListener('click', e => { e.stopPropagation(); exitTheater(); });
+  const keepInsideViewer = () => {
+    let toolbar = viewer.querySelector(':scope > .lp-preview-toolbar');
+    if (!toolbar) {
+      toolbar = document.createElement('div');
+      toolbar.className = 'lp-preview-toolbar';
+      toolbar.setAttribute('role', 'group');
+      toolbar.setAttribute('aria-label', 'Preview controls');
+      viewer.appendChild(toolbar);
+    }
+    // The pan/zoom viewer is rebuilt for each image. Move its accessible
+    // controls into the stable toolbar without recreating the handlers.
+    const panzoom = viewer.querySelector('.shared-panzoom-preview');
+    const dimensions = panzoom?.querySelector('.map-preview__resolution');
+    const zoom = panzoom?.querySelector('.map-preview__controls') || viewer.querySelector(':scope > .map-preview__controls');
+    if (dimensions && dimensions.parentNode !== toolbar) {
+      toolbar.insertBefore(dimensions, toolbar.firstChild);
+    }
+    if (zoom && zoom.parentNode !== toolbar) {
+      toolbar.insertBefore(zoom, enter.parentNode === toolbar ? enter : null);
+    }
+    if (enter.parentNode !== toolbar) toolbar.appendChild(enter);
+    if (exit.parentNode !== toolbar) toolbar.appendChild(exit);
+  };
+  keepInsideViewer();
+  new MutationObserver(keepInsideViewer).observe(viewer, { childList: true });
+  // Exit fullscreen reuses the centered toolbar control slot.
+})();
+window.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && els.modal.classList.contains('lp-theater')) {
+    e.preventDefault(); e.stopImmediatePropagation(); exitTheater();
+  }
+}, true);
 function openModal(it, opts = {}) {
+  clearTimeout(modalCloseTimer);
+  els.modal.classList.remove('is-closing');
+  currentGalleryItem=it;
   const wasOpen = els.modal.classList.contains("is-open");
   if (!wasOpen) state.lastNonPreviewUrl = getPreviewlessHref();
   const previewLink = buildPreviewLink(it);
   els.modal.classList.add("is-open");
   els.modal.setAttribute("aria-hidden", "false");
-  state.lastFocus = document.activeElement;
+  if (!wasOpen) state.lastFocus = document.activeElement;
   try { els.modalClose?.focus?.(); } catch {}
   lockBodyScroll();
   if (!opts.skipUrlUpdate) history.replaceState({}, "", previewLink);
@@ -629,7 +771,11 @@ function openModal(it, opts = {}) {
   variantLabelEl = null;
   activeVariationIndex = 0;
 
-  if (!isModelItem(it) && !isTexturePackItem(it)) {
+  if (isWearable(it)) {
+    activePreview = "wearable";
+    showWearablePreview(it);
+    if (!isShowcase(it)) addDownloadButton(it, imageFile(it), "DOWNLOAD PNG");
+  } else if (!isModelItem(it) && !isTexturePackItem(it)) {
     variantLabelEl = document.createElement("div");
     variantLabelEl.className = "modal__variant";
     els.modalName.insertAdjacentElement("afterend", variantLabelEl);
@@ -661,9 +807,20 @@ function openModal(it, opts = {}) {
 }
 
 function closeModal(opts = {}) {
+  stopItemMotion();
+  if (els.modal.classList.contains('lp-theater')) { exitTheater(); return; }
+  if (!opts.afterAnimation && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    if (els.modal.classList.contains('is-closing')) return;
+    els.modal.classList.add('is-closing');
+    modalCloseTimer=setTimeout(()=>closeModal({...opts,afterAnimation:true}),360);
+    return;
+  }
+  els.modal.classList.remove('is-closing');
   try { state.lastFocus?.focus?.(); } catch {}
   els.modal.classList.remove("is-open");
+  els.modal.classList.remove('lp-theater-used');
   els.modal.setAttribute("aria-hidden", "true");
+  wearableSession?.destroy?.(); wearableSession=null;
   panZoomViewer?.destroy?.();
   panZoomViewer = null;
   try { activeModelModalPreview?.close?.(); } catch {}
@@ -702,13 +859,17 @@ async function loadCategories() {
   state.categories = Array.isArray(res?.categories) ? res.categories : [];
   renderCategoryChips();
 }
+let artLoadSeq=0;
 async function loadDataAndRender() {
+  const mySeq=++artLoadSeq;
   showLoading();
   renderSortChips();
-  const res = await fetchArtItems(state.category).catch(() => ({ items: [], groups: [] }));
+  const requestedCategory=state.category;
+  const res = await fetchArtItems(requestedCategory).catch(() => ({ items: [], groups: [] }));
+  if(mySeq!==artLoadSeq)return;
   const direct = Array.isArray(res?.items) ? res.items : [];
   const groups = Array.isArray(res?.groups) ? res.groups : [];
-  const activeCategory = String(state.category || "all").toLowerCase();
+  const activeCategory = String(requestedCategory || "all").toLowerCase();
 
   let fromGroups = [];
   if (activeCategory === "all") {
@@ -788,3 +949,59 @@ loadCategories()
     els.count.textContent = "0 shown";
     els.grid.innerHTML = '<div class="empty-state">NO ART FILES FOUND.</div>';
   });
+
+// Navigate the currently filtered gallery; variations remain on their own buttons.
+function navigateGalleryItem(direction) {
+  if (!els.modal.classList.contains('is-open') || els.modal.classList.contains('is-closing')) return;
+  const index = state.filtered.findIndex(it => it.id === currentGalleryItem?.id);
+  const next = state.filtered[index + direction];
+  if (index < 0 || !next) return;
+  const rapid = Boolean(itemMotion);
+  stopItemMotion();
+  openModal(next);
+  if (rapid || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  // Move the preview content, not the modal window. Fast input cancels motion.
+  const distance = direction * 78;
+  const frames = [
+    { transform: `translateX(${distance}px)`, opacity: .18, offset: 0 },
+    { transform: `translateX(${-direction * 6}px)`, opacity: 1, offset: .8 },
+    { transform: 'translateX(0px)', opacity: 1, offset: 1 }
+  ];
+  const settings = { duration: 340, easing: 'cubic-bezier(.16,.82,.3,1)', fill: 'both' };
+  const viewerMotion = els.modalViewer.animate(frames, settings);
+  const metaMotion = els.modal.querySelector('.modal__meta').animate(frames, {...settings,duration:370});
+  const pair = { cancel: () => { viewerMotion.cancel(); metaMotion.cancel(); } };
+  itemMotion = pair;
+  metaMotion.onfinish = () => {
+    if (itemMotion === pair) {
+      pair.cancel();
+      itemMotion = null;
+    }
+  };
+}
+
+window.addEventListener('keydown',e=>{
+  if(e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.target.closest?.('input,textarea,select,[contenteditable=true]')) return;
+  if(els.modal.classList.contains('is-open') && ['ArrowLeft','ArrowRight'].includes(e.key)) {
+    e.preventDefault(); navigateGalleryItem(e.key==='ArrowRight'?1:-1);
+  }
+});
+// Gallery swipes start only OUTSIDE the content viewer. Inside the viewer,
+// one-finger panning and two-finger pinching always belong to the media.
+let gallerySwipe = null;
+els.modal.addEventListener('pointerdown', e => {
+  if (e.pointerType !== 'touch' || !els.modal.classList.contains('is-open')) return;
+  if (els.modalViewer.contains(e.target) || e.target.closest('button,a,input,video,iframe')) return;
+  gallerySwipe = {id:e.pointerId,x:e.clientX,y:e.clientY};
+}, true);
+els.modal.addEventListener('pointerup', e => {
+  if (!gallerySwipe || gallerySwipe.id !== e.pointerId) return;
+  const dx=e.clientX-gallerySwipe.x, dy=e.clientY-gallerySwipe.y;
+  gallerySwipe=null;
+  if (Math.abs(dx)>64 && Math.abs(dx)>Math.abs(dy)*1.35)
+    navigateGalleryItem(dx<0?1:-1);
+}, true);
+els.modal.addEventListener('pointercancel', e => {
+  if (gallerySwipe?.id===e.pointerId) gallerySwipe=null;
+}, true);

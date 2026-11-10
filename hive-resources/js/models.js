@@ -49,6 +49,7 @@ const state = {
 };
 
 const modalPreview = new ModalPreview(els.modalViewer);
+els.modalViewer?.addEventListener("spark-reset-preview", () => modalPreview.resetView());
 const liveCardPreviews = new Map();
 const queuedCards = new Set();
 const loadingCards = new Set();
@@ -632,8 +633,12 @@ async function openModal(it, opts = {}) {
 
   try {
     await modalPreview.open(view);
+    if (state.activePreviewId !== it.modelId ||
+        !els.modal.classList.contains("is-open")) return;
     els.modalLoading.style.display = "none";
   } catch (err) {
+    if (state.activePreviewId !== it.modelId ||
+        !els.modal.classList.contains("is-open")) return;
     console.error(err);
     els.modalLoading.style.display = "flex";
     els.modalLoading.textContent = "FAILED TO LOAD";
@@ -668,6 +673,20 @@ function maybeOpenPreviewFromUrl() {
   openModal(match, { skipUrlUpdate: true });
 }
 
+// Shares keyboard and outside-content swipe navigation with all galleries.
+const registerHiveNavigation = () => {
+  window.SparkGalleryMotion?.registerNavigation({
+  modal:els.modal, viewer:els.modalViewer,
+  getItems:()=>state.filtered,
+  getCurrentId:()=>state.activePreviewId,
+  getItemId:it=>it.modelId,
+  openItem:it=>openModal(it)
+});
+};
+// Deferred classics and modules can initialize in different orders.
+// DOMContentLoaded is guaranteed after the deferred shared script is ready.
+if (window.SparkGalleryMotion?.registerNavigation) registerHiveNavigation();
+else window.addEventListener("DOMContentLoaded",registerHiveNavigation,{once:true});
 els.modalBackdrop.addEventListener("click", () => closeModal());
 els.modalClose.addEventListener("click", () => closeModal());
 window.addEventListener("keydown", (e) => {
@@ -681,16 +700,21 @@ els.search.addEventListener("input", debounce(() => {
   applyFiltersAndRenderGrid();
 }, 120));
 
+let modelLoadSeq=0;
 async function loadDataAndRender() {
+  const mySeq=++modelLoadSeq;
+  const requestedGame=state.game;
   showGridLoading(true);
 
   try {
-    const json = await fetchModels(state.game);
+    const json = await fetchModels(requestedGame);
+    if(mySeq!==modelLoadSeq)return;
     state.data = json;
 
     if (json?.game?.key) state.game = json.game.key;
 
     await loadGameListIfNeeded();
+    if(mySeq!==modelLoadSeq)return;
     renderGameChips();
 
     const groups = json.groups || [];
@@ -718,7 +742,7 @@ async function loadDataAndRender() {
     applyFiltersAndRenderGrid();
     maybeOpenPreviewFromUrl();
   } finally {
-    showGridLoading(false);
+    if(mySeq===modelLoadSeq)showGridLoading(false);
   }
 }
 

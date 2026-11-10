@@ -20,6 +20,20 @@ export async function onRequest(context) {
     return new Response("Missing id", { status: 400 });
   }
 
+  // A ? filename marks an artwork as showcase-only. Block attachment responses.
+  // Inline display is still possible, and public media cannot be made unextractable.
+  if (!inline) {
+    const key=context.env?.GOOGLE_API_KEY || context.env?.DRIVE_API_KEY;
+    if (key) {
+      try {
+        const metadata=await fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(id)+'?fields=name&key='+encodeURIComponent(key));
+        if (metadata.ok) {
+          const data=await metadata.json();
+          if (String(data.name||'').trim().startsWith('?')) return new Response('Showcase-only artwork: downloads disabled',{status:403,headers:{'Cache-Control':'no-store','Access-Control-Allow-Origin':'*'}});
+        }
+      } catch(error) { console.warn('Showcase policy metadata check failed',error); }
+    }
+  }
   let safeName = sanitizeFilename(requestedName);
   // If the caller provided a basename plus ext, enforce it so Safari/iOS doesn't
   // treat this as a generic binary and append ".bin".

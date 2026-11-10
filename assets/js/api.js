@@ -95,8 +95,8 @@ export function fileViewUrl(fileId) {
   return apiUrl(`/api/file?id=${encodeURIComponent(fileId)}&inline=1`);
 }
 
-export async function fetchEditingVideos(sort = "date") {
-  const url = siteApiUrl(`/api/youtube?handle=${encodeURIComponent("@sparkskye")}&sort=${encodeURIComponent(sort || "date")}&typeMode=youtube-tabs-v1`);
+export async function fetchEditingVideos(sort = "date", handle = "@sparkskye") {
+  const url = siteApiUrl(`/api/youtube?handle=${encodeURIComponent(handle)}&sort=${encodeURIComponent(sort || "date")}&typeMode=youtube-tabs-v1`);
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
   return await res.json();
