@@ -66,7 +66,7 @@ export async function onRequest(context) {
   headers.set("Access-Control-Allow-Origin", "*");
   headers.set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
   headers.set("Access-Control-Allow-Headers", "Content-Type, Range");
-  headers.set("Cache-Control", "public, max-age=86400");
+  headers.set("Cache-Control", ext.toLowerCase() === "json" || safeName.toLowerCase().endsWith(".json") ? "no-store" : "public, max-age=86400");
   headers.set("Accept-Ranges", driveRes.headers.get("Accept-Ranges") || "bytes");
   for (const h of ["Content-Length", "Content-Range", "ETag", "Last-Modified"]) {
     const v = driveRes.headers.get(h) || driveRes.headers.get(h.toLowerCase());
