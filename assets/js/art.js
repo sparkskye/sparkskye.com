@@ -751,6 +751,33 @@ window.addEventListener('keydown', e => {
     e.preventDefault(); e.stopImmediatePropagation(); exitTheater();
   }
 }, true);
+async function addWearableBuyAction(it) {
+  if (itemKind(it) !== "cape" || !it.animationMetadataUrl) return;
+  let metadata;
+  try {
+    const response = await fetch(it.animationMetadataUrl);
+    if (!response.ok) return;
+    metadata = await response.json();
+  } catch (error) {
+    console.warn("Cape purchase metadata unavailable", error);
+    return;
+  }
+  if (currentGalleryItem !== it || !els.modal.classList.contains("is-open")) return;
+  const raw = typeof metadata?.buy === "string" ? metadata.buy.trim() : "";
+  let url;
+  try {
+    url = new URL(raw);
+    if (url.protocol !== "https:" || !url.hostname || url.username || url.password) return;
+  } catch { return; }
+  const button = document.createElement("a");
+  button.className = "btn";
+  button.href = url.href;
+  button.target = "_blank";
+  button.rel = "noopener noreferrer";
+  button.textContent = "BUY";
+  const copy = Array.from(els.modalActions.children).find(el => el.textContent === "COPY LINK");
+  els.modalActions.insertBefore(button, copy || null);
+}
 function openModal(it, opts = {}) {
   clearTimeout(modalCloseTimer);
   els.modal.classList.remove('is-closing');
@@ -804,6 +831,7 @@ function openModal(it, opts = {}) {
     setTimeout(() => (copyButton.textContent = "COPY LINK"), 900);
   });
   els.modalActions.appendChild(copyButton);
+  if (itemKind(it) === "cape") void addWearableBuyAction(it);
 }
 
 function closeModal(opts = {}) {
