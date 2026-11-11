@@ -755,7 +755,9 @@ async function addWearableBuyAction(it) {
   if (itemKind(it) !== "cape" || !it.animationMetadataUrl) return;
   let metadata;
   try {
-    const response = await fetch(it.animationMetadataUrl);
+    const metadataUrl = new URL(it.animationMetadataUrl, window.location.href);
+    metadataUrl.searchParams.set("_metadata_refresh", String(Date.now()));
+    const response = await fetch(metadataUrl.href, { cache: "no-store" });
     if (!response.ok) return;
     metadata = await response.json();
   } catch (error) {
